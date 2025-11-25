@@ -1,1 +1,1 @@
-// Chisel plugin is optional for basic compilation
+// Chisel 3.x 不需要 SBT 插件

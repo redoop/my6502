@@ -1,6 +1,6 @@
 name := "chisel-6502"
 version := "0.1.0"
-scalaVersion := "2.13.12"
+scalaVersion := "2.12.17"
 
 // 使用阿里云镜像
 resolvers ++= Seq(
@@ -10,16 +10,15 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-  "org.chipsalliance" %% "chisel" % "5.1.0",
-  "edu.berkeley.cs" %% "chiseltest" % "5.0.2" % "test"
+  "edu.berkeley.cs" %% "chisel3" % "3.5.6",
+  "edu.berkeley.cs" %% "chiseltest" % "0.5.6" % "test"
 )
 
 scalacOptions ++= Seq(
   "-deprecation",
   "-feature",
   "-unchecked",
-  "-language:reflectiveCalls",
-  "-Ymacro-annotations"
+  "-language:reflectiveCalls"
 )
 
-addCompilerPlugin("org.chipsalliance" % "chisel-plugin_2.13.12" % "5.1.0")
+addCompilerPlugin("edu.berkeley.cs" % "chisel3-plugin" % "3.5.6" cross CrossVersion.full)

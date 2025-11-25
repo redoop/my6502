@@ -3,7 +3,7 @@ package cpu6502
 import chisel3._
 
 // 顶层模块：连接 CPU 和内存
-class Top extends Module {
+class MyCpu6502 extends Module {
   val io = IO(new Bundle {
     val debug = Output(new DebugBundle)
   })
@@ -23,6 +23,9 @@ class Top extends Module {
 }
 
 // 生成 Verilog
-object Top extends App {
-  emitVerilog(new Top, Array("--target-dir", "generated"))
+object MyCpu6502 extends App {
+  (new chisel3.stage.ChiselStage).emitVerilog(
+    new MyCpu6502,
+    Array("--target-dir", "generated")
+  )
 }
