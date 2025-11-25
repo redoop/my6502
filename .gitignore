@@ -15,11 +15,12 @@ project/project/
 *~
 
 # Chisel
-generated/
 test_run_dir/
 *.fir
-*.v
 *.anno.json
+
+# 保留生成的 Verilog 文件
+# generated/*.v 文件会被提交
 
 # OS
 .DS_Store
