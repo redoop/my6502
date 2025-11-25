@@ -1,0 +1,26 @@
+# SBT
+target/
+project/target/
+project/project/
+
+# Scala
+*.class
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Chisel
+generated/
+test_run_dir/
+*.fir
+*.v
+*.anno.json
+
+# OS
+.DS_Store
+Thumbs.db

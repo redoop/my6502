@@ -1,0 +1,9 @@
+[repositories]
+  local
+  aliyun-maven: https://maven.aliyun.com/repository/public/
+  aliyun-central: https://maven.aliyun.com/repository/central/
+  aliyun-jcenter: https://maven.aliyun.com/repository/jcenter/
+  aliyun-google: https://maven.aliyun.com/repository/google/
+  aliyun-gradle-plugin: https://maven.aliyun.com/repository/gradle-plugin/
+  maven-central
+  typesafe-ivy-releases: https://repo.typesafe.com/typesafe/ivy-releases/, [organization]/[module]/[revision]/[type]s/[artifact](-[classifier]).[ext], bootOnly
