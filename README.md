@@ -6,6 +6,11 @@
 
 MOS 6502 是由 MOS Technology 在 1975 年设计的 8 位微处理器，是计算机历史上最具影响力的处理器之一。
 
+<div align="center">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/MOS_6502AD_4585_top.jpg/600px-MOS_6502AD_4585_top.jpg" alt="MOS 6502 芯片" width="400"/>
+  <p><i>MOS 6502 微处理器芯片</i></p>
+</div>
+
 ### 历史背景
 
 - **发布时间**: 1975 年
