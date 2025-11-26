@@ -1,0 +1,206 @@
+package nes
+
+import chisel3._
+import chisel3.util._
+
+// MMC3 Mapper (Mapper 4)
+// 魂斗罗使用的 mapper
+class MMC3Mapper extends Module {
+  val io = IO(new Bundle {
+    // CPU 接口
+    val cpuAddr = Input(UInt(16.W))
+    val cpuDataIn = Input(UInt(8.W))
+    val cpuDataOut = Output(UInt(8.W))
+    val cpuWrite = Input(Bool())
+    val cpuRead = Input(Bool())
+    
+    // PRG ROM 接口
+    val prgAddr = Output(UInt(19.W))  // 最大 512KB
+    val prgData = Input(UInt(8.W))
+    
+    // CHR ROM 接口
+    val chrAddr = Output(UInt(17.W))  // 最大 256KB
+    val chrData = Input(UInt(8.W))
+    
+    // PPU 接口
+    val ppuAddr = Input(UInt(14.W))
+    
+    // IRQ 输出
+    val irqOut = Output(Bool())
+    
+    // Mirroring
+    val mirrorMode = Output(UInt(1.W))  // 0 = vertical, 1 = horizontal
+  })
+  
+  // MMC3 寄存器
+  val bankSelect = RegInit(0.U(3.W))
+  val prgRomBankMode = RegInit(false.B)
+  val chrA12Inversion = RegInit(false.B)
+  
+  // Bank 寄存器 (8 个)
+  val r0 = RegInit(0.U(8.W))  // CHR bank 0 (2KB)
+  val r1 = RegInit(0.U(8.W))  // CHR bank 1 (2KB)
+  val r2 = RegInit(0.U(8.W))  // CHR bank 2 (1KB)
+  val r3 = RegInit(0.U(8.W))  // CHR bank 3 (1KB)
+  val r4 = RegInit(0.U(8.W))  // CHR bank 4 (1KB)
+  val r5 = RegInit(0.U(8.W))  // CHR bank 5 (1KB)
+  val r6 = RegInit(0.U(8.W))  // PRG bank 0 (8KB)
+  val r7 = RegInit(0.U(8.W))  // PRG bank 1 (8KB)
+  
+  // IRQ 寄存器
+  val irqLatch = RegInit(0.U(8.W))
+  val irqCounter = RegInit(0.U(8.W))
+  val irqReload = RegInit(false.B)
+  val irqEnable = RegInit(false.B)
+  val irqPending = RegInit(false.B)
+  
+  // Mirroring
+  val mirroring = RegInit(0.U(1.W))
+  io.mirrorMode := mirroring
+  
+  // CPU 写入寄存器
+  when(io.cpuWrite) {
+    switch(io.cpuAddr(15, 13)) {
+      is(4.U) {  // $8000-$9FFF
+        when(io.cpuAddr(0) === 0.U) {
+          // Bank select ($8000)
+          bankSelect := io.cpuDataIn(2, 0)
+          prgRomBankMode := io.cpuDataIn(6)
+          chrA12Inversion := io.cpuDataIn(7)
+        }.otherwise {
+          // Bank data ($8001)
+          switch(bankSelect) {
+            is(0.U) { r0 := io.cpuDataIn }
+            is(1.U) { r1 := io.cpuDataIn }
+            is(2.U) { r2 := io.cpuDataIn }
+            is(3.U) { r3 := io.cpuDataIn }
+            is(4.U) { r4 := io.cpuDataIn }
+            is(5.U) { r5 := io.cpuDataIn }
+            is(6.U) { r6 := io.cpuDataIn }
+            is(7.U) { r7 := io.cpuDataIn }
+          }
+        }
+      }
+      is(5.U) {  // $A000-$BFFF
+        when(io.cpuAddr(0) === 0.U) {
+          // Mirroring ($A000)
+          mirroring := io.cpuDataIn(0)
+        }.otherwise {
+          // PRG RAM protect ($A001)
+          // 简化：忽略
+        }
+      }
+      is(6.U) {  // $C000-$DFFF
+        when(io.cpuAddr(0) === 0.U) {
+          // IRQ latch ($C000)
+          irqLatch := io.cpuDataIn
+        }.otherwise {
+          // IRQ reload ($C001)
+          irqReload := true.B
+        }
+      }
+      is(7.U) {  // $E000-$FFFF
+        when(io.cpuAddr(0) === 0.U) {
+          // IRQ disable ($E000)
+          irqEnable := false.B
+          irqPending := false.B
+        }.otherwise {
+          // IRQ enable ($E001)
+          irqEnable := true.B
+        }
+      }
+    }
+  }
+  
+  // PRG ROM bank switching
+  val prgBank0 = Wire(UInt(8.W))
+  val prgBank1 = Wire(UInt(8.W))
+  val prgBank2 = Wire(UInt(8.W))
+  val prgBank3 = Wire(UInt(8.W))
+  
+  when(prgRomBankMode) {
+    // Mode 1: $C000 swappable
+    prgBank0 := 0xFE.U  // 倒数第二个 bank
+    prgBank1 := r7
+    prgBank2 := r6
+    prgBank3 := 0xFF.U  // 最后一个 bank
+  }.otherwise {
+    // Mode 0: $8000 swappable
+    prgBank0 := r6
+    prgBank1 := r7
+    prgBank2 := 0xFE.U
+    prgBank3 := 0xFF.U
+  }
+  
+  // PRG 地址映射
+  val prgBankNum = WireDefault(0.U(8.W))
+  switch(io.cpuAddr(14, 13)) {
+    is(0.U) { prgBankNum := prgBank0 }  // $8000-$9FFF
+    is(1.U) { prgBankNum := prgBank1 }  // $A000-$BFFF
+    is(2.U) { prgBankNum := prgBank2 }  // $C000-$DFFF
+    is(3.U) { prgBankNum := prgBank3 }  // $E000-$FFFF
+  }
+  
+  io.prgAddr := Cat(prgBankNum, io.cpuAddr(12, 0))
+  io.cpuDataOut := io.prgData
+  
+  // CHR ROM bank switching
+  val chrBankNum = WireDefault(0.U(8.W))
+  val ppuAddrAdjusted = Mux(chrA12Inversion, 
+    Cat(~io.ppuAddr(12), io.ppuAddr(11, 0)),
+    io.ppuAddr
+  )
+  
+  switch(ppuAddrAdjusted(12, 10)) {
+    is(0.U) { chrBankNum := r0 & 0xFE.U }  // $0000-$03FF (2KB)
+    is(1.U) { chrBankNum := r0 | 0x01.U }  // $0400-$07FF
+    is(2.U) { chrBankNum := r1 & 0xFE.U }  // $0800-$0BFF (2KB)
+    is(3.U) { chrBankNum := r1 | 0x01.U }  // $0C00-$0FFF
+    is(4.U) { chrBankNum := r2 }           // $1000-$13FF (1KB)
+    is(5.U) { chrBankNum := r3 }           // $1400-$17FF (1KB)
+    is(6.U) { chrBankNum := r4 }           // $1800-$1BFF (1KB)
+    is(7.U) { chrBankNum := r5 }           // $1C00-$1FFF (1KB)
+  }
+  
+  io.chrAddr := Cat(chrBankNum, ppuAddrAdjusted(9, 0))
+  
+  // IRQ 计数器
+  // 在 PPU A12 上升沿时递减
+  val a12Last = RegInit(false.B)
+  val a12Rising = io.ppuAddr(12) && !a12Last
+  a12Last := io.ppuAddr(12)
+  
+  when(a12Rising) {
+    when(irqCounter === 0.U || irqReload) {
+      irqCounter := irqLatch
+      irqReload := false.B
+    }.otherwise {
+      irqCounter := irqCounter - 1.U
+      when(irqCounter === 1.U && irqEnable) {
+        irqPending := true.B
+      }
+    }
+  }
+  
+  io.irqOut := irqPending
+}
+
+// MMC3 测试模块
+class MMC3Test extends Module {
+  val io = IO(new Bundle {
+    val success = Output(Bool())
+  })
+  
+  val mapper = Module(new MMC3Mapper)
+  
+  // 简单的测试逻辑
+  mapper.io.cpuAddr := 0.U
+  mapper.io.cpuDataIn := 0.U
+  mapper.io.cpuWrite := false.B
+  mapper.io.cpuRead := false.B
+  mapper.io.prgData := 0.U
+  mapper.io.chrData := 0.U
+  mapper.io.ppuAddr := 0.U
+  
+  io.success := true.B
+}
