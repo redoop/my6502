@@ -16,6 +16,10 @@
   - 实施步骤规划
 
 #### 对比分析
+- **[晶体管分析](./TRANSISTOR_ANALYSIS.md)** 🔬
+  - 与原版 MOS 6502 晶体管数量对比
+  - FPGA 资源估算
+  - 性能效率分析
 - **[前后对比](./Before-After-Comparison.md)**
   - 代码结构对比
   - 实际使用场景对比
