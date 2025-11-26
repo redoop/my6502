@@ -13,14 +13,15 @@ class CPU6502Core extends Module {
     val memWrite   = Output(Bool())
     val memRead    = Output(Bool())
     val debug      = Output(new DebugBundle)
+    val reset      = Input(Bool())  // Reset 信号
   })
 
   // 寄存器
   val regs = RegInit(Registers.default())
   
   // CPU 状态机
-  val sFetch :: sExecute :: sDone :: Nil = Enum(3)
-  val state = RegInit(sFetch)
+  val sReset :: sFetch :: sExecute :: sDone :: Nil = Enum(4)
+  val state = RegInit(sReset)
   
   val opcode  = RegInit(0.U(8.W))
   val operand = RegInit(0.U(16.W))
@@ -36,8 +37,31 @@ class CPU6502Core extends Module {
   val execResult = Wire(new ExecutionResult)
   execResult := ExecutionResult.hold(regs, operand)
 
+  // Reset 处理
+  when(io.reset) {
+    state := sReset
+    cycle := 0.U
+  }
+
   // 状态机
   switch(state) {
+    is(sReset) {
+      // Reset 序列: 读取 Reset Vector ($FFFC-$FFFD)
+      when(cycle === 0.U) {
+        io.memAddr := 0xFFFC.U
+        io.memRead := true.B
+        operand := io.memDataIn  // 低字节
+        cycle := 1.U
+      }.elsewhen(cycle === 1.U) {
+        io.memAddr := 0xFFFD.U
+        io.memRead := true.B
+        val resetVector = Cat(io.memDataIn, operand(7, 0))
+        regs.pc := resetVector
+        cycle := 0.U
+        state := sFetch
+      }
+    }
+    
     is(sFetch) {
       io.memAddr := regs.pc
       io.memRead := true.B

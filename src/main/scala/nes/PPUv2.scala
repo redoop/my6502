@@ -3,7 +3,7 @@ package nes
 import chisel3._
 import chisel3.util._
 
-// PPU v2 - 带渲染功能
+// PPU v2 - 完整的渲染管线
 class PPUv2 extends Module {
   val io = IO(new Bundle {
     // CPU 接口
@@ -12,6 +12,10 @@ class PPUv2 extends Module {
     val cpuDataOut = Output(UInt(8.W))
     val cpuWrite = Input(Bool())
     val cpuRead = Input(Bool())
+    
+    // CHR ROM 接口
+    val chrAddr = Output(UInt(14.W))
+    val chrData = Input(UInt(8.W))
     
     // 视频输出
     val pixelX = Output(UInt(9.W))
@@ -22,54 +26,45 @@ class PPUv2 extends Module {
     
     // NMI 输出
     val nmiOut = Output(Bool())
-    
-    // CHR ROM 接口 (用于 pattern tables)
-    val chrAddr = Output(UInt(13.W))
-    val chrData = Input(UInt(8.W))
   })
-
-  // 默认输出
-  io.chrAddr := 0.U
 
   // PPU 寄存器
   val ppuCtrl = RegInit(0.U(8.W))
   val ppuMask = RegInit(0.U(8.W))
-  val ppuStatus = RegInit(0.U(8.W))
+  val ppuStatus = RegInit(0x80.U(8.W))  // VBlank 初始为 1
   val oamAddr = RegInit(0.U(8.W))
-  
-  // 滚动寄存器
-  val scrollX = RegInit(0.U(8.W))
-  val scrollY = RegInit(0.U(8.W))
-  val scrollLatch = RegInit(false.B)
-  
-  // 地址寄存器
-  val ppuAddrHi = RegInit(0.U(8.W))
-  val ppuAddrLo = RegInit(0.U(8.W))
+  val ppuScrollX = RegInit(0.U(8.W))
+  val ppuScrollY = RegInit(0.U(8.W))
   val ppuAddrLatch = RegInit(false.B)
-  val ppuAddr = Cat(ppuAddrHi, ppuAddrLo)  // 16 位地址
+  val ppuAddrReg = RegInit(0.U(14.W))
+  val ppuDataBuffer = RegInit(0.U(8.W))
   
-  // 内部 RAM
-  val vram = SyncReadMem(2048, UInt(8.W))      // 2KB VRAM
-  val oam = SyncReadMem(256, UInt(8.W))        // 256B OAM
-  val palette = SyncReadMem(32, UInt(8.W))     // 32B palette
+  // 内部存储
+  val vram = SyncReadMem(2048, UInt(8.W))  // Nametables
+  val oam = SyncReadMem(256, UInt(8.W))    // Sprite OAM
+  val palette = SyncReadMem(32, UInt(8.W)) // Palette RAM
   
-  // 读缓冲区 (PPU 读取延迟)
-  val readBuffer = RegInit(0.U(8.W))
+  // 初始化调色板为默认值
+  val paletteInit = RegInit(false.B)
+  val paletteInitAddr = RegInit(0.U(5.W))
+  when(!paletteInit) {
+    palette.write(paletteInitAddr, 0x0F.U)  // 默认黑色
+    paletteInitAddr := paletteInitAddr + 1.U
+    when(paletteInitAddr === 31.U) {
+      paletteInit := true.B
+    }
+  }
   
   // 扫描计数器
   val scanlineX = RegInit(0.U(9.W))
   val scanlineY = RegInit(0.U(9.W))
   
-  // 标志
+  // VBlank 和 NMI
   val vblankFlag = RegInit(false.B)
-  val sprite0Hit = RegInit(false.B)
-  val spriteOverflow = RegInit(false.B)
   val nmiOccurred = RegInit(false.B)
+  val suppressNMI = RegInit(false.B)
   
-  // 渲染使能
-  val renderingEnabled = ppuMask(3) || ppuMask(4)  // 显示背景或精灵
-  
-  // 扫描线计数
+  // 扫描线时序
   scanlineX := scanlineX + 1.U
   when(scanlineX === 340.U) {
     scanlineX := 0.U
@@ -83,51 +78,22 @@ class PPUv2 extends Module {
   // VBlank 控制
   when(scanlineY === 241.U && scanlineX === 1.U) {
     vblankFlag := true.B
-    when(ppuCtrl(7)) {  // NMI enable
+    ppuStatus := ppuStatus | 0x80.U
+    when(ppuCtrl(7) && !suppressNMI) {
       nmiOccurred := true.B
     }
+    suppressNMI := false.B
   }
   
   when(scanlineY === 261.U && scanlineX === 1.U) {
     vblankFlag := false.B
-    sprite0Hit := false.B
-    spriteOverflow := false.B
+    ppuStatus := ppuStatus & 0x7F.U
     nmiOccurred := false.B
   }
   
-  // 渲染逻辑
+  // 渲染使能
+  val renderingEnabled = ppuMask(3) || ppuMask(4)  // Show background or sprites
   val inVisibleArea = scanlineX < 256.U && scanlineY < 240.U
-  val pixelColor = WireDefault(0.U(6.W))
-  
-  when(inVisibleArea && renderingEnabled) {
-    // 简化的渲染：从 VRAM 读取
-    // 实际应该使用 PPURenderPipeline
-    
-    // 计算 tile 坐标
-    val tileX = (scanlineX + scrollX) >> 3
-    val tileY = (scanlineY + scrollY) >> 3
-    val fineX = (scanlineX + scrollX)(2, 0)
-    val fineY = (scanlineY + scrollY)(2, 0)
-    
-    // Nametable 地址
-    val nametableBase = Mux(ppuCtrl(0), 0x2400.U, 0x2000.U)
-    val nametableAddr = nametableBase + (tileY << 5) + tileX
-    
-    // 读取 tile 索引 (简化)
-    val tileIndex = vram.read(nametableAddr(10, 0))
-    
-    // Pattern table 地址
-    val patternBase = Mux(ppuCtrl(4), 0x1000.U, 0x0000.U)
-    io.chrAddr := patternBase + (tileIndex << 4) + fineY
-    
-    // 从 CHR ROM 读取 pattern data
-    val patternData = io.chrData
-    val pixelBit = 7.U - fineX
-    val pixel = (patternData >> pixelBit)(0)
-    
-    // 查找调色板 (简化)
-    pixelColor := Mux(pixel, 0x30.U, 0x0F.U)  // 白色或黑色
-  }
   
   // CPU 寄存器访问
   io.cpuDataOut := 0.U
@@ -135,33 +101,42 @@ class PPUv2 extends Module {
   when(io.cpuRead) {
     switch(io.cpuAddr) {
       is(0x2.U) {  // PPUSTATUS
-        io.cpuDataOut := Cat(
-          vblankFlag,
-          sprite0Hit,
-          spriteOverflow,
-          0.U(5.W)
-        )
+        io.cpuDataOut := ppuStatus
+        // 读取后清除 VBlank 标志
+        ppuStatus := ppuStatus & 0x7F.U
         vblankFlag := false.B
-        nmiOccurred := false.B
         ppuAddrLatch := false.B
-        scrollLatch := false.B
+        // 如果在 VBlank 开始时读取，抑制 NMI
+        when(scanlineY === 241.U && scanlineX <= 1.U) {
+          suppressNMI := true.B
+          nmiOccurred := false.B
+        }
       }
       is(0x4.U) {  // OAMDATA
         io.cpuDataOut := oam.read(oamAddr)
       }
       is(0x7.U) {  // PPUDATA
-        when(ppuAddr < 0x3F00.U) {
+        val addr = ppuAddrReg
+        when(addr < 0x3F00.U) {
           // VRAM 读取有延迟
-          io.cpuDataOut := readBuffer
-          readBuffer := vram.read(ppuAddr(10, 0))
+          io.cpuDataOut := ppuDataBuffer
+          when(addr < 0x2000.U) {
+            // CHR ROM
+            ppuDataBuffer := io.chrData
+          }.otherwise {
+            // Nametable
+            ppuDataBuffer := vram.read(addr(10, 0))
+          }
         }.otherwise {
-          // 调色板读取无延迟
-          io.cpuDataOut := palette.read(ppuAddr(4, 0))
+          // Palette 读取无延迟
+          val paletteAddr = addr(4, 0)
+          io.cpuDataOut := palette.read(paletteAddr)
+          // 但仍然更新缓冲区
+          ppuDataBuffer := vram.read(addr(10, 0))
         }
-        // 地址自增
+        // 自动递增地址
         val increment = Mux(ppuCtrl(2), 32.U, 1.U)
-        ppuAddrHi := ((ppuAddr + increment) >> 8)(7, 0)
-        ppuAddrLo := (ppuAddr + increment)(7, 0)
+        ppuAddrReg := (ppuAddrReg + increment) & 0x3FFF.U
       }
     }
   }
@@ -170,6 +145,10 @@ class PPUv2 extends Module {
     switch(io.cpuAddr) {
       is(0x0.U) {  // PPUCTRL
         ppuCtrl := io.cpuDataIn
+        // 如果在 VBlank 期间启用 NMI
+        when(io.cpuDataIn(7) && vblankFlag) {
+          nmiOccurred := true.B
+        }
       }
       is(0x1.U) {  // PPUMASK
         ppuMask := io.cpuDataIn
@@ -182,44 +161,78 @@ class PPUv2 extends Module {
         oamAddr := oamAddr + 1.U
       }
       is(0x5.U) {  // PPUSCROLL
-        when(!scrollLatch) {
-          scrollX := io.cpuDataIn
+        when(!ppuAddrLatch) {
+          ppuScrollX := io.cpuDataIn
         }.otherwise {
-          scrollY := io.cpuDataIn
+          ppuScrollY := io.cpuDataIn
         }
-        scrollLatch := !scrollLatch
+        ppuAddrLatch := !ppuAddrLatch
       }
       is(0x6.U) {  // PPUADDR
         when(!ppuAddrLatch) {
-          ppuAddrHi := io.cpuDataIn
+          ppuAddrReg := Cat(io.cpuDataIn(5, 0), 0.U(8.W))
         }.otherwise {
-          ppuAddrLo := io.cpuDataIn
+          ppuAddrReg := Cat(ppuAddrReg(13, 8), io.cpuDataIn)
         }
         ppuAddrLatch := !ppuAddrLatch
       }
       is(0x7.U) {  // PPUDATA
-        when(ppuAddr < 0x2000.U) {
-          // CHR RAM 写入 (如果有)
-        }.elsewhen(ppuAddr < 0x3F00.U) {
-          // VRAM 写入
-          vram.write(ppuAddr(10, 0), io.cpuDataIn)
+        val addr = ppuAddrReg
+        when(addr < 0x2000.U) {
+          // CHR ROM (通常只读，但某些游戏使用 CHR RAM)
+          // 这里不处理
+        }.elsewhen(addr < 0x3F00.U) {
+          // Nametable
+          vram.write(addr(10, 0), io.cpuDataIn)
         }.otherwise {
-          // 调色板写入
-          palette.write(ppuAddr(4, 0), io.cpuDataIn)
+          // Palette
+          val paletteAddr = addr(4, 0)
+          // 处理镜像: $3F10/$3F14/$3F18/$3F1C 镜像到 $3F00/$3F04/$3F08/$3F0C
+          val actualAddr = Mux(paletteAddr(1, 0) === 0.U && paletteAddr(4),
+            paletteAddr & 0x0F.U,
+            paletteAddr
+          )
+          palette.write(actualAddr, io.cpuDataIn & 0x3F.U)
         }
-        // 地址自增
+        // 自动递增地址
         val increment = Mux(ppuCtrl(2), 32.U, 1.U)
-        ppuAddrHi := ((ppuAddr + increment) >> 8)(7, 0)
-        ppuAddrLo := (ppuAddr + increment)(7, 0)
+        ppuAddrReg := (ppuAddrReg + increment) & 0x3FFF.U
       }
     }
   }
   
+  // 简化的背景渲染
+  val tileX = (scanlineX + ppuScrollX) >> 3
+  val tileY = (scanlineY + ppuScrollY) >> 3
+  val fineX = (scanlineX + ppuScrollX)(2, 0)
+  val fineY = (scanlineY + ppuScrollY)(2, 0)
+  
+  // Nametable 地址
+  val nametableBase = Mux(ppuCtrl(0), 0x0400.U, 0x0000.U)
+  val nametableAddr = nametableBase + (tileY(4, 0) << 5) + tileX(4, 0)
+  
+  // 读取 tile 索引
+  val tileIndex = vram.read(nametableAddr)
+  
+  // Pattern table 地址
+  val patternTableBase = Mux(ppuCtrl(4), 0x1000.U, 0x0000.U)
+  val patternAddr = patternTableBase + (tileIndex << 4) + fineY
+  io.chrAddr := patternAddr
+  
+  // 简化的像素输出
+  val pixelData = io.chrData
+  val pixelBit = 7.U - fineX
+  val pixelValue = (pixelData >> pixelBit)(0)
+  
+  // 调色板查找
+  val paletteIndex = Mux(pixelValue === 0.U, 0.U, 1.U)
+  val paletteColor = palette.read(paletteIndex)
+  
   // 输出
   io.pixelX := scanlineX
   io.pixelY := scanlineY
-  io.pixelColor := pixelColor
+  io.pixelColor := Mux(inVisibleArea && renderingEnabled, paletteColor, 0x0F.U)
   io.vblank := vblankFlag
-  io.rendering := inVisibleArea && renderingEnabled
+  io.rendering := renderingEnabled && inVisibleArea
   io.nmiOut := nmiOccurred
 }

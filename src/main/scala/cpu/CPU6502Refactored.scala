@@ -13,6 +13,7 @@ class CPU6502Refactored extends Module {
     val memWrite   = Output(Bool())
     val memRead    = Output(Bool())
     val debug      = Output(new DebugBundle)
+    val reset      = Input(Bool())  // Reset 信号
   })
 
   val core = Module(new CPU6502Core)
@@ -23,6 +24,7 @@ class CPU6502Refactored extends Module {
   io.memWrite   := core.io.memWrite
   io.memRead    := core.io.memRead
   io.debug      := core.io.debug
+  core.io.reset := io.reset
 }
 
 object CPU6502Refactored extends App {

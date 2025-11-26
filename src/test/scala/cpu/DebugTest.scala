@@ -5,8 +5,8 @@ import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
 
 class DebugTest extends AnyFlatSpec with ChiselScalatestTester {
-  "CPU6502" should "debug INX" in {
-    test(new CPU6502) { dut =>
+  "CPU6502Refactored" should "debug INX" in {
+    test(new CPU6502Refactored) { dut =>
       println("=== Initial State ===")
       println(s"PC: ${dut.io.debug.regPC.peek()}")
       println(s"X: ${dut.io.debug.regX.peek()}")

@@ -2,7 +2,8 @@ package nes
 
 import chisel3._
 import chisel3.util._
-import cpu6502._
+import cpu6502.CPU6502Refactored
+import cpu6502.core.DebugBundle
 
 // NES 系统 v2 - 带 MMC3 和改进的 PPU
 class NESSystemv2 extends Module {
@@ -32,9 +33,17 @@ class NESSystemv2 extends Module {
   })
 
   // 实例化组件
-  val cpu = Module(new CPU6502)
+  val cpu = Module(new CPU6502Refactored)
   val ppu = Module(new PPUv2)
   val mapper = Module(new MMC3Mapper)
+  
+  // Reset 控制
+  val resetCounter = RegInit(10.U(4.W))
+  val cpuReset = resetCounter =/= 0.U
+  when(resetCounter =/= 0.U) {
+    resetCounter := resetCounter - 1.U
+  }
+  cpu.io.reset := cpuReset
   
   // PRG ROM (512KB 最大)
   val prgROM = SyncReadMem(524288, UInt(8.W))

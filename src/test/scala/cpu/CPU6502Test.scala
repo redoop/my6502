@@ -6,8 +6,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 
 class CPU6502Test extends AnyFlatSpec with ChiselScalatestTester {
   
-  "CPU6502" should "execute LDA immediate" in {
-    test(new CPU6502) { dut =>
+  "CPU6502Refactored" should "execute LDA immediate" in {
+    test(new CPU6502Refactored) { dut =>
       // 模拟内存：LDA #$42
       dut.io.memDataIn.poke(0xA9.U)  // LDA Immediate
       dut.clock.step(1)
@@ -22,7 +22,7 @@ class CPU6502Test extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   it should "execute ADC and set carry flag" in {
-    test(new CPU6502) { dut =>
+    test(new CPU6502Refactored) { dut =>
       // LDA #$FF
       dut.io.memDataIn.poke(0xA9.U)
       dut.clock.step(1)
@@ -41,7 +41,7 @@ class CPU6502Test extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   it should "execute INX" in {
-    test(new CPU6502) { dut =>
+    test(new CPU6502Refactored) { dut =>
       // LDX #$10
       dut.io.memDataIn.poke(0xA2.U)
       dut.clock.step(1)
@@ -59,7 +59,7 @@ class CPU6502Test extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   it should "execute transfer instructions" in {
-    test(new CPU6502) { dut =>
+    test(new CPU6502Refactored) { dut =>
       // LDA #$55
       dut.io.memDataIn.poke(0xA9.U)
       dut.clock.step(1)
@@ -85,7 +85,7 @@ class CPU6502Test extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   it should "execute branch instructions" in {
-    test(new CPU6502) { dut =>
+    test(new CPU6502Refactored) { dut =>
       // LDA #$00 (设置 Z 标志)
       dut.io.memDataIn.poke(0xA9.U)
       dut.clock.step(1)

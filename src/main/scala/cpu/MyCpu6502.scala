@@ -1,6 +1,7 @@
 package cpu6502
 
 import chisel3._
+import cpu6502.core.DebugBundle
 
 // 顶层模块：连接 CPU 和内存
 class MyCpu6502 extends Module {
@@ -8,7 +9,7 @@ class MyCpu6502 extends Module {
     val debug = Output(new DebugBundle)
   })
 
-  val cpu = Module(new CPU6502)
+  val cpu = Module(new CPU6502Refactored)
   val mem = Module(new Memory())
 
   // 连接 CPU 和内存

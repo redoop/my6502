@@ -30,8 +30,8 @@ object BranchInstructions {
     
     // 计算新 PC
     val offset = memDataIn.asSInt
-    val nextPC = regs.pc + 1.U
-    newRegs.pc := Mux(takeBranch, (nextPC.asSInt + offset).asUInt, nextPC)
+    // regs.pc 已经指向操作数的下一个字节，所以直接加偏移
+    newRegs.pc := Mux(takeBranch, (regs.pc.asSInt + offset).asUInt, regs.pc)
     
     result.done := true.B
     result.nextCycle := 0.U

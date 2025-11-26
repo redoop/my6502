@@ -2,7 +2,8 @@ package nes
 
 import chisel3._
 import chisel3.util._
-import cpu6502._
+import cpu6502.CPU6502Refactored
+import cpu6502.core.DebugBundle
 
 // NES 系统顶层模块
 class NESSystem extends Module {
@@ -27,7 +28,7 @@ class NESSystem extends Module {
   })
 
   // 实例化组件
-  val cpu = Module(new CPU6502)
+  val cpu = Module(new CPU6502Refactored)
   val ppu = Module(new PPU)
   val memory = Module(new MemoryController)
   
