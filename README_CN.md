@@ -116,6 +116,37 @@ MOS 6502 是由 MOS Technology 在 1975 年设计的 8 位微处理器，是计�
 - 📋 **[重构清单](docs/Refactoring-Checklist.md)** - 完成情况追踪
 - 🔄 **[前后对比](docs/Before-After-Comparison.md)** - 重构前后对比分析
 
+**NES 系统文档:**
+- 🎮 **[NES 系统架构](docs/NES_SYSTEM.md)** - 系统设计和组件说明
+- 🕹️ **[运行魂斗罗指南](docs/CONTRA_GUIDE.md)** - 如何在这颗芯片上运行魂斗罗
+- 📝 **[简单 NES 程序](docs/SIMPLE_NES_PROGRAM.md)** - 示例程序和教程
+
+### 🎮 NES 系统 (新增!)
+
+基于 6502 CPU 构建的完整 NES (Nintendo Entertainment System) 系统：
+
+**已完成:**
+- ✅ 基础 PPU (Picture Processing Unit) - 寄存器、VBlank、NMI 中断
+- ✅ 内存控制器 - 完整的 NES 内存映射
+- ✅ 系统集成 - CPU + PPU + Memory
+- ✅ 测试框架 - 所有测试通过
+
+**进行中:**
+- 🚧 PPU 渲染引擎 - 背景和精灵渲染
+- 🚧 MMC3 Mapper - 魂斗罗所需的 bank switching
+
+**计划中:**
+- ⏳ APU (Audio Processing Unit) - 音频处理
+- ⏳ ROM 加载器 - 加载游戏 ROM
+- ⏳ 完整游戏支持 - 运行魂斗罗等经典游戏
+
+```bash
+# 测试 NES 系统
+sbt "testOnly nes.NESSystemTest"
+
+# 生成 NES 系统 Verilog
+sbt "runMain nes.GenerateNESVerilog"
+```
 
 ## 功能特性
 

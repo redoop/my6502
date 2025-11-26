@@ -116,6 +116,38 @@ The 6502 processor was widely used in numerous classic computers and game consol
 - 📋 **[Refactoring Checklist](docs/Refactoring-Checklist.md)** - Progress tracking
 - 🔄 **[Before-After Comparison](docs/Before-After-Comparison.md)** - Refactoring analysis
 
+**NES System Documentation:**
+- 🎮 **[NES System Architecture](docs/NES_SYSTEM.md)** - System design and components
+- 🕹️ **[Contra Guide](docs/CONTRA_GUIDE.md)** - How to run Contra on this chip
+- 📝 **[Simple NES Programs](docs/SIMPLE_NES_PROGRAM.md)** - Example programs and tutorials
+
+### 🎮 NES System (New!)
+
+A complete NES (Nintendo Entertainment System) built on the 6502 CPU:
+
+**Completed:**
+- ✅ Basic PPU (Picture Processing Unit) - Registers, VBlank, NMI interrupts
+- ✅ Memory Controller - Complete NES memory mapping
+- ✅ System Integration - CPU + PPU + Memory
+- ✅ Test Framework - All tests passing
+
+**In Progress:**
+- 🚧 PPU Rendering Engine - Background and sprite rendering
+- 🚧 MMC3 Mapper - Bank switching required for Contra
+
+**Planned:**
+- ⏳ APU (Audio Processing Unit) - Audio processing
+- ⏳ ROM Loader - Load game ROMs
+- ⏳ Full Game Support - Run Contra and other classics
+
+```bash
+# Test NES system
+sbt "testOnly nes.NESSystemTest"
+
+# Generate NES system Verilog
+sbt "runMain nes.GenerateNESVerilog"
+```
+
 ## Features
 
 ### Implemented Instructions

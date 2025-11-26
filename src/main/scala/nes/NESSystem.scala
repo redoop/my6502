@@ -1,0 +1,67 @@
+package nes
+
+import chisel3._
+import chisel3.util._
+import cpu6502._
+
+// NES 系统顶层模块
+class NESSystem extends Module {
+  val io = IO(new Bundle {
+    // 视频输出
+    val pixelX = Output(UInt(9.W))
+    val pixelY = Output(UInt(9.W))
+    val pixelColor = Output(UInt(6.W))
+    val vblank = Output(Bool())
+    
+    // 控制器输入
+    val controller1 = Input(UInt(8.W))
+    val controller2 = Input(UInt(8.W))
+    
+    // 调试接口
+    val debug = Output(new DebugBundle)
+    
+    // ROM 加载接口 (用于测试)
+    val romLoadEn = Input(Bool())
+    val romLoadAddr = Input(UInt(16.W))
+    val romLoadData = Input(UInt(8.W))
+  })
+
+  // 实例化组件
+  val cpu = Module(new CPU6502)
+  val ppu = Module(new PPU)
+  val memory = Module(new MemoryController)
+  
+  // CPU <-> Memory 连接
+  memory.io.cpuAddr := cpu.io.memAddr
+  memory.io.cpuDataIn := cpu.io.memDataOut
+  cpu.io.memDataIn := memory.io.cpuDataOut
+  memory.io.cpuWrite := cpu.io.memWrite
+  memory.io.cpuRead := cpu.io.memRead
+  
+  // Memory <-> PPU 连接
+  ppu.io.cpuAddr := memory.io.ppuAddr
+  ppu.io.cpuDataIn := memory.io.ppuDataIn
+  memory.io.ppuDataOut := ppu.io.cpuDataOut
+  ppu.io.cpuWrite := memory.io.ppuWrite
+  ppu.io.cpuRead := memory.io.ppuRead
+  
+  // 控制器连接
+  memory.io.controller1 := io.controller1
+  memory.io.controller2 := io.controller2
+  
+  // 视频输出
+  io.pixelX := ppu.io.pixelX
+  io.pixelY := ppu.io.pixelY
+  io.pixelColor := ppu.io.pixelColor
+  io.vblank := ppu.io.vblank
+  
+  // 调试输出
+  io.debug := cpu.io.debug
+  
+  // ROM 加载逻辑 (用于测试)
+  // 注意：这是简化的实现，实际应该通过专门的接口
+  when(io.romLoadEn) {
+    // 这里需要访问 memory 内部的 ROM
+    // 实际实现中需要添加专门的加载接口
+  }
+}
