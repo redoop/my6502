@@ -1,0 +1,194 @@
+package cpu6502.core
+
+import chisel3._
+import chisel3.util._
+import cpu6502.instructions._
+
+// 6502 CPU 核心模块 (重构版)
+class CPU6502Core extends Module {
+  val io = IO(new Bundle {
+    val memAddr    = Output(UInt(16.W))
+    val memDataOut = Output(UInt(8.W))
+    val memDataIn  = Input(UInt(8.W))
+    val memWrite   = Output(Bool())
+    val memRead    = Output(Bool())
+    val debug      = Output(new DebugBundle)
+  })
+
+  // 寄存器
+  val regs = RegInit(Registers.default())
+  
+  // CPU 状态机
+  val sFetch :: sExecute :: sDone :: Nil = Enum(3)
+  val state = RegInit(sFetch)
+  
+  val opcode  = RegInit(0.U(8.W))
+  val operand = RegInit(0.U(16.W))
+  val cycle   = RegInit(0.U(3.W))
+
+  // 默认内存接口信号
+  io.memAddr    := regs.pc
+  io.memDataOut := 0.U
+  io.memWrite   := false.B
+  io.memRead    := false.B
+
+  // 指令执行结果
+  val execResult = Wire(new ExecutionResult)
+  execResult := ExecutionResult.hold(regs, operand)
+
+  // 状态机
+  switch(state) {
+    is(sFetch) {
+      io.memAddr := regs.pc
+      io.memRead := true.B
+      opcode := io.memDataIn
+      regs.pc := regs.pc + 1.U
+      cycle := 0.U
+      state := sExecute
+    }
+
+    is(sExecute) {
+      // 根据 opcode 分发到对应指令模块
+      execResult := dispatchInstruction(opcode, cycle, regs, operand, io.memDataIn)
+      
+      // 应用执行结果
+      io.memAddr    := execResult.memAddr
+      io.memDataOut := execResult.memData
+      io.memWrite   := execResult.memWrite
+      io.memRead    := execResult.memRead
+      
+      regs    := execResult.regs
+      operand := execResult.operand
+      cycle   := execResult.nextCycle
+      
+      when(execResult.done) {
+        cycle := 0.U
+        state := sFetch
+      }
+    }
+
+    is(sDone) {
+      // 保持状态
+    }
+  }
+
+  // 调试输出
+  io.debug := DebugBundle.fromRegisters(regs, opcode)
+
+  // 指令分发器
+  def dispatchInstruction(
+    opcode: UInt, 
+    cycle: UInt, 
+    regs: Registers, 
+    operand: UInt, 
+    memDataIn: UInt
+  ): ExecutionResult = {
+    val result = Wire(new ExecutionResult)
+    result := ExecutionResult.hold(regs, operand)
+    
+    switch(opcode) {
+      // ========== Flag 指令 ==========
+      is(0x18.U, 0x38.U, 0xD8.U, 0xF8.U, 0x58.U, 0x78.U, 0xB8.U, 0xEA.U) {
+        result := FlagInstructions.execute(opcode, regs)
+      }
+      
+      // ========== Transfer 指令 ==========
+      is(0xAA.U, 0xA8.U, 0x8A.U, 0x98.U, 0xBA.U, 0x9A.U) {
+        result := TransferInstructions.execute(opcode, regs)
+      }
+      
+      // ========== Arithmetic 隐含寻址 ==========
+      is(0xE8.U, 0xC8.U, 0xCA.U, 0x88.U, 0x1A.U, 0x3A.U) {
+        result := ArithmeticInstructions.executeImplied(opcode, regs)
+      }
+      
+      // ========== Arithmetic 立即寻址 ==========
+      is(0x69.U) { result := ArithmeticInstructions.executeADCImmediate(regs, memDataIn) }
+      is(0xE9.U) { result := ArithmeticInstructions.executeSBCImmediate(regs, memDataIn) }
+      
+      // ========== Arithmetic 零页 ==========
+      is(0xE6.U, 0xC6.U) {
+        result := ArithmeticInstructions.executeZeroPage(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Logic 立即寻址 ==========
+      is(0x29.U, 0x09.U, 0x49.U) {
+        result := LogicInstructions.executeImmediate(opcode, regs, memDataIn)
+      }
+      
+      // ========== Logic BIT 零页 ==========
+      is(0x24.U) {
+        result := LogicInstructions.executeBIT(cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Shift 累加器 ==========
+      is(0x0A.U, 0x4A.U, 0x2A.U, 0x6A.U) {
+        result := ShiftInstructions.executeAccumulator(opcode, regs)
+      }
+      
+      // ========== Shift 零页 ==========
+      is(0x06.U, 0x46.U, 0x26.U, 0x66.U) {
+        result := ShiftInstructions.executeZeroPage(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Compare 立即寻址 ==========
+      is(0xC9.U, 0xE0.U, 0xC0.U) {
+        result := CompareInstructions.executeImmediate(opcode, regs, memDataIn)
+      }
+      
+      // ========== Compare 零页 ==========
+      is(0xC5.U) {
+        result := CompareInstructions.executeZeroPage(cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Branch 指令 ==========
+      is(0xF0.U, 0xD0.U, 0xB0.U, 0x90.U, 0x30.U, 0x10.U, 0x50.U, 0x70.U) {
+        result := BranchInstructions.execute(opcode, regs, memDataIn)
+      }
+      
+      // ========== LoadStore 立即寻址 ==========
+      is(0xA9.U, 0xA2.U, 0xA0.U) {
+        result := LoadStoreInstructions.executeImmediate(opcode, regs, memDataIn)
+      }
+      
+      // ========== LoadStore 零页 ==========
+      is(0xA5.U, 0x85.U, 0x86.U, 0x84.U) {
+        result := LoadStoreInstructions.executeZeroPage(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== LoadStore 零页 X ==========
+      is(0xB5.U, 0x95.U) {
+        result := LoadStoreInstructions.executeZeroPageX(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== LoadStore 绝对寻址 ==========
+      is(0xAD.U, 0x8D.U) {
+        result := LoadStoreInstructions.executeAbsolute(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== LoadStore 绝对索引 ==========
+      is(0xBD.U, 0xB9.U) {
+        result := LoadStoreInstructions.executeAbsoluteIndexed(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Stack Push ==========
+      is(0x48.U, 0x08.U) {
+        result := StackInstructions.executePush(opcode, regs)
+      }
+      
+      // ========== Stack Pull ==========
+      is(0x68.U, 0x28.U) {
+        result := StackInstructions.executePull(opcode, cycle, regs, memDataIn)
+      }
+      
+      // ========== Jump 指令 ==========
+      is(0x4C.U) { result := JumpInstructions.executeJMP(cycle, regs, operand, memDataIn) }
+      is(0x20.U) { result := JumpInstructions.executeJSR(cycle, regs, operand, memDataIn) }
+      is(0x60.U) { result := JumpInstructions.executeRTS(cycle, regs, operand, memDataIn) }
+      is(0x00.U) { result := JumpInstructions.executeBRK(cycle, regs, operand, memDataIn) }
+      is(0x40.U) { result := JumpInstructions.executeRTI(cycle, regs, operand, memDataIn) }
+    }
+    
+    result
+  }
+}

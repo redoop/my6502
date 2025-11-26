@@ -46,6 +46,7 @@ class CPU6502 extends Module {
 
   // 辅助函数：更新标志位
   def updateNZ(value: UInt): Unit = {
+    require(value.getWidth >= 8, s"updateNZ requires at least 8-bit value, got ${value.getWidth} bits")
     flagN := value(7)
     flagZ := value === 0.U
   }
@@ -137,9 +138,10 @@ class CPU6502 extends Module {
             io.memAddr := regPC
             io.memRead := true.B
             val sum = regA +& io.memDataIn +& flagC.asUInt
-            regA := sum(7, 0)
+            val sum8 = sum(7, 0)
+            regA := sum8
             flagC := sum(8)
-            updateNZ(sum(7, 0))
+            updateNZ(sum8)
             // 溢出检测
             flagV := (regA(7) === io.memDataIn(7)) && (regA(7) =/= sum(7))
             regPC := regPC + 1.U
@@ -153,9 +155,10 @@ class CPU6502 extends Module {
             io.memAddr := regPC
             io.memRead := true.B
             val diff = regA -& io.memDataIn -& (~flagC).asUInt
-            regA := diff(7, 0)
+            val diff8 = diff(7, 0)
+            regA := diff8
             flagC := ~diff(8)
-            updateNZ(diff(7, 0))
+            updateNZ(diff8)
             flagV := (regA(7) =/= io.memDataIn(7)) && (regA(7) =/= diff(7))
             regPC := regPC + 1.U
             state := sFetch
@@ -378,6 +381,688 @@ class CPU6502 extends Module {
             }
             state := sFetch
           }
+        }
+
+        // BMI - Branch if Minus
+        is(0x30.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            regPC := regPC + 1.U
+            when(flagN) {
+              val offset = io.memDataIn.asSInt
+              regPC := (regPC.asSInt + offset).asUInt
+            }
+            state := sFetch
+          }
+        }
+
+        // BPL - Branch if Plus
+        is(0x10.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            regPC := regPC + 1.U
+            when(!flagN) {
+              val offset = io.memDataIn.asSInt
+              regPC := (regPC.asSInt + offset).asUInt
+            }
+            state := sFetch
+          }
+        }
+
+        // BVC - Branch if Overflow Clear
+        is(0x50.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            regPC := regPC + 1.U
+            when(!flagV) {
+              val offset = io.memDataIn.asSInt
+              regPC := (regPC.asSInt + offset).asUInt
+            }
+            state := sFetch
+          }
+        }
+
+        // BVS - Branch if Overflow Set
+        is(0x70.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            regPC := regPC + 1.U
+            when(flagV) {
+              val offset = io.memDataIn.asSInt
+              regPC := (regPC.asSInt + offset).asUInt
+            }
+            state := sFetch
+          }
+        }
+
+        // CMP - Compare Accumulator (Immediate)
+        is(0xC9.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            val result = regA -& io.memDataIn
+            flagC := regA >= io.memDataIn
+            flagZ := regA === io.memDataIn
+            flagN := result(7)
+            regPC := regPC + 1.U
+            state := sFetch
+          }
+        }
+
+        // CMP Zero Page
+        is(0xC5.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := io.memDataIn
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := operand
+            io.memRead := true.B
+            val result = regA -& io.memDataIn
+            flagC := regA >= io.memDataIn
+            flagZ := regA === io.memDataIn
+            flagN := result(7)
+            state := sFetch
+          }
+        }
+
+        // CPX - Compare X (Immediate)
+        is(0xE0.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            val result = regX -& io.memDataIn
+            flagC := regX >= io.memDataIn
+            flagZ := regX === io.memDataIn
+            flagN := result(7)
+            regPC := regPC + 1.U
+            state := sFetch
+          }
+        }
+
+        // CPY - Compare Y (Immediate)
+        is(0xC0.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            val result = regY -& io.memDataIn
+            flagC := regY >= io.memDataIn
+            flagZ := regY === io.memDataIn
+            flagN := result(7)
+            regPC := regPC + 1.U
+            state := sFetch
+          }
+        }
+
+        // BIT - Bit Test (Zero Page)
+        is(0x24.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := io.memDataIn
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := operand
+            io.memRead := true.B
+            val data = io.memDataIn
+            flagZ := (regA & data) === 0.U
+            flagN := data(7)
+            flagV := data(6)
+            state := sFetch
+          }
+        }
+
+        // ASL - Arithmetic Shift Left (Accumulator)
+        is(0x0A.U) {
+          flagC := regA(7)
+          val result = WireDefault(0.U(8.W))
+          result := (regA << 1)(7, 0)
+          regA := result
+          updateNZ(result)
+          state := sFetch
+        }
+
+        // ASL Zero Page
+        is(0x06.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := io.memDataIn
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := operand
+            io.memRead := true.B
+            cycle := 2.U
+          }.elsewhen(cycle === 2.U) {
+            io.memAddr := operand
+            val data = io.memDataIn
+            flagC := data(7)
+            val result = Cat(data(6, 0), 0.U(1.W))
+            io.memDataOut := result
+            io.memWrite := true.B
+            updateNZ(result)
+            state := sFetch
+          }
+        }
+
+        // LSR - Logical Shift Right (Accumulator)
+        is(0x4A.U) {
+          flagC := regA(0)
+          val result = Cat(0.U(1.W), regA(7, 1))
+          regA := result
+          updateNZ(result)
+          state := sFetch
+        }
+
+        // LSR Zero Page
+        is(0x46.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := io.memDataIn
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := operand
+            io.memRead := true.B
+            cycle := 2.U
+          }.elsewhen(cycle === 2.U) {
+            io.memAddr := operand
+            val data = io.memDataIn
+            flagC := data(0)
+            val result = Cat(0.U(1.W), data(7, 1))
+            io.memDataOut := result
+            io.memWrite := true.B
+            updateNZ(result)
+            state := sFetch
+          }
+        }
+
+        // ROL - Rotate Left (Accumulator)
+        is(0x2A.U) {
+          val oldCarry = flagC.asUInt
+          flagC := regA(7)
+          val result = Cat(regA(6, 0), oldCarry)
+          regA := result
+          updateNZ(result)
+          state := sFetch
+        }
+
+        // ROL Zero Page
+        is(0x26.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := io.memDataIn
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := operand
+            io.memRead := true.B
+            cycle := 2.U
+          }.elsewhen(cycle === 2.U) {
+            io.memAddr := operand
+            val data = io.memDataIn
+            val oldCarry = flagC.asUInt
+            flagC := data(7)
+            val result = Cat(data(6, 0), oldCarry)
+            io.memDataOut := result
+            io.memWrite := true.B
+            updateNZ(result)
+            state := sFetch
+          }
+        }
+
+        // ROR - Rotate Right (Accumulator)
+        is(0x6A.U) {
+          val oldCarry = flagC.asUInt
+          flagC := regA(0)
+          val result = Cat(oldCarry, regA(7, 1))
+          regA := result
+          updateNZ(result)
+          state := sFetch
+        }
+
+        // ROR Zero Page
+        is(0x66.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := io.memDataIn
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := operand
+            io.memRead := true.B
+            cycle := 2.U
+          }.elsewhen(cycle === 2.U) {
+            io.memAddr := operand
+            val data = io.memDataIn
+            val oldCarry = flagC.asUInt
+            flagC := data(0)
+            val result = Cat(oldCarry, data(7, 1))
+            io.memDataOut := result
+            io.memWrite := true.B
+            updateNZ(result)
+            state := sFetch
+          }
+        }
+
+        // INC - Increment Memory (Zero Page)
+        is(0xE6.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := io.memDataIn
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := operand
+            io.memRead := true.B
+            cycle := 2.U
+          }.elsewhen(cycle === 2.U) {
+            io.memAddr := operand
+            val result = io.memDataIn + 1.U
+            io.memDataOut := result
+            io.memWrite := true.B
+            updateNZ(result)
+            state := sFetch
+          }
+        }
+
+        // DEC - Decrement Memory (Zero Page)
+        is(0xC6.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := io.memDataIn
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := operand
+            io.memRead := true.B
+            cycle := 2.U
+          }.elsewhen(cycle === 2.U) {
+            io.memAddr := operand
+            val result = io.memDataIn - 1.U
+            io.memDataOut := result
+            io.memWrite := true.B
+            updateNZ(result)
+            state := sFetch
+          }
+        }
+
+        // STX - Store X (Zero Page)
+        is(0x86.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := io.memDataIn
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := operand
+            io.memDataOut := regX
+            io.memWrite := true.B
+            state := sFetch
+          }
+        }
+
+        // STY - Store Y (Zero Page)
+        is(0x84.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := io.memDataIn
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := operand
+            io.memDataOut := regY
+            io.memWrite := true.B
+            state := sFetch
+          }
+        }
+
+        // TSX - Transfer SP to X
+        is(0xBA.U) {
+          regX := regSP
+          updateNZ(regSP)
+          state := sFetch
+        }
+
+        // TXS - Transfer X to SP
+        is(0x9A.U) {
+          regSP := regX
+          state := sFetch
+        }
+
+        // PHA - Push Accumulator
+        is(0x48.U) {
+          io.memAddr := Cat(0x01.U(8.W), regSP)
+          io.memDataOut := regA
+          io.memWrite := true.B
+          regSP := regSP - 1.U
+          state := sFetch
+        }
+
+        // PHP - Push Processor Status
+        is(0x08.U) {
+          val status = Cat(flagN, flagV, 1.U(1.W), 1.U(1.W), flagD, flagI, flagZ, flagC)
+          io.memAddr := Cat(0x01.U(8.W), regSP)
+          io.memDataOut := status
+          io.memWrite := true.B
+          regSP := regSP - 1.U
+          state := sFetch
+        }
+
+        // PLA - Pull Accumulator
+        is(0x68.U) {
+          when(cycle === 0.U) {
+            regSP := regSP + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := Cat(0x01.U(8.W), regSP)
+            io.memRead := true.B
+            regA := io.memDataIn
+            updateNZ(io.memDataIn)
+            state := sFetch
+          }
+        }
+
+        // PLP - Pull Processor Status
+        is(0x28.U) {
+          when(cycle === 0.U) {
+            regSP := regSP + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := Cat(0x01.U(8.W), regSP)
+            io.memRead := true.B
+            val status = io.memDataIn
+            flagC := status(0)
+            flagZ := status(1)
+            flagI := status(2)
+            flagD := status(3)
+            flagV := status(6)
+            flagN := status(7)
+            state := sFetch
+          }
+        }
+
+        // JSR - Jump to Subroutine
+        is(0x20.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := io.memDataIn
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := Cat(io.memDataIn, operand(7, 0))
+            cycle := 2.U
+          }.elsewhen(cycle === 2.U) {
+            // Push high byte of return address
+            io.memAddr := Cat(0x01.U(8.W), regSP)
+            io.memDataOut := regPC(15, 8)
+            io.memWrite := true.B
+            regSP := regSP - 1.U
+            cycle := 3.U
+          }.elsewhen(cycle === 3.U) {
+            // Push low byte of return address
+            io.memAddr := Cat(0x01.U(8.W), regSP)
+            io.memDataOut := regPC(7, 0)
+            io.memWrite := true.B
+            regSP := regSP - 1.U
+            regPC := operand
+            state := sFetch
+          }
+        }
+
+        // RTS - Return from Subroutine
+        is(0x60.U) {
+          when(cycle === 0.U) {
+            regSP := regSP + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := Cat(0x01.U(8.W), regSP)
+            io.memRead := true.B
+            operand := io.memDataIn
+            regSP := regSP + 1.U
+            cycle := 2.U
+          }.elsewhen(cycle === 2.U) {
+            io.memAddr := Cat(0x01.U(8.W), regSP)
+            io.memRead := true.B
+            regPC := Cat(io.memDataIn, operand(7, 0)) + 1.U
+            state := sFetch
+          }
+        }
+
+        // BRK - Break
+        is(0x00.U) {
+          when(cycle === 0.U) {
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            // Push PC high byte
+            io.memAddr := Cat(0x01.U(8.W), regSP)
+            io.memDataOut := regPC(15, 8)
+            io.memWrite := true.B
+            regSP := regSP - 1.U
+            cycle := 2.U
+          }.elsewhen(cycle === 2.U) {
+            // Push PC low byte
+            io.memAddr := Cat(0x01.U(8.W), regSP)
+            io.memDataOut := regPC(7, 0)
+            io.memWrite := true.B
+            regSP := regSP - 1.U
+            cycle := 3.U
+          }.elsewhen(cycle === 3.U) {
+            // Push status with B flag set
+            val status = Cat(flagN, flagV, 1.U(1.W), 1.U(1.W), flagD, flagI, flagZ, flagC)
+            io.memAddr := Cat(0x01.U(8.W), regSP)
+            io.memDataOut := status
+            io.memWrite := true.B
+            regSP := regSP - 1.U
+            flagI := true.B
+            flagB := true.B
+            cycle := 4.U
+          }.elsewhen(cycle === 4.U) {
+            // Read IRQ vector low byte
+            io.memAddr := 0xFFFE.U
+            io.memRead := true.B
+            operand := io.memDataIn
+            cycle := 5.U
+          }.elsewhen(cycle === 5.U) {
+            // Read IRQ vector high byte
+            io.memAddr := 0xFFFF.U
+            io.memRead := true.B
+            regPC := Cat(io.memDataIn, operand(7, 0))
+            state := sFetch
+          }
+        }
+
+        // RTI - Return from Interrupt
+        is(0x40.U) {
+          when(cycle === 0.U) {
+            regSP := regSP + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            // Pull status
+            io.memAddr := Cat(0x01.U(8.W), regSP)
+            io.memRead := true.B
+            val status = io.memDataIn
+            flagC := status(0)
+            flagZ := status(1)
+            flagI := status(2)
+            flagD := status(3)
+            flagV := status(6)
+            flagN := status(7)
+            regSP := regSP + 1.U
+            cycle := 2.U
+          }.elsewhen(cycle === 2.U) {
+            // Pull PC low byte
+            io.memAddr := Cat(0x01.U(8.W), regSP)
+            io.memRead := true.B
+            operand := io.memDataIn
+            regSP := regSP + 1.U
+            cycle := 3.U
+          }.elsewhen(cycle === 3.U) {
+            // Pull PC high byte
+            io.memAddr := Cat(0x01.U(8.W), regSP)
+            io.memRead := true.B
+            regPC := Cat(io.memDataIn, operand(7, 0))
+            state := sFetch
+          }
+        }
+
+        // LDA Absolute
+        is(0xAD.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := io.memDataIn
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := Cat(io.memDataIn, operand(7, 0))
+            regPC := regPC + 1.U
+            cycle := 2.U
+          }.elsewhen(cycle === 2.U) {
+            io.memAddr := operand
+            io.memRead := true.B
+            regA := io.memDataIn
+            updateNZ(io.memDataIn)
+            state := sFetch
+          }
+        }
+
+        // STA Absolute
+        is(0x8D.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := io.memDataIn
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := Cat(io.memDataIn, operand(7, 0))
+            regPC := regPC + 1.U
+            cycle := 2.U
+          }.elsewhen(cycle === 2.U) {
+            io.memAddr := operand
+            io.memDataOut := regA
+            io.memWrite := true.B
+            state := sFetch
+          }
+        }
+
+        // LDA Zero Page,X
+        is(0xB5.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := Cat(0.U(8.W), (io.memDataIn + regX)(7, 0))
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := operand
+            io.memRead := true.B
+            regA := io.memDataIn
+            updateNZ(io.memDataIn)
+            state := sFetch
+          }
+        }
+
+        // STA Zero Page,X
+        is(0x95.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := Cat(0.U(8.W), (io.memDataIn + regX)(7, 0))
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := operand
+            io.memDataOut := regA
+            io.memWrite := true.B
+            state := sFetch
+          }
+        }
+
+        // LDA Absolute,X
+        is(0xBD.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := io.memDataIn
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := Cat(io.memDataIn, operand(7, 0)) + regX
+            regPC := regPC + 1.U
+            cycle := 2.U
+          }.elsewhen(cycle === 2.U) {
+            io.memAddr := operand
+            io.memRead := true.B
+            regA := io.memDataIn
+            updateNZ(io.memDataIn)
+            state := sFetch
+          }
+        }
+
+        // LDA Absolute,Y
+        is(0xB9.U) {
+          when(cycle === 0.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := io.memDataIn
+            regPC := regPC + 1.U
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := regPC
+            io.memRead := true.B
+            operand := Cat(io.memDataIn, operand(7, 0)) + regY
+            regPC := regPC + 1.U
+            cycle := 2.U
+          }.elsewhen(cycle === 2.U) {
+            io.memAddr := operand
+            io.memRead := true.B
+            regA := io.memDataIn
+            updateNZ(io.memDataIn)
+            state := sFetch
+          }
+        }
+
+        // INC Accumulator (65C02 extension, but useful)
+        is(0x1A.U) {
+          val result = regA + 1.U
+          regA := result
+          updateNZ(result)
+          state := sFetch
+        }
+
+        // DEC Accumulator (65C02 extension, but useful)
+        is(0x3A.U) {
+          val result = regA - 1.U
+          regA := result
+          updateNZ(result)
+          state := sFetch
         }
       }
     }
