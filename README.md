@@ -12,7 +12,7 @@ MOS 6502 是由 MOS Technology 在 1975 年设计的 8 位微处理器，是计�
 </div>
 
 <div align="center">
-  <img src="docs/my6502.png" alt="本项目 CPU6502 布局布线效果图" width="600"/>
+  <img src="docs/my6502.png" alt="本项目 CPU6502 布局布线效果图" width="200"/>
   <p><i>本项目 CPU6502 布局布线效果图 (iEDA 生成)</i></p>
 </div>
 
