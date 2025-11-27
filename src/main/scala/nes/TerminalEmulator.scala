@@ -19,22 +19,72 @@ object TerminalEmulator {
   val ANSI_SHOW_CURSOR = "\u001b[?25h"
   val ANSI_RESET = "\u001b[0m"
   
-  // NES 调色板到 ANSI 256 色的映射
+  // 改进的 NES 调色板到 ANSI 256 色的映射
+  // 基于实际 NES 调色板的 RGB 值进行更精确的映射
   val NES_TO_ANSI = Array(
-    // 0x00-0x0F
-    16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 16, 16, 16,
-    // 0x10-0x1F
-    250, 33, 39, 45, 201, 196, 202, 208, 214, 220, 226, 190, 154, 16, 16, 16,
-    // 0x20-0x2F
-    255, 51, 87, 123, 159, 195, 231, 229, 228, 227, 226, 190, 159, 240, 16, 16,
-    // 0x30-0x3F
-    255, 159, 195, 231, 225, 219, 213, 207, 201, 195, 189, 183, 159, 255, 16, 16
+    // 0x00-0x0F (灰度和深色)
+    16, 17, 18, 19, 20, 21, 57, 93, 129, 165, 201, 207, 208, 16, 16, 16,
+    // 0x10-0x1F (蓝紫色系)
+    235, 27, 33, 39, 45, 51, 87, 123, 159, 195, 231, 229, 228, 16, 16, 16,
+    // 0x20-0x2F (绿色系)
+    255, 46, 82, 118, 154, 190, 226, 220, 214, 208, 202, 196, 160, 240, 16, 16,
+    // 0x30-0x3F (红色系)
+    255, 226, 220, 214, 208, 202, 196, 160, 124, 88, 52, 22, 28, 255, 16, 16
   )
   
   // 像素字符 (使用 Unicode 方块字符)
   val PIXEL_FULL = "█"
-  val PIXEL_HALF = "▄"
+  val PIXEL_HALF_UPPER = "▀"  // 上半部分
+  val PIXEL_HALF_LOWER = "▄"  // 下半部分
   val PIXEL_EMPTY = " "
+  
+  // 更精确的 NES 调色板 RGB 值 (用于更好的颜色匹配)
+  val NES_PALETTE_RGB = Array(
+    (84, 84, 84), (0, 30, 116), (8, 16, 144), (48, 0, 136),
+    (68, 0, 100), (92, 0, 48), (84, 4, 0), (60, 24, 0),
+    (32, 42, 0), (8, 58, 0), (0, 64, 0), (0, 60, 0),
+    (0, 50, 60), (0, 0, 0), (0, 0, 0), (0, 0, 0),
+    
+    (152, 150, 152), (8, 76, 196), (48, 50, 236), (92, 30, 228),
+    (136, 20, 176), (160, 20, 100), (152, 34, 32), (120, 60, 0),
+    (84, 90, 0), (40, 114, 0), (8, 124, 0), (0, 118, 40),
+    (0, 102, 120), (0, 0, 0), (0, 0, 0), (0, 0, 0),
+    
+    (236, 238, 236), (76, 154, 236), (120, 124, 236), (176, 98, 236),
+    (228, 84, 236), (236, 88, 180), (236, 106, 100), (212, 136, 32),
+    (160, 170, 0), (116, 196, 0), (76, 208, 32), (56, 204, 108),
+    (56, 180, 204), (60, 60, 60), (0, 0, 0), (0, 0, 0),
+    
+    (236, 238, 236), (168, 204, 236), (188, 188, 236), (212, 178, 236),
+    (236, 174, 236), (236, 174, 212), (236, 180, 176), (228, 196, 144),
+    (204, 210, 120), (180, 222, 120), (168, 226, 144), (152, 226, 180),
+    (160, 214, 228), (160, 162, 160), (0, 0, 0), (0, 0, 0)
+  )
+  
+  /**
+   * 将 RGB 颜色转换为最接近的 ANSI 256 色
+   */
+  def rgbToAnsi256(r: Int, g: Int, b: Int): Int = {
+    // 灰度检测
+    if (Math.abs(r - g) < 10 && Math.abs(g - b) < 10 && Math.abs(r - b) < 10) {
+      val gray = (r + g + b) / 3
+      if (gray < 8) return 16
+      if (gray > 247) return 231
+      return 232 + ((gray - 8) * 24 / 240)
+    }
+    
+    // 6x6x6 颜色立方体
+    val r6 = if (r < 48) 0 else if (r < 115) 1 else ((r - 35) / 40).min(5)
+    val g6 = if (g < 48) 0 else if (g < 115) 1 else ((g - 35) / 40).min(5)
+    val b6 = if (b < 48) 0 else if (b < 115) 1 else ((b - 35) / 40).min(5)
+    
+    16 + 36 * r6 + 6 * g6 + b6
+  }
+  
+  // 预计算 NES 调色板到 ANSI 的映射
+  val NES_TO_ANSI_IMPROVED = NES_PALETTE_RGB.map { case (r, g, b) => 
+    rgbToAnsi256(r, g, b)
+  }
   
   def main(args: Array[String]): Unit = {
     if (args.length < 1) {
@@ -81,8 +131,9 @@ class TerminalNESEmulator(romData: Array[Byte]) {
   
   private val WIDTH = 256
   private val HEIGHT = 240
-  private val SCALE_X = 2  // 水平缩放
-  private val SCALE_Y = 1  // 垂直缩放
+  // 使用半字符提高垂直分辨率 (每个字符显示2个像素)
+  private val SCALE_X = 1  // 水平缩放
+  private val SCALE_Y = 2  // 垂直缩放 (使用半字符)
   
   private val displayWidth = WIDTH / SCALE_X
   private val displayHeight = HEIGHT / SCALE_Y
@@ -94,6 +145,19 @@ class TerminalNESEmulator(romData: Array[Byte]) {
   private var controller1 = 0
   private var running = true
   private var paused = false
+  
+  // ROM 数据
+  private val header = romData.take(16)
+  private val prgSize = header(4) * 16384
+  private val chrSize = header(5) * 8192
+  private val hasCHR = chrSize > 0
+  
+  // CHR ROM 数据 (图形数据)
+  private val chrROM = if (hasCHR) {
+    romData.slice(16 + prgSize, 16 + prgSize + chrSize)
+  } else {
+    Array.ofDim[Byte](8192) // 使用 CHR RAM
+  }
   
   /**
    * 运行模拟器
@@ -132,34 +196,28 @@ class TerminalNESEmulator(romData: Array[Byte]) {
   }
   
   /**
-   * 模拟器主循环 (演示模式)
+   * 模拟器主循环 (演示模式 - 显示 CHR 图形数据)
    */
   private def runEmulatorLoop(): Unit = {
     println("🎮 模拟器运行中 (演示模式)...")
-    println("   注意: 完整模拟需要 ChiselTest")
-    println("   当前显示测试图案")
+    println("   显示 ROM 中的图形数据 (CHR ROM)")
+    println(s"   CHR 大小: $chrSize bytes")
     println()
     
     var frameCount = 0
+    var tileOffset = 0
     val startTime = System.currentTimeMillis()
     
-    // 生成测试图案
-    for (y <- 0 until HEIGHT) {
-      for (x <- 0 until WIDTH) {
-        val colorIndex = ((x / 16) + (y / 16)) % 64
-        framebuffer(x)(y) = colorIndex
-      }
-    }
+    // 初始化显示
+    drawCHRTiles(tileOffset)
     
     // 主循环
     while (running) {
       if (!paused) {
-        // 动画效果
-        for (y <- 0 until HEIGHT by 4) {
-          for (x <- 0 until WIDTH by 4) {
-            val colorIndex = ((x + frameCount) / 16 + (y + frameCount / 2) / 16) % 64
-            framebuffer(x)(y) = colorIndex
-          }
+        // 每 60 帧切换显示的图块
+        if (frameCount % 60 == 0 && hasCHR) {
+          tileOffset = (tileOffset + 32) % (chrSize / 16)
+          drawCHRTiles(tileOffset)
         }
         
         // 渲染到终端
@@ -171,7 +229,7 @@ class TerminalNESEmulator(romData: Array[Byte]) {
         if (frameCount % 60 == 0) {
           val elapsed = (System.currentTimeMillis() - startTime) / 1000.0
           val fps = frameCount / elapsed
-          displayStatus(frameCount, fps)
+          displayStatus(frameCount, fps, tileOffset)
         }
         
         // 限制帧率
@@ -183,7 +241,113 @@ class TerminalNESEmulator(romData: Array[Byte]) {
   }
   
   /**
-   * 渲染帧到终端
+   * 绘制 CHR ROM 图块到帧缓冲
+   * NES 图块格式: 8x8 像素，每个图块 16 字节
+   */
+  private def drawCHRTiles(startTile: Int): Unit = {
+    if (!hasCHR) {
+      // 没有 CHR ROM，显示提示信息
+      drawNoChRMessage()
+      return
+    }
+    
+    val tilesPerRow = 32  // 每行显示 32 个图块
+    val tilesPerCol = 30  // 每列显示 30 个图块
+    
+    for (tileY <- 0 until tilesPerCol) {
+      for (tileX <- 0 until tilesPerRow) {
+        val tileIndex = startTile + tileY * tilesPerRow + tileX
+        if (tileIndex * 16 < chrSize) {
+          drawTile(tileX * 8, tileY * 8, tileIndex)
+        }
+      }
+    }
+  }
+  
+  /**
+   * 绘制单个 8x8 图块（使用边缘检测）
+   * NES 图块格式:
+   * - 16 字节/图块
+   * - 前 8 字节: 低位平面
+   * - 后 8 字节: 高位平面
+   * - 每个像素 2 位颜色索引 (0-3)
+   */
+  private def drawTile(x: Int, y: Int, tileIndex: Int): Unit = {
+    val tileAddr = tileIndex * 16
+    if (tileAddr + 16 > chrSize) return
+    
+    // 先提取图块数据到临时数组
+    val tileData = Array.ofDim[Int](8, 8)
+    for (row <- 0 until 8) {
+      val lowByte = chrROM(tileAddr + row) & 0xFF
+      val highByte = chrROM(tileAddr + row + 8) & 0xFF
+      
+      for (col <- 0 until 8) {
+        val bit = 7 - col
+        val lowBit = (lowByte >> bit) & 1
+        val highBit = (highByte >> bit) & 1
+        tileData(row)(col) = (highBit << 1) | lowBit
+      }
+    }
+    
+    // 绘制边缘轮廓
+    for (row <- 0 until 8) {
+      for (col <- 0 until 8) {
+        val px = x + col
+        val py = y + row
+        
+        if (px >= WIDTH || py >= HEIGHT) {
+          // 跳过越界
+        } else {
+          val current = tileData(row)(col)
+          
+          if (current > 0) {
+            // 检测边缘：如果相邻像素是背景色(0)，则绘制边缘
+            val hasTop = row == 0 || tileData(row - 1)(col) == 0
+            val hasBottom = row == 7 || tileData(row + 1)(col) == 0
+            val hasLeft = col == 0 || tileData(row)(col - 1) == 0
+            val hasRight = col == 7 || tileData(row)(col + 1) == 0
+            
+            // 根据边缘情况选择颜色索引
+            if (hasTop || hasBottom || hasLeft || hasRight) {
+              // 边缘像素 - 使用亮色
+              framebuffer(px)(py) = 0x30  // 白色
+            } else {
+              // 内部像素 - 使用暗色
+              framebuffer(px)(py) = 0x10  // 灰色
+            }
+          } else {
+            // 背景
+            framebuffer(px)(py) = 0x0F  // 黑色
+          }
+        }
+      }
+    }
+  }
+  
+  /**
+   * 显示无 CHR ROM 的提示信息
+   */
+  private def drawNoChRMessage(): Unit = {
+    // 清空为黑色
+    for (y <- 0 until HEIGHT) {
+      for (x <- 0 until WIDTH) {
+        framebuffer(x)(y) = 0x0F
+      }
+    }
+    
+    // 绘制一些彩色条纹作为背景
+    for (y <- 0 until HEIGHT) {
+      for (x <- 0 until WIDTH) {
+        if ((y / 20) % 2 == 0) {
+          framebuffer(x)(y) = ((x / 32) % 4) * 16
+        }
+      }
+    }
+  }
+  
+  /**
+   * 渲染帧到终端 (使用半字符提高分辨率)
    */
   private def renderFrame(): Unit = {
     val sb = new StringBuilder()
@@ -192,19 +356,29 @@ class TerminalNESEmulator(romData: Array[Byte]) {
     sb.append(ANSI_CLEAR)
     sb.append(ANSI_HOME)
     
-    // 渲染每一行
+    // 渲染每一行 (每个字符显示2个垂直像素)
     for (y <- 0 until displayHeight) {
       for (x <- 0 until displayWidth) {
-        // 采样原始像素
+        // 采样上下两个像素
         val srcX = x * SCALE_X
         val srcY = y * SCALE_Y
-        val colorIndex = framebuffer(srcX)(srcY)
+        
+        val upperColorIndex = framebuffer(srcX)(srcY).min(63)
+        val lowerColorIndex = if (srcY + 1 < HEIGHT) 
+          framebuffer(srcX)(srcY + 1).min(63) 
+        else upperColorIndex
         
         // 转换为 ANSI 颜色
-        val ansiColor = NES_TO_ANSI(colorIndex)
+        val upperAnsi = NES_TO_ANSI_IMPROVED(upperColorIndex)
+        val lowerAnsi = NES_TO_ANSI_IMPROVED(lowerColorIndex)
         
-        // 输出彩色方块
-        sb.append(s"\u001b[48;5;${ansiColor}m$PIXEL_FULL")
+        // 如果上下颜色相同，使用全字符
+        if (upperAnsi == lowerAnsi) {
+          sb.append(s"\u001b[48;5;${upperAnsi}m$PIXEL_FULL")
+        } else {
+          // 使用半字符：前景色为下半部分，背景色为上半部分
+          sb.append(s"\u001b[38;5;${lowerAnsi}m\u001b[48;5;${upperAnsi}m$PIXEL_HALF_LOWER")
+        }
       }
       sb.append(ANSI_RESET)
       sb.append("\n")
@@ -216,10 +390,10 @@ class TerminalNESEmulator(romData: Array[Byte]) {
   /**
    * 显示状态信息
    */
-  private def displayStatus(frame: Int, fps: Double): Unit = {
+  private def displayStatus(frame: Int, fps: Double, tileOffset: Int): Unit = {
     print(ANSI_RESET)
     println()
-    println(f"帧数: $frame%6d | FPS: $fps%5.1f | 控制器: 0x$controller1%02X | ${if (paused) "暂停" else "运行"}")
+    println(f"帧数: $frame%6d | FPS: $fps%5.1f | 图块偏移: $tileOffset%4d | ${if (paused) "暂停" else "运行"} | 按 Q 退出")
   }
   
   /**
@@ -328,11 +502,11 @@ object SimpleTerminalEmulator {
   }
   
   /**
-   * 运行演示
+   * 运行演示 (改进版，使用半字符和更好的颜色)
    */
   private def runDemo(): Unit = {
-    val WIDTH = 128
-    val HEIGHT = 60
+    val WIDTH = 256
+    val HEIGHT = 240
     
     var frame = 0
     var running = true
@@ -355,14 +529,26 @@ object SimpleTerminalEmulator {
       sb.append(ANSI_CLEAR)
       sb.append(ANSI_HOME)
       
-      // 绘制测试图案
-      for (y <- 0 until HEIGHT) {
+      // 绘制改进的测试图案 (使用半字符)
+      for (y <- 0 until HEIGHT / 2) {
         for (x <- 0 until WIDTH) {
-          // 动画效果
-          val colorIndex = ((x + frame) / 8 + (y + frame / 2) / 8) % 64
-          val ansiColor = NES_TO_ANSI(colorIndex)
+          // 上下两个像素
+          val y1 = y * 2
+          val y2 = y * 2 + 1
           
-          sb.append(s"\u001b[48;5;${ansiColor}m$PIXEL_FULL")
+          // 创建更有趣的图案
+          val colorIndex1 = ((x + frame) / 4 + (y1 + frame / 2) / 4) % 64
+          val colorIndex2 = ((x + frame) / 4 + (y2 + frame / 2) / 4) % 64
+          
+          val ansiColor1 = NES_TO_ANSI_IMPROVED(colorIndex1)
+          val ansiColor2 = NES_TO_ANSI_IMPROVED(colorIndex2)
+          
+          // 使用半字符
+          if (ansiColor1 == ansiColor2) {
+            sb.append(s"\u001b[48;5;${ansiColor1}m$PIXEL_FULL")
+          } else {
+            sb.append(s"\u001b[38;5;${ansiColor2}m\u001b[48;5;${ansiColor1}m$PIXEL_HALF_LOWER")
+          }
         }
         sb.append(ANSI_RESET)
         sb.append("\n")

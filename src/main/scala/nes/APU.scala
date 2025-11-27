@@ -3,6 +3,72 @@ package nes
 import chisel3._
 import chisel3.util._
 
+// 长度计数器
+class LengthCounter extends Module {
+  val io = IO(new Bundle {
+    val enable = Input(Bool())
+    val halt = Input(Bool())  // 也用作包络循环标志
+    val load = Input(UInt(5.W))
+    val loadTrigger = Input(Bool())
+    val clock = Input(Bool())  // 来自帧计数器 (half frame)
+    val counter = Output(UInt(8.W))
+    val active = Output(Bool())
+  })
+  
+  // 长度查找表
+  val lengthTable = VecInit(
+    10.U, 254.U, 20.U, 2.U, 40.U, 4.U, 80.U, 6.U,
+    160.U, 8.U, 60.U, 10.U, 14.U, 12.U, 26.U, 14.U,
+    12.U, 16.U, 24.U, 18.U, 48.U, 20.U, 96.U, 22.U,
+    192.U, 24.U, 72.U, 26.U, 16.U, 28.U, 32.U, 30.U
+  )
+  
+  val counter = RegInit(0.U(8.W))
+  
+  when(io.loadTrigger && io.enable) {
+    counter := lengthTable(io.load)
+  }.elsewhen(io.clock && !io.halt && counter > 0.U) {
+    counter := counter - 1.U
+  }
+  
+  io.counter := counter
+  io.active := counter > 0.U
+}
+
+// 线性计数器 (用于 Triangle 通道)
+class LinearCounter extends Module {
+  val io = IO(new Bundle {
+    val control = Input(Bool())  // 控制标志 (也是长度计数器 halt)
+    val reload = Input(UInt(7.W))
+    val reloadTrigger = Input(Bool())
+    val clock = Input(Bool())  // 来自帧计数器 (quarter frame)
+    val counter = Output(UInt(7.W))
+    val active = Output(Bool())
+  })
+  
+  val counter = RegInit(0.U(7.W))
+  val reloadFlag = RegInit(false.B)
+  
+  when(io.reloadTrigger) {
+    reloadFlag := true.B
+  }
+  
+  when(io.clock) {
+    when(reloadFlag) {
+      counter := io.reload
+    }.elsewhen(counter > 0.U) {
+      counter := counter - 1.U
+    }
+    
+    when(!io.control) {
+      reloadFlag := false.B
+    }
+  }
+  
+  io.counter := counter
+  io.active := counter > 0.U
+}
+
 // 包络生成器
 class Envelope extends Module {
   val io = IO(new Bundle {
@@ -86,11 +152,12 @@ class Sweep extends Module {
     reloadFlag := true.B
   }
   
+  // 默认输出当前周期
+  io.periodOut := io.channelPeriod
+  
   when(io.clock) {
     when(divider === 0.U && io.enable && !muted) {
       io.periodOut := targetPeriod(10, 0)
-    }.otherwise {
-      io.periodOut := io.channelPeriod
     }
     
     when(divider === 0.U || reloadFlag) {
@@ -99,12 +166,10 @@ class Sweep extends Module {
     }.otherwise {
       divider := divider - 1.U
     }
-  }.otherwise {
-    io.periodOut := io.channelPeriod
   }
 }
 
-// Pulse 波形生成器 (带包络和扫描)
+// Pulse 波形生成器 (带包络、扫描和长度计数器)
 class PulseChannel extends Module {
   val io = IO(new Bundle {
     val enable = Input(Bool())
@@ -118,9 +183,10 @@ class PulseChannel extends Module {
     val sweepShift = Input(UInt(3.W))
     val sweepPeriod = Input(UInt(3.W))
     val onesComplement = Input(Bool())
-    val lengthCounter = Input(UInt(5.W))
+    val lengthLoad = Input(UInt(5.W))
+    val loadTrigger = Input(Bool())
     val quarterFrame = Input(Bool())  // 包络时钟
-    val halfFrame = Input(Bool())     // 扫描时钟
+    val halfFrame = Input(Bool())     // 扫描和长度计数器时钟
     val output = Output(UInt(4.W))
   })
   
@@ -136,9 +202,10 @@ class PulseChannel extends Module {
   val sequencePos = RegInit(0.U(3.W))
   val currentPeriod = RegInit(0.U(11.W))
   
-  // 实例化包络和扫描
+  // 实例化包络、扫描和长度计数器
   val envelope = Module(new Envelope)
   val sweep = Module(new Sweep)
+  val lengthCounter = Module(new LengthCounter)
   
   // 连接包络
   envelope.io.start := false.B  // 由外部控制
@@ -158,6 +225,13 @@ class PulseChannel extends Module {
   sweep.io.channelPeriod := currentPeriod
   sweep.io.onesComplement := io.onesComplement
   
+  // 连接长度计数器
+  lengthCounter.io.enable := io.enable
+  lengthCounter.io.halt := io.envelopeLoop
+  lengthCounter.io.load := io.lengthLoad
+  lengthCounter.io.loadTrigger := io.loadTrigger
+  lengthCounter.io.clock := io.halfFrame
+  
   // 更新周期
   when(io.enable) {
     currentPeriod := sweep.io.periodOut
@@ -166,7 +240,7 @@ class PulseChannel extends Module {
   }
   
   // 定时器
-  when(io.enable && io.lengthCounter > 0.U) {
+  when(io.enable && lengthCounter.io.active) {
     when(timer === 0.U) {
       timer := currentPeriod
       sequencePos := (sequencePos + 1.U) & 0x7.U
@@ -179,15 +253,21 @@ class PulseChannel extends Module {
   val currentBit = (dutySeq >> sequencePos)(0)
   val envelopeVolume = envelope.io.output
   
-  io.output := Mux(io.enable && currentBit && !sweep.io.mute && io.lengthCounter > 0.U, 
+  io.output := Mux(io.enable && currentBit && !sweep.io.mute && lengthCounter.io.active, 
     envelopeVolume, 0.U)
 }
 
-// Triangle 波形生成器
+// Triangle 波形生成器 (带线性计数器)
 class TriangleChannel extends Module {
   val io = IO(new Bundle {
     val enable = Input(Bool())
     val period = Input(UInt(11.W))
+    val control = Input(Bool())  // 控制标志
+    val linearReload = Input(UInt(7.W))
+    val lengthLoad = Input(UInt(5.W))
+    val loadTrigger = Input(Bool())
+    val quarterFrame = Input(Bool())
+    val halfFrame = Input(Bool())
     val output = Output(UInt(4.W))
   })
   
@@ -202,7 +282,27 @@ class TriangleChannel extends Module {
   val timer = RegInit(0.U(11.W))
   val sequencePos = RegInit(0.U(5.W))
   
-  when(io.enable) {
+  // 实例化计数器
+  val linearCounter = Module(new LinearCounter)
+  val lengthCounter = Module(new LengthCounter)
+  
+  // 连接线性计数器
+  linearCounter.io.control := io.control
+  linearCounter.io.reload := io.linearReload
+  linearCounter.io.reloadTrigger := io.loadTrigger
+  linearCounter.io.clock := io.quarterFrame
+  
+  // 连接长度计数器
+  lengthCounter.io.enable := io.enable
+  lengthCounter.io.halt := io.control
+  lengthCounter.io.load := io.lengthLoad
+  lengthCounter.io.loadTrigger := io.loadTrigger
+  lengthCounter.io.clock := io.halfFrame
+  
+  // 只有当两个计数器都激活时才产生输出
+  val canOutput = linearCounter.io.active && lengthCounter.io.active
+  
+  when(io.enable && canOutput) {
     when(timer === 0.U) {
       timer := io.period
       sequencePos := (sequencePos + 1.U) & 0x1F.U
@@ -211,10 +311,10 @@ class TriangleChannel extends Module {
     }
   }
   
-  io.output := Mux(io.enable, triangleSequence(sequencePos), 0.U)
+  io.output := Mux(io.enable && canOutput, triangleSequence(sequencePos), 0.U)
 }
 
-// Noise 波形生成器 (带包络)
+// Noise 波形生成器 (带包络和长度计数器)
 class NoiseChannel extends Module {
   val io = IO(new Bundle {
     val enable = Input(Bool())
@@ -223,8 +323,10 @@ class NoiseChannel extends Module {
     val mode = Input(Bool())  // 0 = 15-bit, 1 = 1-bit (short mode)
     val envelopeLoop = Input(Bool())
     val constantVolume = Input(Bool())
-    val lengthCounter = Input(UInt(5.W))
+    val lengthLoad = Input(UInt(5.W))
+    val loadTrigger = Input(Bool())
     val quarterFrame = Input(Bool())
+    val halfFrame = Input(Bool())
     val output = Output(UInt(4.W))
   })
   
@@ -237,7 +339,7 @@ class NoiseChannel extends Module {
   val timer = RegInit(0.U(12.W))
   val shiftReg = RegInit(1.U(15.W))  // LFSR
   
-  // 实例化包络
+  // 实例化包络和长度计数器
   val envelope = Module(new Envelope)
   envelope.io.start := false.B
   envelope.io.loop := io.envelopeLoop
@@ -246,7 +348,14 @@ class NoiseChannel extends Module {
   envelope.io.dividerPeriod := io.volume
   envelope.io.clock := io.quarterFrame
   
-  when(io.enable && io.lengthCounter > 0.U) {
+  val lengthCounter = Module(new LengthCounter)
+  lengthCounter.io.enable := io.enable
+  lengthCounter.io.halt := io.envelopeLoop
+  lengthCounter.io.load := io.lengthLoad
+  lengthCounter.io.loadTrigger := io.loadTrigger
+  lengthCounter.io.clock := io.halfFrame
+  
+  when(io.enable && lengthCounter.io.active) {
     val actualPeriod = noisePeriods(io.period)
     when(timer === 0.U) {
       timer := actualPeriod
@@ -260,7 +369,7 @@ class NoiseChannel extends Module {
   }
   
   val envelopeVolume = envelope.io.output
-  io.output := Mux(io.enable && !shiftReg(0) && io.lengthCounter > 0.U, 
+  io.output := Mux(io.enable && !shiftReg(0) && lengthCounter.io.active, 
     envelopeVolume, 0.U)
 }
 
@@ -390,7 +499,8 @@ class APU extends Module {
   val pulse1SweepNegate = RegInit(false.B)
   val pulse1SweepShift = RegInit(0.U(3.W))
   val pulse1SweepPeriod = RegInit(0.U(3.W))
-  val pulse1LengthCounter = RegInit(0.U(5.W))
+  val pulse1LengthLoad = RegInit(0.U(5.W))
+  val pulse1LoadTrigger = RegInit(false.B)
   
   // Pulse 2
   val pulse2Duty = RegInit(0.U(2.W))
@@ -403,12 +513,16 @@ class APU extends Module {
   val pulse2SweepNegate = RegInit(false.B)
   val pulse2SweepShift = RegInit(0.U(3.W))
   val pulse2SweepPeriod = RegInit(0.U(3.W))
-  val pulse2LengthCounter = RegInit(0.U(5.W))
+  val pulse2LengthLoad = RegInit(0.U(5.W))
+  val pulse2LoadTrigger = RegInit(false.B)
   
   // Triangle
   val trianglePeriod = RegInit(0.U(11.W))
   val triangleEnabled = RegInit(false.B)
-  val triangleLengthCounter = RegInit(0.U(5.W))
+  val triangleControl = RegInit(false.B)
+  val triangleLinearReload = RegInit(0.U(7.W))
+  val triangleLengthLoad = RegInit(0.U(5.W))
+  val triangleLoadTrigger = RegInit(false.B)
   
   // Noise
   val noiseVolume = RegInit(0.U(4.W))
@@ -417,7 +531,8 @@ class APU extends Module {
   val noiseMode = RegInit(false.B)
   val noiseEnvelopeLoop = RegInit(false.B)
   val noiseConstantVolume = RegInit(false.B)
-  val noiseLengthCounter = RegInit(0.U(5.W))
+  val noiseLengthLoad = RegInit(0.U(5.W))
+  val noiseLoadTrigger = RegInit(false.B)
   
   // DMC
   val dmcEnabled = RegInit(false.B)
@@ -464,7 +579,8 @@ class APU extends Module {
       }
       is(0x03.U) {
         pulse1Period := Cat(io.cpuDataIn(2, 0), pulse1Period(7, 0))
-        pulse1LengthCounter := io.cpuDataIn(7, 3)
+        pulse1LengthLoad := io.cpuDataIn(7, 3)
+        pulse1LoadTrigger := true.B
       }
       
       // Pulse 2
@@ -485,19 +601,22 @@ class APU extends Module {
       }
       is(0x07.U) {
         pulse2Period := Cat(io.cpuDataIn(2, 0), pulse2Period(7, 0))
-        pulse2LengthCounter := io.cpuDataIn(7, 3)
+        pulse2LengthLoad := io.cpuDataIn(7, 3)
+        pulse2LoadTrigger := true.B
       }
       
       // Triangle
       is(0x08.U) {
-        // Linear counter (简化)
+        triangleControl := io.cpuDataIn(7)
+        triangleLinearReload := io.cpuDataIn(6, 0)
       }
       is(0x0A.U) {
         trianglePeriod := Cat(trianglePeriod(10, 8), io.cpuDataIn)
       }
       is(0x0B.U) {
         trianglePeriod := Cat(io.cpuDataIn(2, 0), trianglePeriod(7, 0))
-        triangleLengthCounter := io.cpuDataIn(7, 3)
+        triangleLengthLoad := io.cpuDataIn(7, 3)
+        triangleLoadTrigger := true.B
       }
       
       // Noise
@@ -511,7 +630,8 @@ class APU extends Module {
         noisePeriod := io.cpuDataIn(3, 0)
       }
       is(0x0F.U) {
-        noiseLengthCounter := io.cpuDataIn(7, 3)
+        noiseLengthLoad := io.cpuDataIn(7, 3)
+        noiseLoadTrigger := true.B
       }
       
       // DMC
@@ -599,9 +719,15 @@ class APU extends Module {
   pulse1Channel.io.sweepShift := pulse1SweepShift
   pulse1Channel.io.sweepPeriod := pulse1SweepPeriod
   pulse1Channel.io.onesComplement := true.B  // Pulse 1 使用 1's complement
-  pulse1Channel.io.lengthCounter := pulse1LengthCounter
+  pulse1Channel.io.lengthLoad := pulse1LengthLoad
+  pulse1Channel.io.loadTrigger := pulse1LoadTrigger
   pulse1Channel.io.quarterFrame := quarterFrame
   pulse1Channel.io.halfFrame := halfFrame
+  
+  // 清除触发标志
+  when(pulse1LoadTrigger) {
+    pulse1LoadTrigger := false.B
+  }
   
   // 连接 Pulse 2
   pulse2Channel.io.enable := pulse2Enabled
@@ -615,13 +741,30 @@ class APU extends Module {
   pulse2Channel.io.sweepShift := pulse2SweepShift
   pulse2Channel.io.sweepPeriod := pulse2SweepPeriod
   pulse2Channel.io.onesComplement := false.B  // Pulse 2 使用 2's complement
-  pulse2Channel.io.lengthCounter := pulse2LengthCounter
+  pulse2Channel.io.lengthLoad := pulse2LengthLoad
+  pulse2Channel.io.loadTrigger := pulse2LoadTrigger
   pulse2Channel.io.quarterFrame := quarterFrame
   pulse2Channel.io.halfFrame := halfFrame
+  
+  // 清除触发标志
+  when(pulse2LoadTrigger) {
+    pulse2LoadTrigger := false.B
+  }
   
   // 连接 Triangle
   triangleChannel.io.enable := triangleEnabled
   triangleChannel.io.period := trianglePeriod
+  triangleChannel.io.control := triangleControl
+  triangleChannel.io.linearReload := triangleLinearReload
+  triangleChannel.io.lengthLoad := triangleLengthLoad
+  triangleChannel.io.loadTrigger := triangleLoadTrigger
+  triangleChannel.io.quarterFrame := quarterFrame
+  triangleChannel.io.halfFrame := halfFrame
+  
+  // 清除触发标志
+  when(triangleLoadTrigger) {
+    triangleLoadTrigger := false.B
+  }
   
   // 连接 Noise
   noiseChannel.io.enable := noiseEnabled
@@ -630,8 +773,15 @@ class APU extends Module {
   noiseChannel.io.mode := noiseMode
   noiseChannel.io.envelopeLoop := noiseEnvelopeLoop
   noiseChannel.io.constantVolume := noiseConstantVolume
-  noiseChannel.io.lengthCounter := noiseLengthCounter
+  noiseChannel.io.lengthLoad := noiseLengthLoad
+  noiseChannel.io.loadTrigger := noiseLoadTrigger
   noiseChannel.io.quarterFrame := quarterFrame
+  noiseChannel.io.halfFrame := halfFrame
+  
+  // 清除触发标志
+  when(noiseLoadTrigger) {
+    noiseLoadTrigger := false.B
+  }
   
   // 连接 DMC
   dmcChannel.io.enable := dmcEnabled

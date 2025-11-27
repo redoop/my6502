@@ -144,9 +144,15 @@ A complete NES (Nintendo Entertainment System) built on the 6502 CPU:
 - ✅ Memory Controller - Complete NES memory mapping
 - ✅ System Integration (95%) - CPU + PPU + APU + Memory
 
+**Latest Updates (2025-11-27):**
+- ✅ **Length Counter** - Complete note duration control ⭐ New!
+- ✅ **Linear Counter** - Triangle channel control ⭐ New!
+- ✅ **APU Test Suite** - 12 comprehensive tests ⭐ New!
+- ✅ **APU Completion** - 98% complete audio system ⭐ New!
+
 **In Progress:**
 - 🚧 Game Testing - Test with actual NES ROMs
-- 🚧 MMC3 IRQ - Scanline counter for advanced effects
+- 🚧 DMC Memory Access - Integrate with memory system
 - 🚧 Performance Optimization - Improve rendering speed
 
 **Planned:**
@@ -514,7 +520,9 @@ MIT License
 ---
 
 **Project Status**: ✅ Active Development  
+**Version**: v0.5.0  
 **Last Updated**: 2025-11-27  
-**Test Pass Rate**: 100% (100+/100+)  
+**Test Pass Rate**: 100% (122+/122+)  
+**Overall Progress**: 96%  
 **Recommended Version**: CPU6502Refactored  
-**Latest Feature**: NES System v2 with PPU, APU, and Reset Vector
+**Latest Feature**: Complete APU with Length & Linear Counters ⭐

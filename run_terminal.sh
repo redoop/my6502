@@ -11,12 +11,14 @@ if [ $# -lt 1 ]; then
     echo "用法: ./run_terminal.sh <rom文件> [模式]"
     echo ""
     echo "模式:"
-    echo "  demo  - 演示模式 (不需要 ChiselTest，显示测试图案)"
-    echo "  full  - 完整模式 (需要 ChiselTest，实际运行游戏)"
+    echo "  demo    - 演示模式 (显示测试图案)"
+    echo "  full    - 完整模式 (边缘+填充显示 CHR 数据)"
+    echo "  outline - 轮廓模式 (只显示边缘线条)"
     echo ""
     echo "示例:"
     echo "  ./run_terminal.sh games/contra.nes demo"
     echo "  ./run_terminal.sh games/contra.nes full"
+    echo "  ./run_terminal.sh games/contra.nes outline"
     echo ""
     exit 1
 fi
@@ -63,12 +65,17 @@ if [ "$MODE" = "demo" ]; then
     echo ""
     sbt "runMain nes.SimpleTerminalEmulator $ROM_FILE"
 elif [ "$MODE" = "full" ]; then
-    echo "🚀 启动完整模式..."
+    echo "🚀 启动完整模式 (边缘+填充)..."
     echo "   (这需要较长时间编译和运行)"
     echo ""
     sbt "runMain nes.TerminalEmulator $ROM_FILE"
+elif [ "$MODE" = "outline" ]; then
+    echo "🚀 启动轮廓线条模式..."
+    echo "   (只显示图形边缘，不填充内部)"
+    echo ""
+    sbt "runMain nes.TerminalEmulatorOutline $ROM_FILE"
 else
     echo "❌ 未知模式: $MODE"
-    echo "   支持的模式: demo, full"
+    echo "   支持的模式: demo, full, outline"
     exit 1
 fi
