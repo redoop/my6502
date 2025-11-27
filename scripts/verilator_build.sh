@@ -27,10 +27,24 @@ if ! pkg-config --exists sdl2; then
     exit 1
 fi
 
-# 检查 Verilog 文件是否存在
+# 检查 sbt 是否安装
+if ! command -v sbt &> /dev/null; then
+    echo "❌ 错误: sbt 未安装"
+    echo ""
+    echo "安装方法:"
+    echo "  Ubuntu/Debian: sudo apt-get install sbt"
+    echo "  macOS: brew install sbt"
+    exit 1
+fi
+
+# 生成 Verilog 文件
+echo "📝 生成 Verilog 代码..."
+sbt "runMain nes.GenerateNESVerilog" 2>&1 | grep -E "(Generating|generated|error|Error|success|Total time)" || true
+echo ""
+
+# 检查 Verilog 文件是否生成成功
 if [ ! -f "generated/nes/NESSystem.v" ]; then
-    echo "❌ 错误: Verilog 文件不存在"
-    echo "请先运行: ./scripts/generate_verilog.sh"
+    echo "❌ 错误: Verilog 文件生成失败"
     exit 1
 fi
 

@@ -31,11 +31,12 @@ class MemoryController extends Module {
     val romLoadPRG = Input(Bool())
   })
 
-  // 内部 RAM (2KB)
+  // 内部 RAM (2KB) - 同步读取
   val internalRAM = SyncReadMem(2048, UInt(8.W))
   
-  // 程序 ROM (32KB) - 简化为 RAM 用于测试
-  val prgROM = SyncReadMem(32768, UInt(8.W))
+  // 程序 ROM (32KB) - 异步读取（组合逻辑）
+  // 这样可以在同一个周期内读取数据，避免时序问题
+  val prgROM = Mem(32768, UInt(8.W))
   
   // 默认输出
   io.cpuDataOut := 0.U
@@ -70,8 +71,11 @@ class MemoryController extends Module {
       // 控制器 2
       io.cpuDataOut := io.controller2
     }.elsewhen(io.cpuAddr >= 0x8000.U) {
-      // PRG ROM
-      val romAddr = io.cpuAddr - 0x8000.U
+      // PRG ROM (支持 16KB 镜像)
+      // 对于 16KB ROM: 0x8000-0xBFFF 和 0xC000-0xFFFF 映射到同一个 ROM
+      // 对于 32KB ROM: 0x8000-0xFFFF 直接映射
+      // 使用低 14 位来支持 16KB 镜像
+      val romAddr = (io.cpuAddr - 0x8000.U)(13, 0)  // 取低 14 位，16KB 自动镜像
       io.cpuDataOut := prgROM.read(romAddr)
     }
   }
@@ -87,8 +91,8 @@ class MemoryController extends Module {
       io.ppuDataIn := io.cpuDataIn
       io.ppuWrite := true.B
     }.elsewhen(io.cpuAddr >= 0x8000.U) {
-      // PRG ROM (测试时可写)
-      val romAddr = io.cpuAddr - 0x8000.U
+      // PRG ROM (测试时可写，支持 16KB 镜像)
+      val romAddr = (io.cpuAddr - 0x8000.U)(14, 0)  // 取低 15 位
       prgROM.write(romAddr, io.cpuDataIn)
     }
   }

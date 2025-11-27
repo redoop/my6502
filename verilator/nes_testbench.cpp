@@ -8,6 +8,7 @@
 #include <vector>
 #include <cstdint>
 #include <chrono>
+#include <iomanip>
 #include <SDL2/SDL.h>
 
 // NES 调色板 (RGB)
@@ -138,15 +139,24 @@ public:
         std::cout << "⬆️  加载 ROM 到硬件..." << std::endl;
         
         // 加载 PRG ROM
+        // 对于大于 32KB 的 ROM，加载最后 32KB (包含 reset vector)
+        size_t prg_offset = 0;
+        if (prg_rom.size() > 32768) {
+            prg_offset = prg_rom.size() - 32768;
+            std::cout << "   ⚠️  ROM 大于 32KB，加载最后 32KB (偏移: 0x" << std::hex << prg_offset << std::dec << ")" << std::endl;
+        }
+        
+
+        
         dut->io_romLoadPRG = 1;
-        for (size_t i = 0; i < prg_rom.size() && i < 32768; i++) {
+        for (size_t i = 0; i < 32768 && (prg_offset + i) < prg_rom.size(); i++) {
             dut->io_romLoadEn = 1;
             dut->io_romLoadAddr = i;
-            dut->io_romLoadData = prg_rom[i];
+            dut->io_romLoadData = prg_rom[prg_offset + i];
             tick();
             
             if (i % 4096 == 0) {
-                std::cout << "\r   PRG: " << (i * 100 / std::min(prg_rom.size(), (size_t)32768)) << "%" << std::flush;
+                std::cout << "\r   PRG: " << (i * 100 / 32768) << "%" << std::flush;
             }
         }
         std::cout << "\r   PRG: 100%" << std::endl;
@@ -169,6 +179,18 @@ public:
         
         dut->io_romLoadEn = 0;
         std::cout << "✅ ROM 加载完成" << std::endl;
+        
+        // 检查中断向量
+        std::cout << "   检查 ROM 内容:" << std::endl;
+        size_t vec_offset = prg_rom.size() - 6;  // 最后 6 字节包含中断向量
+        
+        // NMI 向量 (0xFFFA-0xFFFB)
+        uint16_t nmi_vec = prg_rom[vec_offset] | (prg_rom[vec_offset + 1] << 8);
+        std::cout << "   NMI 向量 (0xFFFA-0xFFFB) = 0x" << std::hex << nmi_vec << std::dec << std::endl;
+        
+        // Reset 向量 (0xFFFC-0xFFFD)
+        uint16_t reset_vec = prg_rom[vec_offset + 2] | (prg_rom[vec_offset + 3] << 8);
+        std::cout << "   Reset 向量 (0xFFFC-0xFFFD) = 0x" << std::hex << reset_vec << std::dec << std::endl;
     }
     
     void tick() {
@@ -258,27 +280,77 @@ public:
         
         uint64_t frame_count = 0;
         auto start_time = std::chrono::high_resolution_clock::now();
+        auto last_report_time = start_time;
+        bool last_vblank = false;
         
         while (true) {
             handleInput();
             tick();
             updateDisplay();
             
-            // 每秒统计一次
-            if (cycle_count % 1789773 == 0) {  // NTSC CPU 频率
+            // 检测 VBlank 上升沿来计数帧
+            bool vblank = dut->io_vblank;
+            if (vblank && !last_vblank) {
                 frame_count++;
-                auto now = std::chrono::high_resolution_clock::now();
-                auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start_time).count();
                 
-                if (elapsed > 0) {
-                    double fps = static_cast<double>(frame_count) / elapsed;
+                // 每秒报告一次状态
+                auto now = std::chrono::high_resolution_clock::now();
+                auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_report_time).count();
+                
+                if (elapsed >= 1000) {
+                    double fps = static_cast<double>(frame_count) * 1000.0 / elapsed;
                     uint16_t pc = dut->io_debug_regPC;
-                    std::cout << "\r帧数: " << frame_count 
-                              << " | FPS: " << fps 
-                              << " | PC: 0x" << std::hex << pc << std::dec
-                              << " | 周期: " << cycle_count << std::flush;
+                    uint8_t a = dut->io_debug_regA;
+                    uint8_t x = dut->io_debug_regX;
+                    uint8_t y = dut->io_debug_regY;
+                    uint8_t sp = dut->io_debug_regSP;
+                    
+                    // 每 5 秒报告一次调试信息
+                    static auto last_debug_time = now;
+                    auto debug_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_debug_time).count();
+                    
+                    if (debug_elapsed >= 5000) {
+                        std::cout << "\n=== PPU 调试信息 ===" << std::endl;
+                        std::cout << "  当前像素: (" << dut->io_pixelX << ", " << dut->io_pixelY << ")" << std::endl;
+                        std::cout << "  当前颜色: 0x" << std::hex << (int)dut->io_pixelColor << std::dec << std::endl;
+                        
+                        // PPU 寄存器状态
+                        std::cout << "  PPUCTRL: 0x" << std::hex << (int)dut->io_ppuDebug_ppuCtrl << std::dec << std::endl;
+                        std::cout << "  PPUMASK: 0x" << std::hex << (int)dut->io_ppuDebug_ppuMask << std::dec << std::endl;
+                        std::cout << "  PPUSTATUS: 0x" << std::hex << (int)dut->io_ppuDebug_ppuStatus << std::dec << std::endl;
+                        std::cout << "  PPUADDR: 0x" << std::hex << dut->io_ppuDebug_ppuAddrReg << std::dec << std::endl;
+                        std::cout << "  调色板初始化: " << (dut->io_ppuDebug_paletteInitDone ? "完成" : "进行中") << std::endl;
+                        
+                        // Framebuffer 统计
+                        std::cout << "  Framebuffer[0]: 0x" << std::hex << framebuffer[0] << std::dec << std::endl;
+                        std::cout << "  Framebuffer[100]: 0x" << std::hex << framebuffer[100] << std::dec << std::endl;
+                        std::cout << "  Framebuffer[1000]: 0x" << std::hex << framebuffer[1000] << std::dec << std::endl;
+                        
+                        // 统计非零像素数量
+                        int non_zero_pixels = 0;
+                        for (int i = 0; i < 256 * 240; i++) {
+                            if (framebuffer[i] != 0) non_zero_pixels++;
+                        }
+                        std::cout << "  非零像素: " << non_zero_pixels << " / " << (256 * 240) << std::endl;
+                        std::cout << "===================" << std::endl;
+                        
+                        last_debug_time = now;
+                    }
+                    
+                    std::cout << "\r帧: " << frame_count 
+                              << " | FPS: " << std::fixed << std::setprecision(1) << fps 
+                              << " | PC: 0x" << std::hex << pc 
+                              << " | A: 0x" << (int)a
+                              << " | X: 0x" << (int)x
+                              << " | Y: 0x" << (int)y
+                              << " | SP: 0x" << (int)sp << std::dec
+                              << "     " << std::flush;
+                    
+                    frame_count = 0;
+                    last_report_time = now;
                 }
             }
+            last_vblank = vblank;
         }
     }
 };
@@ -296,7 +368,24 @@ int main(int argc, char** argv) {
     
     VNESSystem* dut = new VNESSystem;
     
-    // 复位
+    NESEmulator emulator(dut);
+    
+    // 初始 reset
+    dut->reset = 1;
+    dut->io_romLoadEn = 0;
+    for (int i = 0; i < 10; i++) {
+        dut->clock = 0;
+        dut->eval();
+        dut->clock = 1;
+        dut->eval();
+    }
+    
+    // 加载 ROM
+    if (!emulator.loadROM(argv[1])) {
+        return 1;
+    }
+    
+    // 再次 reset，让 CPU 从 reset vector 启动
     dut->reset = 1;
     for (int i = 0; i < 10; i++) {
         dut->clock = 0;
@@ -304,13 +393,40 @@ int main(int argc, char** argv) {
         dut->clock = 1;
         dut->eval();
     }
+    
+    // 释放 reset
     dut->reset = 0;
+    std::cout << "🔄 释放 Reset，CPU 启动中..." << std::endl;
     
-    NESEmulator emulator(dut);
+    // 初始化 PPU 调色板（用于测试渲染）
+    std::cout << "   初始化 PPU 调色板..." << std::endl;
+    dut->io_romLoadEn = 0;
     
-    if (!emulator.loadROM(argv[1])) {
-        return 1;
+    // 等待几个周期让 PPU 稳定
+    for (int i = 0; i < 10; i++) {
+        dut->clock = 0;
+        dut->eval();
+        dut->clock = 1;
+        dut->eval();
     }
+    
+    // 给足够的周期让 CPU 读取 reset vector (需要 5 个周期完成 reset 序列)
+    for (int i = 0; i < 10; i++) {
+        dut->clock = 0;
+        dut->eval();
+        dut->clock = 1;
+        dut->eval();
+        
+        // 调试：显示前几个周期的状态
+        if (i < 10) {
+            std::cout << "   周期 " << i 
+                      << ": state=" << (int)dut->io_debug_state 
+                      << " cycle=" << (int)dut->io_debug_cycle
+                      << " PC=0x" << std::hex << dut->io_debug_regPC << std::dec << std::endl;
+        }
+    }
+    
+    std::cout << "✅ CPU 已启动，PC = 0x" << std::hex << dut->io_debug_regPC << std::dec << std::endl;
     
     emulator.run();
     

@@ -21,6 +21,15 @@ class NESSystem extends Module {
     // 调试接口
     val debug = Output(new DebugBundle)
     
+    // PPU 调试接口
+    val ppuDebug = Output(new Bundle {
+      val ppuCtrl = UInt(8.W)
+      val ppuMask = UInt(8.W)
+      val ppuStatus = UInt(8.W)
+      val ppuAddrReg = UInt(16.W)
+      val paletteInitDone = Bool()
+    })
+    
     // ROM 加载接口 (用于 Verilator 仿真)
     val romLoadEn = Input(Bool())
     val romLoadAddr = Input(UInt(16.W))
@@ -33,8 +42,9 @@ class NESSystem extends Module {
   val ppu = Module(new PPU)
   val memory = Module(new MemoryController)
   
-  // Reset 连接
+  // Reset 和 NMI 连接
   cpu.io.reset := reset.asBool
+  cpu.io.nmi := ppu.io.nmiOut
   
   // CPU <-> Memory 连接
   memory.io.cpuAddr := cpu.io.memAddr
@@ -62,6 +72,7 @@ class NESSystem extends Module {
   
   // 调试输出
   io.debug := cpu.io.debug
+  io.ppuDebug := ppu.io.debug
   
   // ROM 加载逻辑 (用于 Verilator 仿真)
   memory.io.romLoadEn := io.romLoadEn

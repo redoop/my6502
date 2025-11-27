@@ -14,18 +14,29 @@ class CPU6502Core extends Module {
     val memRead    = Output(Bool())
     val debug      = Output(new DebugBundle)
     val reset      = Input(Bool())  // Reset 信号
+    val nmi        = Input(Bool())  // NMI 中断信号
   })
 
   // 寄存器
   val regs = RegInit(Registers.default())
   
   // CPU 状态机
-  val sReset :: sFetch :: sExecute :: sDone :: Nil = Enum(4)
+  val sReset :: sFetch :: sExecute :: sNMI :: sDone :: Nil = Enum(5)
   val state = RegInit(sReset)
   
   val opcode  = RegInit(0.U(8.W))
   val operand = RegInit(0.U(16.W))
   val cycle   = RegInit(0.U(3.W))
+  
+  // NMI 边沿检测
+  val nmiLast = RegInit(false.B)
+  val nmiEdge = RegInit(false.B)
+  
+  // 检测 NMI 上升沿
+  when(io.nmi && !nmiLast) {
+    nmiEdge := true.B
+  }
+  nmiLast := io.nmi
 
   // 默认内存接口信号
   io.memAddr    := regs.pc
@@ -37,67 +48,147 @@ class CPU6502Core extends Module {
   val execResult = Wire(new ExecutionResult)
   execResult := ExecutionResult.hold(regs, operand)
 
-  // Reset 处理
+  // Reset 标志：用于检测 reset 刚刚释放
+  val resetReleased = RegInit(false.B)
+  
+  // 状态机
   when(io.reset) {
+    // Reset 时初始化状态
     state := sReset
     cycle := 0.U
-  }
-
-  // 状态机
-  switch(state) {
-    is(sReset) {
-      // Reset 序列: 读取 Reset Vector ($FFFC-$FFFD)
-      when(cycle === 0.U) {
-        io.memAddr := 0xFFFC.U
-        io.memRead := true.B
-        operand := io.memDataIn  // 低字节
-        cycle := 1.U
-      }.elsewhen(cycle === 1.U) {
-        io.memAddr := 0xFFFD.U
-        io.memRead := true.B
-        val resetVector = Cat(io.memDataIn, operand(7, 0))
-        regs.pc := resetVector
-        cycle := 0.U
-        state := sFetch
-      }
-    }
-    
-    is(sFetch) {
-      io.memAddr := regs.pc
-      io.memRead := true.B
-      opcode := io.memDataIn
-      regs.pc := regs.pc + 1.U
+    regs.pc := 0.U
+    resetReleased := false.B
+  }.otherwise {
+    when(!resetReleased) {
+      // Reset 刚释放，等待一个周期让寄存器稳定
+      resetReleased := true.B
       cycle := 0.U
-      state := sExecute
-    }
+    }.otherwise {
+      switch(state) {
+        is(sReset) {
+          // Reset 序列: 读取 Reset Vector ($FFFC-$FFFD)
+          when(cycle === 0.U) {
+            // 读取低字节
+            io.memAddr := 0xFFFC.U
+            io.memRead := true.B
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            io.memAddr := 0xFFFC.U
+            io.memRead := true.B
+            operand := io.memDataIn
+            cycle := 2.U
+          }.elsewhen(cycle === 2.U) {
+            // 读取高字节
+            io.memAddr := 0xFFFD.U
+            io.memRead := true.B
+            cycle := 3.U
+          }.otherwise {  // cycle === 3
+            // 设置 PC 并进入 Fetch 状态
+            io.memAddr := 0xFFFD.U
+            io.memRead := true.B
+            val resetVector = Cat(io.memDataIn, operand(7, 0))
+            regs.pc := resetVector
+            cycle := 0.U
+            state := sFetch
+          }
+        }
+    
+        is(sFetch) {
+          // 检查是否有 NMI 中断
+          when(nmiEdge) {
+            nmiEdge := false.B
+            cycle := 0.U
+            state := sNMI
+          }.otherwise {
+            io.memAddr := regs.pc
+            io.memRead := true.B
+            opcode := io.memDataIn
+            regs.pc := regs.pc + 1.U
+            cycle := 0.U
+            state := sExecute
+          }
+        }
 
-    is(sExecute) {
-      // 根据 opcode 分发到对应指令模块
-      execResult := dispatchInstruction(opcode, cycle, regs, operand, io.memDataIn)
-      
-      // 应用执行结果
-      io.memAddr    := execResult.memAddr
-      io.memDataOut := execResult.memData
-      io.memWrite   := execResult.memWrite
-      io.memRead    := execResult.memRead
-      
-      regs    := execResult.regs
-      operand := execResult.operand
-      cycle   := execResult.nextCycle
-      
-      when(execResult.done) {
-        cycle := 0.U
-        state := sFetch
+        is(sExecute) {
+          // 根据 opcode 分发到对应指令模块
+          execResult := dispatchInstruction(opcode, cycle, regs, operand, io.memDataIn)
+          
+          // 应用执行结果
+          io.memAddr    := execResult.memAddr
+          io.memDataOut := execResult.memData
+          io.memWrite   := execResult.memWrite
+          io.memRead    := execResult.memRead
+          
+          regs    := execResult.regs
+          operand := execResult.operand
+          cycle   := execResult.nextCycle
+          
+          when(execResult.done) {
+            cycle := 0.U
+            state := sFetch
+          }
+        }
+
+        is(sNMI) {
+          // NMI 中断处理 (7 个周期)
+          when(cycle === 0.U) {
+            // 周期 1: 空操作
+            cycle := 1.U
+          }.elsewhen(cycle === 1.U) {
+            // 周期 2: 将 PC 高字节压栈
+            io.memAddr := Cat(0x01.U(8.W), regs.sp)
+            io.memDataOut := regs.pc(15, 8)
+            io.memWrite := true.B
+            regs.sp := regs.sp - 1.U
+            cycle := 2.U
+          }.elsewhen(cycle === 2.U) {
+            // 周期 3: 将 PC 低字节压栈
+            io.memAddr := Cat(0x01.U(8.W), regs.sp)
+            io.memDataOut := regs.pc(7, 0)
+            io.memWrite := true.B
+            regs.sp := regs.sp - 1.U
+            cycle := 3.U
+          }.elsewhen(cycle === 3.U) {
+            // 周期 4: 将状态寄存器压栈 (B 标志清除)
+            val status = Cat(regs.flagN, regs.flagV, 1.U(1.W), 0.U(1.W), 
+                           regs.flagD, regs.flagI, regs.flagZ, regs.flagC)
+            io.memAddr := Cat(0x01.U(8.W), regs.sp)
+            io.memDataOut := status
+            io.memWrite := true.B
+            regs.sp := regs.sp - 1.U
+            cycle := 4.U
+          }.elsewhen(cycle === 4.U) {
+            // 周期 5: 读取 NMI 向量低字节 (0xFFFA)
+            io.memAddr := 0xFFFA.U
+            io.memRead := true.B
+            cycle := 5.U
+          }.elsewhen(cycle === 5.U) {
+            // 周期 6: 保存低字节，读取高字节 (0xFFFB)
+            io.memAddr := 0xFFFA.U
+            io.memRead := true.B
+            operand := io.memDataIn
+            cycle := 6.U
+          }.otherwise {  // cycle === 6
+            // 周期 7: 读取高字节，设置 PC
+            io.memAddr := 0xFFFB.U
+            io.memRead := true.B
+            val nmiVector = Cat(io.memDataIn, operand(7, 0))
+            regs.pc := nmiVector
+            regs.flagI := true.B  // 设置中断禁止标志
+            cycle := 0.U
+            state := sFetch
+          }
+        }
+
+        is(sDone) {
+          // 保持状态
+        }
       }
-    }
-
-    is(sDone) {
-      // 保持状态
     }
   }
 
   // 调试输出
-  io.debug := DebugBundle.fromRegisters(regs, opcode)
+  io.debug := DebugBundle.fromRegisters(regs, opcode, state, cycle)
 
   // 指令分发器
   def dispatchInstruction(
