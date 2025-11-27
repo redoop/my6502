@@ -520,9 +520,9 @@ MIT License
 ---
 
 **Project Status**: ✅ Active Development  
-**Version**: v0.5.0  
+**Version**: v0.7.0  
 **Last Updated**: 2025-11-27  
 **Test Pass Rate**: 100% (122+/122+)  
-**Overall Progress**: 96%  
+**Overall Progress**: 98%  
 **Recommended Version**: CPU6502Refactored  
-**Latest Feature**: Complete APU with Length & Linear Counters ⭐
+**Latest Feature**: Verilator Hardware Simulation Environment ⭐

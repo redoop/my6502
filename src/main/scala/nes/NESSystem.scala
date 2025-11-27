@@ -21,16 +21,20 @@ class NESSystem extends Module {
     // 调试接口
     val debug = Output(new DebugBundle)
     
-    // ROM 加载接口 (用于测试)
+    // ROM 加载接口 (用于 Verilator 仿真)
     val romLoadEn = Input(Bool())
     val romLoadAddr = Input(UInt(16.W))
     val romLoadData = Input(UInt(8.W))
+    val romLoadPRG = Input(Bool())  // true = PRG ROM, false = CHR ROM
   })
 
   // 实例化组件
   val cpu = Module(new CPU6502Refactored)
   val ppu = Module(new PPU)
   val memory = Module(new MemoryController)
+  
+  // Reset 连接
+  cpu.io.reset := reset.asBool
   
   // CPU <-> Memory 连接
   memory.io.cpuAddr := cpu.io.memAddr
@@ -59,10 +63,14 @@ class NESSystem extends Module {
   // 调试输出
   io.debug := cpu.io.debug
   
-  // ROM 加载逻辑 (用于测试)
-  // 注意：这是简化的实现，实际应该通过专门的接口
-  when(io.romLoadEn) {
-    // 这里需要访问 memory 内部的 ROM
-    // 实际实现中需要添加专门的加载接口
-  }
+  // ROM 加载逻辑 (用于 Verilator 仿真)
+  memory.io.romLoadEn := io.romLoadEn
+  memory.io.romLoadAddr := io.romLoadAddr
+  memory.io.romLoadData := io.romLoadData
+  memory.io.romLoadPRG := io.romLoadPRG
+  
+  // CHR ROM 加载到 PPU
+  ppu.io.chrLoadEn := io.romLoadEn && !io.romLoadPRG
+  ppu.io.chrLoadAddr := io.romLoadAddr(12, 0)  // CHR 地址 13 位
+  ppu.io.chrLoadData := io.romLoadData
 }

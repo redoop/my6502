@@ -23,6 +23,12 @@ class MemoryController extends Module {
     // 控制器接口 (简化)
     val controller1 = Input(UInt(8.W))
     val controller2 = Input(UInt(8.W))
+    
+    // ROM 加载接口 (用于 Verilator)
+    val romLoadEn = Input(Bool())
+    val romLoadAddr = Input(UInt(16.W))
+    val romLoadData = Input(UInt(8.W))
+    val romLoadPRG = Input(Bool())
   })
 
   // 内部 RAM (2KB)
@@ -84,6 +90,14 @@ class MemoryController extends Module {
       // PRG ROM (测试时可写)
       val romAddr = io.cpuAddr - 0x8000.U
       prgROM.write(romAddr, io.cpuDataIn)
+    }
+  }
+  
+  // ROM 加载逻辑 (用于 Verilator 仿真)
+  when(io.romLoadEn && io.romLoadPRG) {
+    // 加载 PRG ROM
+    when(io.romLoadAddr < 32768.U) {
+      prgROM.write(io.romLoadAddr, io.romLoadData)
     }
   }
 }

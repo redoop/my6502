@@ -31,6 +31,11 @@ class PPU extends Module {
     val pixelColor = Output(UInt(6.W))  // 调色板索引
     val vblank = Output(Bool())         // VBlank 标志
     val nmiOut = Output(Bool())         // NMI 中断输出
+    
+    // CHR ROM 加载接口 (用于 Verilator)
+    val chrLoadEn = Input(Bool())
+    val chrLoadAddr = Input(UInt(13.W))  // 8KB CHR ROM
+    val chrLoadData = Input(UInt(8.W))
   })
 
   // PPU 寄存器
@@ -47,6 +52,7 @@ class PPU extends Module {
   val vram = SyncReadMem(2048, UInt(8.W))  // 2KB VRAM (nametables)
   val oam = SyncReadMem(256, UInt(8.W))    // 256B OAM (sprites)
   val palette = SyncReadMem(32, UInt(8.W)) // 32B palette RAM
+  val chrROM = SyncReadMem(8192, UInt(8.W)) // 8KB CHR ROM (pattern tables)
   
   // 扫描计数器
   val scanlineX = RegInit(0.U(9.W))
@@ -138,6 +144,11 @@ class PPU extends Module {
         ppuAddrReg := ppuAddrReg + 1.U
       }
     }
+  }
+  
+  // CHR ROM 加载逻辑 (用于 Verilator 仿真)
+  when(io.chrLoadEn) {
+    chrROM.write(io.chrLoadAddr, io.chrLoadData)
   }
   
   // 输出
