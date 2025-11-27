@@ -6,7 +6,7 @@ import cpu6502.core._
 
 // 跳转指令: JMP, JSR, RTS, BRK, RTI
 object JumpInstructions {
-  val opcodes = Seq(0x4C, 0x20, 0x60, 0x00, 0x40)
+  val opcodes = Seq(0x4C, 0x6C, 0x20, 0x60, 0x00, 0x40)
   
   // JMP Absolute
   def executeJMP(cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
@@ -34,6 +34,60 @@ object JumpInstructions {
       }
       is(1.U) {
         result.memAddr := regs.pc
+        result.memRead := true.B
+        newRegs.pc := Cat(memDataIn, operand(7, 0))
+        result.regs := newRegs
+        result.done := true.B
+      }
+    }
+    
+    result
+  }
+  
+  // JMP Indirect
+  def executeJMPIndirect(cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
+    val result = Wire(new ExecutionResult)
+    val newRegs = Wire(new Registers)
+    newRegs := regs
+    
+    result.done := false.B
+    result.nextCycle := cycle + 1.U
+    result.regs := newRegs
+    result.memAddr := 0.U
+    result.memData := 0.U
+    result.memWrite := false.B
+    result.memRead := false.B
+    result.operand := operand
+    
+    switch(cycle) {
+      is(0.U) {
+        // 读取间接地址低字节
+        result.memAddr := regs.pc
+        result.memRead := true.B
+        result.operand := memDataIn
+        newRegs.pc := regs.pc + 1.U
+        result.regs := newRegs
+      }
+      is(1.U) {
+        // 读取间接地址高字节
+        result.memAddr := regs.pc
+        result.memRead := true.B
+        result.operand := Cat(memDataIn, operand(7, 0))
+        newRegs.pc := regs.pc + 1.U
+        result.regs := newRegs
+      }
+      is(2.U) {
+        // 读取目标地址低字节
+        result.memAddr := operand
+        result.memRead := true.B
+        result.operand := Cat(operand(15, 8), memDataIn)
+      }
+      is(3.U) {
+        // 读取目标地址高字节 (注意 6502 的 JMP indirect bug: 不跨页)
+        val indirectAddrHigh = Mux(operand(7, 0) === 0xFF.U,
+          Cat(operand(15, 8), 0.U(8.W)),  // Bug: 回绕到同一页
+          operand + 1.U)
+        result.memAddr := indirectAddrHigh
         result.memRead := true.B
         newRegs.pc := Cat(memDataIn, operand(7, 0))
         result.regs := newRegs

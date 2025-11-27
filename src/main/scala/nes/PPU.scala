@@ -128,6 +128,7 @@ class PPU extends Module {
       is(0x2.U) {  // PPUSTATUS
         io.cpuDataOut := Cat(vblankFlag, 0.U(7.W))
         vblankFlag := false.B  // 读取后清除
+        nmiOccurred := false.B  // 同时清除 NMI 标志
         ppuAddrLatch := false.B
       }
       is(0x4.U) {  // OAMDATA

@@ -32,11 +32,18 @@ class CPU6502Core extends Module {
   val nmiLast = RegInit(false.B)
   val nmiEdge = RegInit(false.B)
   
+  // 始终更新 nmiLast
+  nmiLast := io.nmi
+  
   // 检测 NMI 上升沿
   when(io.nmi && !nmiLast) {
     nmiEdge := true.B
   }
-  nmiLast := io.nmi
+  
+  // 在进入 NMI 状态时清除边沿标志
+  when(state === sNMI) {
+    nmiEdge := false.B
+  }
 
   // 默认内存接口信号
   io.memAddr    := regs.pc
@@ -102,7 +109,6 @@ class CPU6502Core extends Module {
         is(sFetch) {
           // 检查是否有 NMI 中断
           when(nmiEdge) {
-            nmiEdge := false.B
             cycle := 0.U
             state := sNMI
           }.otherwise {
@@ -167,15 +173,15 @@ class CPU6502Core extends Module {
             // 周期 5: 读取 NMI 向量低字节 (0xFFFA)
             io.memAddr := 0xFFFA.U
             io.memRead := true.B
+            operand := io.memDataIn
             cycle := 5.U
           }.elsewhen(cycle === 5.U) {
-            // 周期 6: 保存低字节，读取高字节 (0xFFFB)
-            io.memAddr := 0xFFFA.U
+            // 周期 6: 读取高字节 (0xFFFB)
+            io.memAddr := 0xFFFB.U
             io.memRead := true.B
-            operand := io.memDataIn
             cycle := 6.U
           }.otherwise {  // cycle === 6
-            // 周期 7: 读取高字节，设置 PC
+            // 周期 7: 设置 PC
             io.memAddr := 0xFFFB.U
             io.memRead := true.B
             val nmiVector = Cat(io.memDataIn, operand(7, 0))
@@ -226,17 +232,52 @@ class CPU6502Core extends Module {
       is(0x69.U) { result := ArithmeticInstructions.executeADCImmediate(regs, memDataIn) }
       is(0xE9.U) { result := ArithmeticInstructions.executeSBCImmediate(regs, memDataIn) }
       
-      // ========== Arithmetic 零页 ==========
+      // ========== ADC/SBC 零页 ==========
+      is(0x65.U, 0xE5.U) {
+        result := ArithmeticInstructions.executeADCSBCZeroPage(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== ADC/SBC 零页 X ==========
+      is(0x75.U, 0xF5.U) {
+        result := ArithmeticInstructions.executeADCSBCZeroPageX(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== ADC/SBC 绝对 ==========
+      is(0x6D.U, 0xED.U) {
+        result := ArithmeticInstructions.executeADCSBCAbsolute(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== ADC/SBC 间接 X ==========
+      is(0x61.U, 0xE1.U) {
+        result := ArithmeticInstructions.executeADCSBCIndirectX(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== ADC/SBC 间接 Y ==========
+      is(0x71.U, 0xF1.U) {
+        result := ArithmeticInstructions.executeADCSBCIndirectY(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== INC/DEC 零页 ==========
       is(0xE6.U, 0xC6.U) {
         result := ArithmeticInstructions.executeZeroPage(opcode, cycle, regs, operand, memDataIn)
       }
       
-      // ========== Arithmetic 绝对 ==========
+      // ========== INC/DEC 零页 X ==========
+      is(0xF6.U, 0xD6.U) {
+        result := ArithmeticInstructions.executeZeroPageX(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== INC/DEC 绝对 ==========
       is(0xEE.U, 0xCE.U) {
         result := ArithmeticInstructions.executeAbsolute(opcode, cycle, regs, operand, memDataIn)
       }
       
-      // ========== Arithmetic 绝对索引 ==========
+      // ========== INC/DEC 绝对 X ==========
+      is(0xFE.U, 0xDE.U) {
+        result := ArithmeticInstructions.executeAbsoluteX(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== ADC/SBC 绝对索引 ==========
       is(0x79.U, 0xF9.U, 0x7D.U, 0xFD.U) {
         result := ArithmeticInstructions.executeAbsoluteIndexed(opcode, cycle, regs, operand, memDataIn)
       }
@@ -287,6 +328,21 @@ class CPU6502Core extends Module {
       // ========== Shift 零页 ==========
       is(0x06.U, 0x46.U, 0x26.U, 0x66.U) {
         result := ShiftInstructions.executeZeroPage(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Shift 零页 X ==========
+      is(0x16.U, 0x56.U, 0x36.U, 0x76.U) {
+        result := ShiftInstructions.executeZeroPageX(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Shift 绝对 ==========
+      is(0x0E.U, 0x4E.U, 0x2E.U, 0x6E.U) {
+        result := ShiftInstructions.executeAbsolute(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Shift 绝对 X ==========
+      is(0x1E.U, 0x5E.U, 0x3E.U, 0x7E.U) {
+        result := ShiftInstructions.executeAbsoluteX(opcode, cycle, regs, operand, memDataIn)
       }
       
       // ========== Compare 立即寻址 ==========
@@ -386,6 +442,7 @@ class CPU6502Core extends Module {
       
       // ========== Jump 指令 ==========
       is(0x4C.U) { result := JumpInstructions.executeJMP(cycle, regs, operand, memDataIn) }
+      is(0x6C.U) { result := JumpInstructions.executeJMPIndirect(cycle, regs, operand, memDataIn) }
       is(0x20.U) { result := JumpInstructions.executeJSR(cycle, regs, operand, memDataIn) }
       is(0x60.U) { result := JumpInstructions.executeRTS(cycle, regs, operand, memDataIn) }
       is(0x00.U) { result := JumpInstructions.executeBRK(cycle, regs, operand, memDataIn) }

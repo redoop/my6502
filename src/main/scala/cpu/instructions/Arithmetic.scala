@@ -10,14 +10,31 @@ object ArithmeticInstructions {
   val impliedOpcodes = Seq(0xE8, 0xC8, 0xCA, 0x88, 0x1A, 0x3A)
   // 立即寻址
   val immediateOpcodes = Seq(0x69, 0xE9)
+  // ADC/SBC 零页
+  val adcsbcZeroPageOpcodes = Seq(0x65, 0xE5)
+  // ADC/SBC 零页 X
+  val adcsbcZeroPageXOpcodes = Seq(0x75, 0xF5)
+  // ADC/SBC 绝对
+  val adcsbcAbsoluteOpcodes = Seq(0x6D, 0xED)
+  // ADC/SBC 间接 X
+  val adcsbcIndirectXOpcodes = Seq(0x61, 0xE1)
+  // ADC/SBC 间接 Y
+  val adcsbcIndirectYOpcodes = Seq(0x71, 0xF1)
   // 零页寻址
   val zeroPageOpcodes = Seq(0xE6, 0xC6)
+  // 零页 X 索引
+  val zeroPageXOpcodes = Seq(0xF6, 0xD6)  // INC, DEC zp,X
   // 绝对寻址
   val absoluteOpcodes = Seq(0xEE, 0xCE)
+  // 绝对 X 索引
+  val absoluteXOpcodes = Seq(0xFE, 0xDE)  // INC, DEC abs,X
   // 绝对索引寻址
   val absoluteIndexedOpcodes = Seq(0x79, 0xF9, 0x7D, 0xFD)  // ADC/SBC abs,Y/X
   
-  val opcodes = impliedOpcodes ++ immediateOpcodes ++ zeroPageOpcodes ++ absoluteOpcodes ++ absoluteIndexedOpcodes
+  val opcodes = impliedOpcodes ++ immediateOpcodes ++ zeroPageOpcodes ++ zeroPageXOpcodes ++
+                absoluteOpcodes ++ absoluteXOpcodes ++ absoluteIndexedOpcodes ++
+                adcsbcZeroPageOpcodes ++ adcsbcZeroPageXOpcodes ++ adcsbcAbsoluteOpcodes ++
+                adcsbcIndirectXOpcodes ++ adcsbcIndirectYOpcodes
   
   // 单周期指令执行
   def executeImplied(opcode: UInt, regs: Registers): ExecutionResult = {
@@ -170,6 +187,48 @@ object ArithmeticInstructions {
     result
   }
   
+  // INC/DEC 零页 X - 多周期
+  def executeZeroPageX(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
+    val result = Wire(new ExecutionResult)
+    val newRegs = Wire(new Registers)
+    newRegs := regs
+    
+    result.done := false.B
+    result.nextCycle := cycle + 1.U
+    result.regs := newRegs
+    result.memAddr := 0.U
+    result.memData := 0.U
+    result.memWrite := false.B
+    result.memRead := false.B
+    result.operand := operand
+    
+    switch(cycle) {
+      is(0.U) {
+        result.memAddr := regs.pc
+        result.memRead := true.B
+        result.operand := (memDataIn + regs.x)(7, 0)
+        newRegs.pc := regs.pc + 1.U
+        result.regs := newRegs
+      }
+      is(1.U) {
+        result.memAddr := operand
+        result.memRead := true.B
+      }
+      is(2.U) {
+        result.memAddr := operand
+        val res = Mux(opcode === 0xF6.U, memDataIn + 1.U, memDataIn - 1.U)
+        result.memData := res
+        result.memWrite := true.B
+        newRegs.flagN := res(7)
+        newRegs.flagZ := res === 0.U
+        result.regs := newRegs
+        result.done := true.B
+      }
+    }
+    
+    result
+  }
+  
   // INC/DEC 绝对寻址 - 多周期
   def executeAbsolute(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
@@ -214,6 +273,312 @@ object ArithmeticInstructions {
         result.memData := res
         result.memWrite := true.B
         newRegs.flagN := res(7)
+        newRegs.flagZ := res === 0.U
+        result.regs := newRegs
+        result.done := true.B
+      }
+    }
+    
+    result
+  }
+  
+  // INC/DEC 绝对 X 索引 - 多周期
+  def executeAbsoluteX(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
+    val result = Wire(new ExecutionResult)
+    val newRegs = Wire(new Registers)
+    newRegs := regs
+    
+    result.done := false.B
+    result.nextCycle := cycle + 1.U
+    result.regs := newRegs
+    result.memAddr := 0.U
+    result.memData := 0.U
+    result.memWrite := false.B
+    result.memRead := false.B
+    result.operand := operand
+    
+    switch(cycle) {
+      is(0.U) {
+        result.memAddr := regs.pc
+        result.memRead := true.B
+        result.operand := memDataIn
+        newRegs.pc := regs.pc + 1.U
+        result.regs := newRegs
+      }
+      is(1.U) {
+        result.memAddr := regs.pc
+        result.memRead := true.B
+        result.operand := Cat(memDataIn, operand(7, 0)) + regs.x
+        newRegs.pc := regs.pc + 1.U
+        result.regs := newRegs
+      }
+      is(2.U) {
+        result.memAddr := operand
+        result.memRead := true.B
+      }
+      is(3.U) {
+        result.memAddr := operand
+        val res = Mux(opcode === 0xFE.U, memDataIn + 1.U, memDataIn - 1.U)
+        result.memData := res
+        result.memWrite := true.B
+        newRegs.flagN := res(7)
+        newRegs.flagZ := res === 0.U
+        result.regs := newRegs
+        result.done := true.B
+      }
+    }
+    
+    result
+  }
+  
+  // 通用 ADC/SBC 操作
+  private def doADCSBC(opcode: UInt, a: UInt, data: UInt, carry: Bool): (UInt, Bool, Bool, Bool) = {
+    val isADC = (opcode === 0x69.U) || (opcode === 0x65.U) || (opcode === 0x75.U) || 
+                (opcode === 0x6D.U) || (opcode === 0x7D.U) || (opcode === 0x79.U) ||
+                (opcode === 0x61.U) || (opcode === 0x71.U)
+    
+    val result = Wire(UInt(8.W))
+    val flagC = Wire(Bool())
+    val flagV = Wire(Bool())
+    val flagN = Wire(Bool())
+    
+    when(isADC) {
+      // ADC
+      val sum = a +& data +& carry.asUInt
+      result := sum(7, 0)
+      flagC := sum(8)
+      flagN := sum(7)
+      flagV := (a(7) === data(7)) && (a(7) =/= sum(7))
+    }.otherwise {
+      // SBC
+      val diff = a -& data -& (~carry).asUInt
+      result := diff(7, 0)
+      flagC := ~diff(8)
+      flagN := diff(7)
+      flagV := (a(7) =/= data(7)) && (a(7) =/= diff(7))
+    }
+    
+    (result, flagC, flagV, flagN)
+  }
+  
+  // ADC/SBC 零页
+  def executeADCSBCZeroPage(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
+    val result = Wire(new ExecutionResult)
+    val newRegs = Wire(new Registers)
+    newRegs := regs
+    
+    result.done := false.B
+    result.nextCycle := cycle + 1.U
+    result.regs := newRegs
+    result.memAddr := 0.U
+    result.memData := 0.U
+    result.memWrite := false.B
+    result.memRead := false.B
+    result.operand := operand
+    
+    switch(cycle) {
+      is(0.U) {
+        result.memAddr := regs.pc
+        result.memRead := true.B
+        result.operand := memDataIn
+        newRegs.pc := regs.pc + 1.U
+        result.regs := newRegs
+      }
+      is(1.U) {
+        result.memAddr := operand
+        result.memRead := true.B
+        val (res, flagC, flagV, flagN) = doADCSBC(opcode, regs.a, memDataIn, regs.flagC)
+        newRegs.a := res
+        newRegs.flagC := flagC
+        newRegs.flagV := flagV
+        newRegs.flagN := flagN
+        newRegs.flagZ := res === 0.U
+        result.regs := newRegs
+        result.done := true.B
+      }
+    }
+    
+    result
+  }
+  
+  // ADC/SBC 零页 X
+  def executeADCSBCZeroPageX(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
+    val result = Wire(new ExecutionResult)
+    val newRegs = Wire(new Registers)
+    newRegs := regs
+    
+    result.done := false.B
+    result.nextCycle := cycle + 1.U
+    result.regs := newRegs
+    result.memAddr := 0.U
+    result.memData := 0.U
+    result.memWrite := false.B
+    result.memRead := false.B
+    result.operand := operand
+    
+    switch(cycle) {
+      is(0.U) {
+        result.memAddr := regs.pc
+        result.memRead := true.B
+        result.operand := (memDataIn + regs.x)(7, 0)
+        newRegs.pc := regs.pc + 1.U
+        result.regs := newRegs
+      }
+      is(1.U) {
+        result.memAddr := operand
+        result.memRead := true.B
+        val (res, flagC, flagV, flagN) = doADCSBC(opcode, regs.a, memDataIn, regs.flagC)
+        newRegs.a := res
+        newRegs.flagC := flagC
+        newRegs.flagV := flagV
+        newRegs.flagN := flagN
+        newRegs.flagZ := res === 0.U
+        result.regs := newRegs
+        result.done := true.B
+      }
+    }
+    
+    result
+  }
+  
+  // ADC/SBC 绝对
+  def executeADCSBCAbsolute(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
+    val result = Wire(new ExecutionResult)
+    val newRegs = Wire(new Registers)
+    newRegs := regs
+    
+    result.done := false.B
+    result.nextCycle := cycle + 1.U
+    result.regs := newRegs
+    result.memAddr := 0.U
+    result.memData := 0.U
+    result.memWrite := false.B
+    result.memRead := false.B
+    result.operand := operand
+    
+    switch(cycle) {
+      is(0.U) {
+        result.memAddr := regs.pc
+        result.memRead := true.B
+        result.operand := memDataIn
+        newRegs.pc := regs.pc + 1.U
+        result.regs := newRegs
+      }
+      is(1.U) {
+        result.memAddr := regs.pc
+        result.memRead := true.B
+        result.operand := Cat(memDataIn, operand(7, 0))
+        newRegs.pc := regs.pc + 1.U
+        result.regs := newRegs
+      }
+      is(2.U) {
+        result.memAddr := operand
+        result.memRead := true.B
+        val (res, flagC, flagV, flagN) = doADCSBC(opcode, regs.a, memDataIn, regs.flagC)
+        newRegs.a := res
+        newRegs.flagC := flagC
+        newRegs.flagV := flagV
+        newRegs.flagN := flagN
+        newRegs.flagZ := res === 0.U
+        result.regs := newRegs
+        result.done := true.B
+      }
+    }
+    
+    result
+  }
+  
+  // ADC/SBC 间接 X
+  def executeADCSBCIndirectX(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
+    val result = Wire(new ExecutionResult)
+    val newRegs = Wire(new Registers)
+    newRegs := regs
+    
+    result.done := false.B
+    result.nextCycle := cycle + 1.U
+    result.regs := newRegs
+    result.memAddr := 0.U
+    result.memData := 0.U
+    result.memWrite := false.B
+    result.memRead := false.B
+    result.operand := operand
+    
+    switch(cycle) {
+      is(0.U) {
+        result.memAddr := regs.pc
+        result.memRead := true.B
+        result.operand := (memDataIn + regs.x)(7, 0)
+        newRegs.pc := regs.pc + 1.U
+        result.regs := newRegs
+      }
+      is(1.U) {
+        result.memAddr := operand(7, 0)
+        result.memRead := true.B
+        result.operand := Cat(operand(15, 8), memDataIn)
+      }
+      is(2.U) {
+        result.memAddr := (operand(7, 0) + 1.U)(7, 0)
+        result.memRead := true.B
+        result.operand := Cat(memDataIn, operand(7, 0))
+      }
+      is(3.U) {
+        result.memAddr := operand
+        result.memRead := true.B
+        val (res, flagC, flagV, flagN) = doADCSBC(opcode, regs.a, memDataIn, regs.flagC)
+        newRegs.a := res
+        newRegs.flagC := flagC
+        newRegs.flagV := flagV
+        newRegs.flagN := flagN
+        newRegs.flagZ := res === 0.U
+        result.regs := newRegs
+        result.done := true.B
+      }
+    }
+    
+    result
+  }
+  
+  // ADC/SBC 间接 Y
+  def executeADCSBCIndirectY(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
+    val result = Wire(new ExecutionResult)
+    val newRegs = Wire(new Registers)
+    newRegs := regs
+    
+    result.done := false.B
+    result.nextCycle := cycle + 1.U
+    result.regs := newRegs
+    result.memAddr := 0.U
+    result.memData := 0.U
+    result.memWrite := false.B
+    result.memRead := false.B
+    result.operand := operand
+    
+    switch(cycle) {
+      is(0.U) {
+        result.memAddr := regs.pc
+        result.memRead := true.B
+        result.operand := memDataIn
+        newRegs.pc := regs.pc + 1.U
+        result.regs := newRegs
+      }
+      is(1.U) {
+        result.memAddr := operand(7, 0)
+        result.memRead := true.B
+        result.operand := Cat(operand(15, 8), memDataIn)
+      }
+      is(2.U) {
+        result.memAddr := (operand(7, 0) + 1.U)(7, 0)
+        result.memRead := true.B
+        result.operand := Cat(memDataIn, operand(7, 0)) + regs.y
+      }
+      is(3.U) {
+        result.memAddr := operand
+        result.memRead := true.B
+        val (res, flagC, flagV, flagN) = doADCSBC(opcode, regs.a, memDataIn, regs.flagC)
+        newRegs.a := res
+        newRegs.flagC := flagC
+        newRegs.flagV := flagV
+        newRegs.flagN := flagN
         newRegs.flagZ := res === 0.U
         result.regs := newRegs
         result.done := true.B
