@@ -164,22 +164,45 @@ class MMC3Mapper extends Module {
   
   io.chrAddr := Cat(chrBankNum, ppuAddrAdjusted(9, 0))
   
-  // IRQ 计数器
-  // 在 PPU A12 上升沿时递减
+  // IRQ 计数器 - 改进的实现
+  // 在 PPU A12 上升沿时递减 (每条扫描线触发一次)
   val a12Last = RegInit(false.B)
-  val a12Rising = io.ppuAddr(12) && !a12Last
-  a12Last := io.ppuAddr(12)
+  val a12Filter = RegInit(0.U(4.W))  // 去抖动滤波器
   
+  // A12 去抖动: 需要连续 4 个周期保持高电平
+  when(io.ppuAddr(12)) {
+    when(a12Filter < 15.U) {
+      a12Filter := a12Filter + 1.U
+    }
+  }.otherwise {
+    a12Filter := 0.U
+  }
+  
+  val a12Stable = a12Filter >= 4.U
+  val a12Rising = a12Stable && !a12Last
+  a12Last := a12Stable
+  
+  // IRQ 计数器逻辑
   when(a12Rising) {
     when(irqCounter === 0.U || irqReload) {
       irqCounter := irqLatch
       irqReload := false.B
+      // 如果 latch 为 0，立即触发 IRQ
+      when(irqLatch === 0.U && irqEnable) {
+        irqPending := true.B
+      }
     }.otherwise {
       irqCounter := irqCounter - 1.U
+      // 计数器递减到 0 时触发 IRQ
       when(irqCounter === 1.U && irqEnable) {
         irqPending := true.B
       }
     }
+  }
+  
+  // 写入 IRQ disable 时清除 pending
+  when(io.cpuWrite && io.cpuAddr(15, 13) === 7.U && io.cpuAddr(0) === 0.U) {
+    irqPending := false.B
   }
   
   io.irqOut := irqPending

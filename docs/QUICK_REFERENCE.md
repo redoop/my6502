@@ -5,22 +5,28 @@
 ```
 NES System v2
 ├── CPU6502Refactored (100%) ✅
-│   ├── 56 指令
+│   ├── 70+ 指令
 │   ├── Reset Vector 支持
 │   └── NMI/IRQ 中断
-├── PPUv2 (85%) ✅
+├── PPUv3 (100%) ✅ NEW!
 │   ├── 8 个寄存器
 │   ├── VBlank + NMI
+│   ├── 完整渲染管线
+│   ├── 8x8/8x16 精灵 ⭐
+│   ├── 精灵溢出检测 ⭐
+│   ├── Sprite 0 碰撞
 │   ├── 2KB VRAM
 │   ├── 256B OAM
 │   └── 32B Palette
-├── APU (40%) 🚧
-│   ├── Pulse 1/2
-│   ├── Triangle
-│   └── Noise
-└── MMC3 Mapper (90%) ✅
+├── APU (70%) 🚧 NEW!
+│   ├── Pulse 1/2 ⭐
+│   ├── Triangle ⭐
+│   ├── Noise ⭐
+│   └── 音频混合 ⭐
+└── MMC3 Mapper (95%) ✅ NEW!
     ├── PRG Bank Switching
-    └── CHR Bank Switching
+    ├── CHR Bank Switching
+    └── IRQ 计数器 ⭐
 ```
 
 ## 🎯 快速开始
@@ -42,12 +48,54 @@ sbt test
 sbt "runMain nes.GenerateNESVerilog"
 ```
 
+## 🆕 新功能快速使用 (v0.3.1)
+
+### 8x16 精灵
+```scala
+// PPUCTRL bit 5 = 1 启用 8x16 模式
+poke(ppuCtrl, 0x20.U)  // bit 5 = 1
+```
+
+### 精灵溢出检测
+```scala
+// PPUSTATUS bit 5 = 精灵溢出标志
+val status = peek(ppuStatus)
+val overflow = (status & 0x20) != 0
+```
+
+### APU 音频
+```scala
+// Pulse 1: duty=25%, volume=8
+poke(apu_pulse1_ctrl, 0x48.U)
+poke(apu_status, 0x01.U)  // enable
+
+// Triangle: period=128
+poke(apu_triangle_lo, 0x80.U)
+poke(apu_status, 0x04.U)  // enable
+
+// Noise: volume=8, period=5
+poke(apu_noise_ctrl, 0x08.U)
+poke(apu_noise_period, 0x05.U)
+poke(apu_status, 0x08.U)  // enable
+```
+
+### MMC3 IRQ
+```scala
+// 每 10 条扫描线触发 IRQ
+poke(mmc3_irq_latch, 0x0A.U)
+poke(mmc3_irq_reload, 0.U)
+poke(mmc3_irq_enable, 0.U)
+```
+
+---
+
 ## 📝 PPU 寄存器
 
 | 地址 | 名称 | 功能 |
 |------|------|------|
-| $2000 | PPUCTRL | 控制 (NMI, pattern tables) |
+| $2000 | PPUCTRL | 控制 (NMI, pattern tables, 8x16 sprites) |
 | $2001 | PPUMASK | 掩码 (rendering enable) |
+| $2002 | PPUSTATUS | 状态 (VBlank, Sprite 0, Sprite overflow) |
 | $2002 | PPUSTATUS | 状态 (VBlank, sprite 0) |
 | $2003 | OAMADDR | OAM 地址 |
 | $2004 | OAMDATA | OAM 数据 |

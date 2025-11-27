@@ -117,9 +117,12 @@ MOS 6502 是由 MOS Technology 在 1975 年设计的 8 位微处理器，是计�
 - 🔄 **[前后对比](docs/Before-After-Comparison.md)** - 重构前后对比分析
 
 **NES 系统文档:**
-- 🎮 **[NES 系统架构](docs/NES_SYSTEM.md)** - 系统设计和组件说明
-- 🕹️ **[运行魂斗罗指南](docs/CONTRA_GUIDE.md)** - 如何在这颗芯片上运行魂斗罗
-- 📝 **[简单 NES 程序](docs/SIMPLE_NES_PROGRAM.md)** - 示例程序和教程
+- 📊 **[项目状态](docs/PROJECT_STATUS.md)** - 当前进度和路线图 ⭐ 推荐
+- 🎮 **[NES 改进文档](docs/NES_V2_IMPROVEMENTS.md)** - v2/v3 功能说明
+- 🎨 **[PPU v3 集成](docs/PPU_V3_INTEGRATION.md)** - 集成渲染管线
+- 🎨 **[PPU 渲染管线](docs/PPU_RENDERING_PIPELINE.md)** - 技术细节
+- 📖 **[NES 使用指南](docs/NES_USAGE_GUIDE.md)** - 如何使用系统
+- 🕹️ **[魂斗罗指南](docs/CONTRA_GUIDE.md)** - 在这颗芯片上运行魂斗罗
 
 ### 🎮 NES 系统 (新增!)
 
@@ -127,22 +130,27 @@ MOS 6502 是由 MOS Technology 在 1975 年设计的 8 位微处理器，是计�
 
 **已完成:**
 - ✅ 基础 PPU (Picture Processing Unit) - 寄存器、VBlank、NMI 中断
+- ✅ PPU 渲染管线 (100%) - 完整的背景和精灵渲染 ⭐ 新增!
 - ✅ 内存控制器 - 完整的 NES 内存映射
 - ✅ 系统集成 - CPU + PPU + Memory
 - ✅ 测试框架 - 所有测试通过
 
 **进行中:**
-- 🚧 PPU 渲染引擎 - 背景和精灵渲染
+- 🚧 PPU 集成 - 将渲染管线集成到 PPUv2
 - 🚧 MMC3 Mapper - 魂斗罗所需的 bank switching
 
 **计划中:**
-- ⏳ APU (Audio Processing Unit) - 音频处理
-- ⏳ ROM 加载器 - 加载游戏 ROM
+- ⏳ PPU 集成 - 将渲染管线集成到 PPUv2
+- ⏳ 8x16 精灵支持 - 大精灵模式
+- ⏳ APU 波形生成 - 实际音频合成
 - ⏳ 完整游戏支持 - 运行魂斗罗等经典游戏
 
 ```bash
 # 测试 NES 系统
 sbt "testOnly nes.NESSystemTest"
+
+# 测试 PPU 渲染管线 (新增!)
+sbt "testOnly nes.PPURendererTest"
 
 # 生成 NES 系统 Verilog
 sbt "runMain nes.GenerateNESVerilog"

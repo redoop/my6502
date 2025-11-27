@@ -109,31 +109,34 @@ The 6502 processor was widely used in numerous classic computers and game consol
 
 ### 📚 Documentation
 
-- 📖 **[MOS 6502 Architecture](docs/6502-architecture.md)** - Registers, addressing modes, instruction set
-- 🎯 **[Refactoring Summary](docs/REFACTORING-SUMMARY.md)** ⭐ Recommended
-- 🔬 **[Transistor Analysis](docs/TRANSISTOR_ANALYSIS.md)** - Comparison with original 6502
-- 📊 **[Test Report](docs/Test-Report.md)** - 78 test cases details
-- 🏗️ **[Architecture Design](docs/CPU6502-Architecture-Design.md)** - Modular design
-- 📋 **[Refactoring Checklist](docs/Refactoring-Checklist.md)** - Progress tracking
-- 🔄 **[Before-After Comparison](docs/Before-After-Comparison.md)** - Refactoring analysis
+**Core Documentation** (5 essential docs):
+- 📚 **[Documentation Index](docs/README.md)** - Complete documentation guide
+- 📊 **[Project Status](docs/PROJECT_STATUS.md)** - Progress & roadmap ⭐ Start here
+- 🏗️ **[Architecture](docs/ARCHITECTURE.md)** - System design (CPU + PPU + NES)
+- 🛠️ **[Development](docs/DEVELOPMENT.md)** - Development & testing guide
+- 🎮 **[Game Support](docs/GAME_SUPPORT.md)** - Running games (Contra, etc.)
+- 🔬 **[Technical Details](docs/TECHNICAL_DETAILS.md)** - Performance & optimization
 
-**NES System Documentation:**
-- 🎮 **[NES System Architecture](docs/NES_SYSTEM.md)** - System design and components
-- 🕹️ **[Contra Guide](docs/CONTRA_GUIDE.md)** - How to run Contra on this chip
-- 📝 **[Simple NES Programs](docs/SIMPLE_NES_PROGRAM.md)** - Example programs and tutorials
+**Specialized Documentation**:
+- 🎨 **[PPU v3 Integration](docs/PPU_V3_INTEGRATION.md)** - Rendering pipeline integration
+- 🎨 **[PPU Rendering](docs/PPU_RENDERING_PIPELINE.md)** - Technical rendering details
+- 🎮 **[NES Improvements](docs/NES_V2_IMPROVEMENTS.md)** - v2/v3 features
 
 ### 🎮 NES System v2 (Latest Update!)
 
 A complete NES (Nintendo Entertainment System) built on the 6502 CPU:
 
-**✨ v2 Updates (2025-11-27):**
-- ✅ **PPUv2** - Complete PPU implementation with all registers, VBlank, NMI
+**✨ v3 Updates (2025-11-27):**
+- ✅ **PPUv3** - Integrated rendering pipeline with full game support ⭐ New!
+- ✅ **PPU Rendering Pipeline** - Complete background and sprite rendering
+- ✅ **Sprite 0 Hit Detection** - Status bar splits and effects ⭐ New!
 - ✅ **CPU Reset Vector** - Proper CPU initialization from $FFFC-$FFFD
 - ✅ **APU Framework** - Audio Processing Unit with 4 channels
-- ✅ **100+ Tests Passing** - Comprehensive test coverage
+- ✅ **110+ Tests Passing** - Comprehensive test coverage
 
 **Completed:**
-- ✅ PPUv2 (85%) - Complete registers, timing, VBlank, NMI, VRAM/OAM/Palette
+- ✅ PPUv3 (95%) - Integrated rendering pipeline with Sprite 0 hit ⭐ New!
+- ✅ PPU Rendering Pipeline (100%) - Background and sprite rendering
 - ✅ CPU Reset Support - Hardware reset and Reset Vector
 - ✅ APU (40%) - Pulse, Triangle, Noise channels with register interface
 - ✅ MMC3 Mapper (90%) - Bank switching for Contra
@@ -142,11 +145,13 @@ A complete NES (Nintendo Entertainment System) built on the 6502 CPU:
 - ✅ System Integration (95%) - CPU + PPU + APU + Memory
 
 **In Progress:**
-- 🚧 PPU Rendering (60%) - Background and sprite rendering pipeline
+- 🚧 Game Testing - Test with actual NES ROMs
 - 🚧 MMC3 IRQ - Scanline counter for advanced effects
+- 🚧 Performance Optimization - Improve rendering speed
 
 **Planned:**
-- ⏳ Complete Rendering - Full tile and sprite rendering
+- ⏳ 8x16 Sprite Support - Large sprite mode
+- ⏳ Sprite Overflow Detection - Accurate sprite limits
 - ⏳ APU Waveform Generation - Actual audio synthesis
 - ⏳ Full Game Support - Run Contra and other classics
 
@@ -155,15 +160,16 @@ A complete NES (Nintendo Entertainment System) built on the 6502 CPU:
 sbt "testOnly nes.NESSystemv2Test"
 sbt "testOnly nes.ContraQuickTest"
 
+# Test PPUv3 (NEW!)
+sbt "testOnly nes.PPUv3Test"
+
+# Test PPU rendering pipeline
+sbt "testOnly nes.PPURendererTest"
+
 # Generate NES system Verilog
 sbt "runMain nes.GenerateNESVerilog"
 ```
 
-**📚 NES Documentation:**
-- 🎮 [NES v2 Improvements](docs/NES_V2_IMPROVEMENTS.md) - Latest features
-- 📖 [NES Usage Guide](docs/NES_USAGE_GUIDE.md) - How to use the system
-- 📊 [NES v2 Summary](docs/NES_V2_SUMMARY.md) - Update summary
-- 🕹️ [Contra Progress](docs/CONTRA_PROGRESS.md) - Game compatibility status
 
 ## Features
 

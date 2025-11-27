@@ -1,155 +1,131 @@
-# CPU6502 重构项目文档
+# 📚 文档导航
 
-## 📖 文档导航
+**最后更新**: 2025-11-27
 
-### 快速开始
-- **[重构总结](./REFACTORING-SUMMARY.md)** ⭐ 推荐首先阅读
-  - 项目概览和主要成果
-  - 快速了解重构带来的改进
+## 🎯 核心文档 (推荐阅读)
 
-### 详细文档
+### 1. [PROJECT_STATUS.md](PROJECT_STATUS.md) ⭐
+**项目状态总览**
+- 当前进度和完成度
+- 测试统计
+- 下一步计划
+- 资源使用情况
 
-#### 设计文档
-- **[架构设计](./CPU6502-Architecture-Design.md)**
-  - 模块化架构设计
-  - 接口定义和指令分类
-  - 实施步骤规划
+### 2. [ARCHITECTURE.md](ARCHITECTURE.md)
+**系统架构设计**
+- CPU 6502 架构
+- PPU 架构
+- NES 系统架构
+- 模块化设计
 
-#### 对比分析
-- **[晶体管分析](./TRANSISTOR_ANALYSIS.md)** 🔬
-  - 与原版 MOS 6502 晶体管数量对比
-  - FPGA 资源估算
-  - 性能效率分析
-- **[前后对比](./Before-After-Comparison.md)**
-  - 代码结构对比
-  - 实际使用场景对比
-  - 性能和质量指标对比
+### 3. [DEVELOPMENT.md](DEVELOPMENT.md)
+**开发指南**
+- 快速开始
+- 测试指南
+- 使用指南
+- 重构总结
 
-#### 进度追踪
-- **[重构清单](./Refactoring-Checklist.md)**
-  - 详细的完成情况
-  - 模块和测试清单
-  - 后续工作建议
+### 4. [GAME_SUPPORT.md](GAME_SUPPORT.md)
+**游戏支持**
+- 魂斗罗支持
+- ROM 加载
+- 简单程序示例
+- 调试指南
 
-#### 测试报告
-- **[测试报告](./Test-Report.md)**
-  - 72 个测试用例详情
-  - 测试覆盖率分析
-  - 性能指标
+### 5. [TECHNICAL_DETAILS.md](TECHNICAL_DETAILS.md)
+**技术细节**
+- 晶体管分析
+- 性能指标
+- PPU 渲染细节
+- 优化技巧
 
-## 🎯 重构成果一览
+## 📖 专题文档
 
-```
-✅ 15 个模块化文件
-✅ 78 个单元测试 (100% 通过)
-✅ 代码行数减少 82%
-✅ 测试覆盖率 100%
-✅ 零性能损失
-✅ 完全向后兼容
-```
+### PPU 相关
+- [PPU_V3_INTEGRATION.md](PPU_V3_INTEGRATION.md) - PPUv3 集成报告
+- [PPU_RENDERING_PIPELINE.md](PPU_RENDERING_PIPELINE.md) - 渲染管线技术文档
 
-## 🚀 快速使用
+### 系统改进
+- [NES_V2_IMPROVEMENTS.md](NES_V2_IMPROVEMENTS.md) - v2/v3 功能改进
 
-### 编译
-```bash
-sbt compile
-```
+### 其他
+- [CHANGELOG.md](CHANGELOG.md) - 变更日志
+- [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - 快速参考
 
-### 测试
-```bash
-sbt test
-```
-
-### 使用重构版本
-```scala
-import cpu6502._
-
-// 替换原版 CPU6502
-val cpu = Module(new CPU6502Refactored)
-```
-
-## 📊 项目结构
+## 🗺️ 文档地图
 
 ```
-src/main/scala/cpu/
-├── core/                    # 核心模块
-│   ├── CPU6502Core.scala   # 主控制器
-│   ├── Registers.scala     # 寄存器
-│   ├── MemoryInterface.scala
-│   └── DebugBundle.scala
-├── instructions/            # 指令模块
-│   ├── Flag.scala          # 标志位指令
-│   ├── Transfer.scala      # 传输指令
-│   ├── Arithmetic.scala    # 算术指令
-│   ├── Logic.scala         # 逻辑指令
-│   ├── Shift.scala         # 移位指令
-│   ├── LoadStore.scala     # 加载/存储
-│   ├── Compare.scala       # 比较指令
-│   ├── Branch.scala        # 分支指令
-│   ├── Stack.scala         # 栈操作
-│   └── Jump.scala          # 跳转指令
-└── CPU6502Refactored.scala # 顶层模块
+docs/
+├── 📊 PROJECT_STATUS.md          ⭐ 从这里开始
+├── 🏗️ ARCHITECTURE.md            系统架构
+├── 🛠️ DEVELOPMENT.md             开发指南
+├── 🎮 GAME_SUPPORT.md            游戏支持
+├── 🔬 TECHNICAL_DETAILS.md       技术细节
+│
+├── 🎨 PPU_V3_INTEGRATION.md      PPUv3 集成
+├── 🎨 PPU_RENDERING_PIPELINE.md  渲染管线
+├── 🎮 NES_V2_IMPROVEMENTS.md     系统改进
+│
+├── 📝 CHANGELOG.md               变更日志
+├── 📖 QUICK_REFERENCE.md         快速参考
+└── � README.md                  本文件
 ```
 
-## 📈 关键改进
+## 🎯 按需求查找
 
-| 指标 | 改进 |
-|------|------|
-| 最大文件行数 | ↓ 82% |
-| 可测试性 | +100% |
-| 测试覆盖率 | 0% → 100% |
-| 模块化程度 | 1 → 15 模块 |
+### 我想了解项目进度
+→ [PROJECT_STATUS.md](PROJECT_STATUS.md)
 
-## 🎓 适用场景
+### 我想了解系统架构
+→ [ARCHITECTURE.md](ARCHITECTURE.md)
 
-### 推荐使用重构版本
-- ✅ 新项目开发
-- ✅ 需要添加新指令
-- ✅ 需要单元测试
-- ✅ 团队协作开发
+### 我想开始开发
+→ [DEVELOPMENT.md](DEVELOPMENT.md)
 
-### 保留原版
-- 📌 已有稳定项目
-- 📌 不需要修改
-- 📌 作为参考对比
+### 我想运行游戏
+→ [GAME_SUPPORT.md](GAME_SUPPORT.md)
 
-## 💡 核心优势
+### 我想了解技术细节
+→ [TECHNICAL_DETAILS.md](TECHNICAL_DETAILS.md)
 
-### 1. 可维护性
-- 每个指令类型独立文件
-- 代码更清晰易懂
-- 修改影响范围小
+### 我想了解 PPU 渲染
+→ [PPU_RENDERING_PIPELINE.md](PPU_RENDERING_PIPELINE.md)
+→ [PPU_V3_INTEGRATION.md](PPU_V3_INTEGRATION.md)
 
-### 2. 可测试性
-- 每个模块可独立测试
-- 快速定位问题
-- 持续集成友好
+### 我想了解最新改进
+→ [NES_V2_IMPROVEMENTS.md](NES_V2_IMPROVEMENTS.md)
+→ [CHANGELOG.md](CHANGELOG.md)
 
-### 3. 可扩展性
-- 新增指令简单
-- 支持 65C02 扩展
-- 易于添加新功能
+## 📈 文档完整度
 
-## 📞 获取帮助
+```
+核心文档:     5/5  ✅ 100%
+专题文档:     3/3  ✅ 100%
+其他文档:     3/3  ✅ 100%
+总计:        11/11 ✅ 100%
+```
 
-遇到问题？查看相关文档：
+## 🔄 文档更新
 
-1. **使用问题** → [重构总结](./REFACTORING-SUMMARY.md)
-2. **架构问题** → [架构设计](./CPU6502-Architecture-Design.md)
-3. **测试问题** → [测试报告](./Test-Report.md)
-4. **对比分析** → [前后对比](./Before-After-Comparison.md)
+所有文档都会随着项目进展持续更新。
 
-## 📝 更新日志
+**更新频率**:
+- PROJECT_STATUS.md: 每周
+- 其他核心文档: 按需
+- 专题文档: 重大更新时
 
-### 2025-11-26
-- ✅ 完成模块化重构
-- ✅ 实现 78 个单元测试（包括原版CPU6502的6个测试）
-- ✅ 修复LSR指令位宽问题（Chisel右移产生7位结果）
-- ✅ 所有测试通过
-- ✅ 文档完善
+## 💡 贡献文档
+
+欢迎改进文档！
+
+**指南**:
+1. 保持简洁明了
+2. 使用示例代码
+3. 添加图表说明
+4. 更新目录
 
 ---
 
-**项目状态**: ✅ 完成  
-**质量评级**: ⭐⭐⭐⭐⭐  
-**推荐使用**: 是
+**文档版本**: v3.0
+**最后更新**: 2025-11-27
+**维护者**: NES 开发团队
