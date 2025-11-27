@@ -45,6 +45,9 @@ class NESSystemv2 extends Module {
   }
   cpu.io.reset := cpuReset
   
+  // NMI 连接 - 从 PPU 到 CPU
+  cpu.io.nmi := ppu.io.nmiOut
+  
   // PRG ROM (512KB 最大)
   val prgROM = SyncReadMem(524288, UInt(8.W))
   

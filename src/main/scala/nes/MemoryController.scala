@@ -71,12 +71,13 @@ class MemoryController extends Module {
       // 控制器 2
       io.cpuDataOut := io.controller2
     }.elsewhen(io.cpuAddr >= 0x8000.U) {
-      // PRG ROM (支持 16KB 镜像)
-      // 对于 16KB ROM: 0x8000-0xBFFF 和 0xC000-0xFFFF 映射到同一个 ROM
-      // 对于 32KB ROM: 0x8000-0xFFFF 直接映射
-      // 使用低 14 位来支持 16KB 镜像
-      val romAddr = (io.cpuAddr - 0x8000.U)(13, 0)  // 取低 14 位，16KB 自动镜像
+      // PRG ROM (支持 16KB 和 32KB)
+      // 对于 16KB ROM: 0x8000-0xBFFF 和 0xC000-0xFFFF 都映射到 ROM 0x0000-0x3FFF
+      // 对于 32KB ROM: 0x8000-0xFFFF 直接映射到 ROM 0x0000-0x7FFF
+      // 使用低 14 位 (0-13)，自动支持 16KB 镜像
+      val romAddr = (io.cpuAddr - 0x8000.U)(13, 0)
       io.cpuDataOut := prgROM.read(romAddr)
+
     }
   }
   
@@ -91,8 +92,8 @@ class MemoryController extends Module {
       io.ppuDataIn := io.cpuDataIn
       io.ppuWrite := true.B
     }.elsewhen(io.cpuAddr >= 0x8000.U) {
-      // PRG ROM (测试时可写，支持 16KB 镜像)
-      val romAddr = (io.cpuAddr - 0x8000.U)(14, 0)  // 取低 15 位
+      // PRG ROM (测试时可写)
+      val romAddr = io.cpuAddr - 0x8000.U
       prgROM.write(romAddr, io.cpuDataIn)
     }
   }
@@ -102,6 +103,7 @@ class MemoryController extends Module {
     // 加载 PRG ROM
     when(io.romLoadAddr < 32768.U) {
       prgROM.write(io.romLoadAddr, io.romLoadData)
+
     }
   }
 }

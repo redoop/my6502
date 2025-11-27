@@ -7,14 +7,18 @@ import cpu6502.core._
 // 加载/存储指令: LDA, LDX, LDY, STA, STX, STY
 object LoadStoreInstructions {
   val immediateOpcodes = Seq(0xA9, 0xA2, 0xA0)
-  val zeroPageOpcodes = Seq(0xA5, 0x85, 0x86, 0x84)
-  val zeroPageXOpcodes = Seq(0xB5, 0x95)
-  val absoluteOpcodes = Seq(0xAD, 0x8D)
-  val absoluteXOpcodes = Seq(0xBD)
-  val absoluteYOpcodes = Seq(0xB9)
+  val zeroPageOpcodes = Seq(0xA5, 0x85, 0x86, 0x84, 0xA6, 0xA4)  // LDA/STA/STX/STY/LDX/LDY
+  val zeroPageXOpcodes = Seq(0xB5, 0x95, 0xB4, 0x94)  // LDA/STA zp,X + LDY/STY zp,X
+  val zeroPageYOpcodes = Seq(0xB6, 0x96)  // LDX/STX zp,Y
+  val absoluteOpcodes = Seq(0xAD, 0x8D, 0x8E, 0x8C, 0xAE, 0xAC)  // LDA/STA/STX/STY/LDX/LDY
+  val absoluteXOpcodes = Seq(0xBD, 0xBC, 0x9D, 0x99)  // LDA/LDY abs,X + STA abs,X/Y
+  val absoluteYOpcodes = Seq(0xB9, 0xBE)  // LDA/LDX abs,Y
+  val indirectXOpcodes = Seq(0xA1, 0x81)  // LDA/STA (ind,X)
+  val indirectYOpcodes = Seq(0x91, 0xB1)  // STA/LDA (ind),Y
   
-  val opcodes = immediateOpcodes ++ zeroPageOpcodes ++ zeroPageXOpcodes ++ 
-                absoluteOpcodes ++ absoluteXOpcodes ++ absoluteYOpcodes
+  val opcodes = immediateOpcodes ++ zeroPageOpcodes ++ zeroPageXOpcodes ++ zeroPageYOpcodes ++
+                absoluteOpcodes ++ absoluteXOpcodes ++ absoluteYOpcodes ++ 
+                indirectXOpcodes ++ indirectYOpcodes
   
   // 立即寻址 (LDA, LDX, LDY)
   def executeImmediate(opcode: UInt, regs: Registers, memDataIn: UInt): ExecutionResult = {
@@ -58,7 +62,9 @@ object LoadStoreInstructions {
     result.memRead := false.B
     result.operand := operand
     
-    val isLoad = opcode === 0xA5.U
+    val isLoadA = opcode === 0xA5.U
+    val isLoadX = opcode === 0xA6.U
+    val isLoadY = opcode === 0xA4.U
     val isStoreA = opcode === 0x85.U
     val isStoreX = opcode === 0x86.U
     val isStoreY = opcode === 0x84.U
@@ -74,9 +80,15 @@ object LoadStoreInstructions {
       }
       is(1.U) {
         result.memAddr := operand
-        when(isLoad) {
+        when(isLoadA || isLoadX || isLoadY) {
           result.memRead := true.B
-          newRegs.a := memDataIn
+          when(isLoadA) {
+            newRegs.a := memDataIn
+          }.elsewhen(isLoadX) {
+            newRegs.x := memDataIn
+          }.otherwise {
+            newRegs.y := memDataIn
+          }
           newRegs.flagN := memDataIn(7)
           newRegs.flagZ := memDataIn === 0.U
         }.otherwise {
@@ -106,7 +118,9 @@ object LoadStoreInstructions {
     result.memRead := false.B
     result.operand := operand
     
-    val isLoad = opcode === 0xB5.U
+    val isLoadA = opcode === 0xB5.U
+    val isLoadY = opcode === 0xB4.U
+    val isStoreY = opcode === 0x94.U
     
     switch(cycle) {
       is(0.U) {
@@ -119,14 +133,62 @@ object LoadStoreInstructions {
       }
       is(1.U) {
         result.memAddr := operand
-        when(isLoad) {
+        when(isLoadA || isLoadY) {
           result.memRead := true.B
-          newRegs.a := memDataIn
+          when(isLoadA) {
+            newRegs.a := memDataIn
+          }.otherwise {
+            newRegs.y := memDataIn
+          }
           newRegs.flagN := memDataIn(7)
           newRegs.flagZ := memDataIn === 0.U
         }.otherwise {
           result.memWrite := true.B
-          result.memData := regs.a
+          result.memData := Mux(opcode === 0x95.U, regs.a, regs.y)
+        }
+        result.regs := newRegs
+        result.done := true.B
+      }
+    }
+    
+    result
+  }
+  
+  // 零页 Y 索引 (LDX/STX zp,Y)
+  def executeZeroPageY(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
+    val result = Wire(new ExecutionResult)
+    val newRegs = Wire(new Registers)
+    newRegs := regs
+    
+    result.done := false.B
+    result.nextCycle := cycle + 1.U
+    result.regs := newRegs
+    result.memAddr := 0.U
+    result.memData := 0.U
+    result.memWrite := false.B
+    result.memRead := false.B
+    result.operand := operand
+    
+    val isLoad = opcode === 0xB6.U
+    
+    switch(cycle) {
+      is(0.U) {
+        result.memAddr := regs.pc
+        result.memRead := true.B
+        result.operand := (memDataIn + regs.y)(7, 0)
+        newRegs.pc := regs.pc + 1.U
+        result.regs := newRegs
+      }
+      is(1.U) {
+        result.memAddr := operand
+        when(isLoad) {
+          result.memRead := true.B
+          newRegs.x := memDataIn
+          newRegs.flagN := memDataIn(7)
+          newRegs.flagZ := memDataIn === 0.U
+        }.otherwise {
+          result.memWrite := true.B
+          result.memData := regs.x
         }
         result.regs := newRegs
         result.done := true.B
@@ -151,7 +213,9 @@ object LoadStoreInstructions {
     result.memRead := false.B
     result.operand := operand
     
-    val isLoad = opcode === 0xAD.U
+    val isLoadA = opcode === 0xAD.U
+    val isLoadX = opcode === 0xAE.U
+    val isLoadY = opcode === 0xAC.U
     
     switch(cycle) {
       is(0.U) {
@@ -172,14 +236,24 @@ object LoadStoreInstructions {
       }
       is(2.U) {
         result.memAddr := operand
-        when(isLoad) {
+        when(isLoadA || isLoadX || isLoadY) {
           result.memRead := true.B
-          newRegs.a := memDataIn
+          when(isLoadA) {
+            newRegs.a := memDataIn
+          }.elsewhen(isLoadX) {
+            newRegs.x := memDataIn
+          }.otherwise {
+            newRegs.y := memDataIn
+          }
           newRegs.flagN := memDataIn(7)
           newRegs.flagZ := memDataIn === 0.U
         }.otherwise {
           result.memWrite := true.B
-          result.memData := regs.a
+          // 根据 opcode 选择要存储的寄存器
+          result.memData := MuxCase(regs.a, Seq(
+            (opcode === 0x8E.U) -> regs.x,
+            (opcode === 0x8C.U) -> regs.y
+          ))
         }
         result.regs := newRegs
         result.done := true.B
@@ -204,7 +278,14 @@ object LoadStoreInstructions {
     result.memRead := false.B
     result.operand := operand
     
-    val indexReg = Mux(opcode === 0xBD.U, regs.x, regs.y)
+    // 判断使用 X 还是 Y 索引
+    val useY = (opcode === 0xB9.U) || (opcode === 0xBE.U) || (opcode === 0x99.U)
+    val indexReg = Mux(useY, regs.y, regs.x)
+    
+    val isLoadA = opcode === 0xBD.U || opcode === 0xB9.U
+    val isLoadX = opcode === 0xBE.U
+    val isLoadY = opcode === 0xBC.U
+    val isStoreA = opcode === 0x9D.U || opcode === 0x99.U
     
     switch(cycle) {
       is(0.U) {
@@ -230,6 +311,133 @@ object LoadStoreInstructions {
         newRegs.flagN := memDataIn(7)
         newRegs.flagZ := memDataIn === 0.U
         result.regs := newRegs
+        result.done := true.B
+      }
+    }
+    
+    result
+  }
+  
+  // 间接 X 索引 (ind,X) - LDA/STA
+  def executeIndirectX(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
+    val result = Wire(new ExecutionResult)
+    val newRegs = Wire(new Registers)
+    newRegs := regs
+    
+    result.done := false.B
+    result.nextCycle := cycle + 1.U
+    result.regs := newRegs
+    result.memAddr := 0.U
+    result.memData := 0.U
+    result.memWrite := false.B
+    result.memRead := false.B
+    result.operand := operand
+    
+    val isLoad = opcode === 0xA1.U
+    
+    switch(cycle) {
+      is(0.U) {
+        // 读取零页地址
+        result.memAddr := regs.pc
+        result.memRead := true.B
+        result.operand := (memDataIn + regs.x)(7, 0)
+        newRegs.pc := regs.pc + 1.U
+        result.regs := newRegs
+      }
+      is(1.U) {
+        // 读取间接地址的低字节
+        result.memAddr := operand(7, 0)
+        result.memRead := true.B
+        result.operand := Cat(operand(15, 8), memDataIn)
+      }
+      is(2.U) {
+        // 读取间接地址的高字节
+        result.memAddr := (operand(7, 0) + 1.U)(7, 0)
+        result.memRead := true.B
+        result.operand := Cat(memDataIn, operand(7, 0))
+      }
+      is(3.U) {
+        // 访问最终地址
+        result.memAddr := operand
+        when(isLoad) {
+          result.memRead := true.B
+        }.otherwise {
+          result.memWrite := true.B
+          result.memData := regs.a
+        }
+      }
+      is(4.U) {
+        // 对于 load，保存数据
+        when(isLoad) {
+          newRegs.a := memDataIn
+          newRegs.flagN := memDataIn(7)
+          newRegs.flagZ := memDataIn === 0.U
+          result.regs := newRegs
+        }
+        result.done := true.B
+      }
+    }
+    
+    result
+  }
+  
+  // 间接索引 Y (indirect),Y - LDA/STA
+  def executeIndirectY(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
+    val result = Wire(new ExecutionResult)
+    val newRegs = Wire(new Registers)
+    newRegs := regs
+    
+    result.done := false.B
+    result.nextCycle := cycle + 1.U
+    result.regs := newRegs
+    result.memAddr := 0.U
+    result.memData := 0.U
+    result.memWrite := false.B
+    result.memRead := false.B
+    result.operand := operand
+    
+    val isLoad = opcode === 0xB1.U
+    
+    switch(cycle) {
+      is(0.U) {
+        // 读取零页地址
+        result.memAddr := regs.pc
+        result.memRead := true.B
+        result.operand := memDataIn
+        newRegs.pc := regs.pc + 1.U
+        result.regs := newRegs
+      }
+      is(1.U) {
+        // 读取间接地址的低字节
+        result.memAddr := operand(7, 0)
+        result.memRead := true.B
+        result.operand := Cat(operand(15, 8), memDataIn)
+      }
+      is(2.U) {
+        // 读取间接地址的高字节
+        result.memAddr := (operand(7, 0) + 1.U)(7, 0)
+        result.memRead := true.B
+        result.operand := Cat(memDataIn, operand(7, 0))
+      }
+      is(3.U) {
+        // 加上 Y 索引，访问最终地址
+        val finalAddr = operand + regs.y
+        result.memAddr := finalAddr
+        when(isLoad) {
+          result.memRead := true.B
+        }.otherwise {
+          result.memWrite := true.B
+          result.memData := regs.a
+        }
+      }
+      is(4.U) {
+        // 对于 load，保存数据
+        when(isLoad) {
+          newRegs.a := memDataIn
+          newRegs.flagN := memDataIn(7)
+          newRegs.flagZ := memDataIn === 0.U
+          result.regs := newRegs
+        }
         result.done := true.B
       }
     }

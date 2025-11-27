@@ -48,48 +48,54 @@ class CPU6502Core extends Module {
   val execResult = Wire(new ExecutionResult)
   execResult := ExecutionResult.hold(regs, operand)
 
-  // Reset 标志：用于检测 reset 刚刚释放
-  val resetReleased = RegInit(false.B)
-  
   // 状态机
   when(io.reset) {
     // Reset 时初始化状态
     state := sReset
     cycle := 0.U
     regs.pc := 0.U
-    resetReleased := false.B
+    regs.sp := 0xFF.U
   }.otherwise {
-    when(!resetReleased) {
-      // Reset 刚释放，等待一个周期让寄存器稳定
-      resetReleased := true.B
-      cycle := 0.U
-    }.otherwise {
-      switch(state) {
+    switch(state) {
         is(sReset) {
           // Reset 序列: 读取 Reset Vector ($FFFC-$FFFD)
+          // 注意：即使 PRG ROM 使用 Mem (异步读)，在 Verilator 中仍需要时序考虑
           when(cycle === 0.U) {
-            // 读取低字节
+            // 周期 0: 发起读取低字节
             io.memAddr := 0xFFFC.U
             io.memRead := true.B
             cycle := 1.U
+
           }.elsewhen(cycle === 1.U) {
+            // 周期 1: 保存低字节到 operand 寄存器
             io.memAddr := 0xFFFC.U
             io.memRead := true.B
-            operand := io.memDataIn
+            operand := io.memDataIn  // 保存到寄存器
             cycle := 2.U
+
           }.elsewhen(cycle === 2.U) {
-            // 读取高字节
+            // 周期 2: 发起读取高字节（operand 已经在上个周期保存）
             io.memAddr := 0xFFFD.U
             io.memRead := true.B
             cycle := 3.U
-          }.otherwise {  // cycle === 3
-            // 设置 PC 并进入 Fetch 状态
+
+          }.elsewhen(cycle === 3.U) {
+            // 周期 3: 等待数据稳定
             io.memAddr := 0xFFFD.U
+            io.memRead := true.B
+            cycle := 4.U
+
+          }.otherwise {  // cycle === 4
+            // 周期 4: 读取高字节，设置 PC 并进入 Fetch
+            io.memAddr := 0xFFFD.U  // 保持地址
             io.memRead := true.B
             val resetVector = Cat(io.memDataIn, operand(7, 0))
             regs.pc := resetVector
+            regs.sp := 0xFD.U  // 初始化 SP
+            regs.flagI := true.B  // 设置中断禁止标志
             cycle := 0.U
             state := sFetch
+
           }
         }
     
@@ -180,9 +186,8 @@ class CPU6502Core extends Module {
           }
         }
 
-        is(sDone) {
-          // 保持状态
-        }
+      is(sDone) {
+        // 保持状态
       }
     }
   }
@@ -226,14 +231,52 @@ class CPU6502Core extends Module {
         result := ArithmeticInstructions.executeZeroPage(opcode, cycle, regs, operand, memDataIn)
       }
       
+      // ========== Arithmetic 绝对 ==========
+      is(0xEE.U, 0xCE.U) {
+        result := ArithmeticInstructions.executeAbsolute(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Arithmetic 绝对索引 ==========
+      is(0x79.U, 0xF9.U, 0x7D.U, 0xFD.U) {
+        result := ArithmeticInstructions.executeAbsoluteIndexed(opcode, cycle, regs, operand, memDataIn)
+      }
+      
       // ========== Logic 立即寻址 ==========
       is(0x29.U, 0x09.U, 0x49.U) {
         result := LogicInstructions.executeImmediate(opcode, regs, memDataIn)
       }
       
-      // ========== Logic BIT 零页 ==========
+      // ========== Logic 零页 ==========
       is(0x24.U) {
         result := LogicInstructions.executeBIT(cycle, regs, operand, memDataIn)
+      }
+      is(0x25.U, 0x05.U, 0x45.U) {
+        result := LogicInstructions.executeZeroPage(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Logic 零页 X ==========
+      is(0x35.U, 0x15.U, 0x55.U) {
+        result := LogicInstructions.executeZeroPageX(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Logic 绝对 ==========
+      is(0x2C.U, 0x2D.U, 0x0D.U, 0x4D.U) {
+        result := LogicInstructions.executeAbsolute(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Logic 绝对索引 ==========
+      is(0x3D.U, 0x1D.U, 0x5D.U, 0x39.U, 0x19.U, 0x59.U) {
+        result := LogicInstructions.executeAbsoluteIndexed(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Logic 间接 X ==========
+      is(0x21.U, 0x01.U, 0x41.U) {
+        result := LogicInstructions.executeIndirectX(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Logic 间接 Y ==========
+      is(0x31.U, 0x11.U, 0x51.U) {
+        result := LogicInstructions.executeIndirectY(opcode, cycle, regs, operand, memDataIn)
       }
       
       // ========== Shift 累加器 ==========
@@ -252,8 +295,38 @@ class CPU6502Core extends Module {
       }
       
       // ========== Compare 零页 ==========
-      is(0xC5.U) {
-        result := CompareInstructions.executeZeroPage(cycle, regs, operand, memDataIn)
+      is(0xC5.U, 0xE4.U, 0xC4.U) {
+        result := CompareInstructions.executeZeroPageGeneric(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Compare 零页 X ==========
+      is(0xD5.U) {
+        result := CompareInstructions.executeZeroPageX(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Compare 绝对 ==========
+      is(0xCD.U, 0xEC.U, 0xCC.U) {
+        result := CompareInstructions.executeAbsolute(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Compare 绝对索引 ==========
+      is(0xDD.U, 0xD9.U) {
+        result := CompareInstructions.executeAbsoluteIndexed(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Compare 间接 X ==========
+      is(0xC1.U) {
+        result := CompareInstructions.executeIndirectX(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Compare 间接 Y ==========
+      is(0xD1.U) {
+        result := CompareInstructions.executeIndirectY(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== Compare 间接 (65C02) ==========
+      is(0xD2.U) {
+        result := CompareInstructions.executeIndirect(opcode, cycle, regs, operand, memDataIn)
       }
       
       // ========== Branch 指令 ==========
@@ -267,23 +340,38 @@ class CPU6502Core extends Module {
       }
       
       // ========== LoadStore 零页 ==========
-      is(0xA5.U, 0x85.U, 0x86.U, 0x84.U) {
+      is(0xA5.U, 0x85.U, 0x86.U, 0x84.U, 0xA6.U, 0xA4.U) {
         result := LoadStoreInstructions.executeZeroPage(opcode, cycle, regs, operand, memDataIn)
       }
       
       // ========== LoadStore 零页 X ==========
-      is(0xB5.U, 0x95.U) {
+      is(0xB5.U, 0x95.U, 0xB4.U, 0x94.U) {
         result := LoadStoreInstructions.executeZeroPageX(opcode, cycle, regs, operand, memDataIn)
       }
       
+      // ========== LoadStore 零页 Y ==========
+      is(0xB6.U, 0x96.U) {
+        result := LoadStoreInstructions.executeZeroPageY(opcode, cycle, regs, operand, memDataIn)
+      }
+      
       // ========== LoadStore 绝对寻址 ==========
-      is(0xAD.U, 0x8D.U) {
+      is(0xAD.U, 0x8D.U, 0x8E.U, 0x8C.U, 0xAE.U, 0xAC.U) {
         result := LoadStoreInstructions.executeAbsolute(opcode, cycle, regs, operand, memDataIn)
       }
       
       // ========== LoadStore 绝对索引 ==========
-      is(0xBD.U, 0xB9.U) {
+      is(0xBD.U, 0xB9.U, 0xBC.U, 0xBE.U, 0x9D.U, 0x99.U) {
         result := LoadStoreInstructions.executeAbsoluteIndexed(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== LoadStore 间接 X ==========
+      is(0xA1.U, 0x81.U) {
+        result := LoadStoreInstructions.executeIndirectX(opcode, cycle, regs, operand, memDataIn)
+      }
+      
+      // ========== LoadStore 间接 Y ==========
+      is(0x91.U, 0xB1.U) {
+        result := LoadStoreInstructions.executeIndirectY(opcode, cycle, regs, operand, memDataIn)
       }
       
       // ========== Stack Push ==========

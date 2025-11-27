@@ -2,6 +2,7 @@
 // 用于硬件级仿真 NES 模拟器
 
 #include <verilated.h>
+#include <verilated_vcd_c.h>
 #include "VNESSystem.h"
 #include <iostream>
 #include <fstream>
@@ -193,13 +194,15 @@ public:
         std::cout << "   Reset 向量 (0xFFFC-0xFFFD) = 0x" << std::hex << reset_vec << std::dec << std::endl;
     }
     
-    void tick() {
+    void tick(VerilatedVcdC* tfp = nullptr) {
         dut->clock = 0;
         dut->eval();
+        if (tfp) tfp->dump(cycle_count * 2);
         cycle_count++;
         
         dut->clock = 1;
         dut->eval();
+        if (tfp) tfp->dump(cycle_count * 2 + 1);
     }
     
     void handleInput() {
@@ -310,23 +313,17 @@ public:
                     auto debug_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_debug_time).count();
                     
                     if (debug_elapsed >= 5000) {
-                        std::cout << "\n=== PPU 调试信息 ===" << std::endl;
-                        std::cout << "  当前像素: (" << dut->io_pixelX << ", " << dut->io_pixelY << ")" << std::endl;
-                        std::cout << "  当前颜色: 0x" << std::hex << (int)dut->io_pixelColor << std::dec << std::endl;
-                        
-                        // PPU 寄存器状态
+                        std::cout << "\n=== 调试信息 ===" << std::endl;
+                        std::cout << "  像素: (" << dut->io_pixelX << ", " << dut->io_pixelY << ")" << std::endl;
+                        std::cout << "  颜色: 0x" << std::hex << (int)dut->io_pixelColor << std::dec << std::endl;
+                        std::cout << "  VBlank: " << (dut->io_vblank ? "是" : "否") << std::endl;
+                        std::cout << "  CPU State: " << (int)dut->io_debug_state << std::endl;
+                        std::cout << "  CPU Cycle: " << (int)dut->io_debug_cycle << std::endl;
+                        std::cout << "  Opcode: 0x" << std::hex << (int)dut->io_debug_opcode << std::dec << std::endl;
                         std::cout << "  PPUCTRL: 0x" << std::hex << (int)dut->io_ppuDebug_ppuCtrl << std::dec << std::endl;
                         std::cout << "  PPUMASK: 0x" << std::hex << (int)dut->io_ppuDebug_ppuMask << std::dec << std::endl;
-                        std::cout << "  PPUSTATUS: 0x" << std::hex << (int)dut->io_ppuDebug_ppuStatus << std::dec << std::endl;
-                        std::cout << "  PPUADDR: 0x" << std::hex << dut->io_ppuDebug_ppuAddrReg << std::dec << std::endl;
-                        std::cout << "  调色板初始化: " << (dut->io_ppuDebug_paletteInitDone ? "完成" : "进行中") << std::endl;
                         
                         // Framebuffer 统计
-                        std::cout << "  Framebuffer[0]: 0x" << std::hex << framebuffer[0] << std::dec << std::endl;
-                        std::cout << "  Framebuffer[100]: 0x" << std::hex << framebuffer[100] << std::dec << std::endl;
-                        std::cout << "  Framebuffer[1000]: 0x" << std::hex << framebuffer[1000] << std::dec << std::endl;
-                        
-                        // 统计非零像素数量
                         int non_zero_pixels = 0;
                         for (int i = 0; i < 256 * 240; i++) {
                             if (framebuffer[i] != 0) non_zero_pixels++;
@@ -357,8 +354,13 @@ public:
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::cerr << "用法: " << argv[0] << " <rom文件>" << std::endl;
+        std::cerr << "用法: " << argv[0] << " <rom文件> [--trace]" << std::endl;
         return 1;
+    }
+    
+    bool enable_trace = false;
+    if (argc >= 3 && std::string(argv[2]) == "--trace") {
+        enable_trace = true;
     }
     
     std::cout << "🚀 NES Verilator 仿真器" << std::endl;
@@ -368,11 +370,23 @@ int main(int argc, char** argv) {
     
     VNESSystem* dut = new VNESSystem;
     
+    // 启用波形追踪
+    VerilatedVcdC* tfp = nullptr;
+    if (enable_trace) {
+        Verilated::traceEverOn(true);
+        tfp = new VerilatedVcdC;
+        dut->trace(tfp, 99);
+        tfp->open("nes_trace.vcd");
+        std::cout << "📊 VCD 追踪已启用: nes_trace.vcd" << std::endl;
+    }
+    
     NESEmulator emulator(dut);
     
     // 初始 reset
     dut->reset = 1;
     dut->io_romLoadEn = 0;
+    dut->io_controller1 = 0;
+    dut->io_controller2 = 0;
     for (int i = 0; i < 10; i++) {
         dut->clock = 0;
         dut->eval();
@@ -385,44 +399,31 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    // 再次 reset，让 CPU 从 reset vector 启动
-    dut->reset = 1;
-    for (int i = 0; i < 10; i++) {
-        dut->clock = 0;
-        dut->eval();
-        dut->clock = 1;
-        dut->eval();
-    }
-    
-    // 释放 reset
+    // 释放 reset，让 CPU 从 reset vector 启动
     dut->reset = 0;
-    std::cout << "🔄 释放 Reset，CPU 启动中..." << std::endl;
-    
-    // 初始化 PPU 调色板（用于测试渲染）
-    std::cout << "   初始化 PPU 调色板..." << std::endl;
     dut->io_romLoadEn = 0;
     
-    // 等待几个周期让 PPU 稳定
-    for (int i = 0; i < 10; i++) {
-        dut->clock = 0;
-        dut->eval();
-        dut->clock = 1;
-        dut->eval();
-    }
+    std::cout << "🔄 释放 Reset，CPU 启动中..." << std::endl;
+    std::cout << "   等待 CPU 完成 reset 序列（约 7 个周期）..." << std::endl;
     
-    // 给足够的周期让 CPU 读取 reset vector (需要 5 个周期完成 reset 序列)
-    for (int i = 0; i < 10; i++) {
+    // CPU reset 序列需要约 7 个周期：
+    // - 读取 reset vector 低字节 (0xFFFC)
+    // - 读取 reset vector 高字节 (0xFFFD)
+    // - 设置 PC
+    // 给更多周期确保完成
+    for (int i = 0; i < 20; i++) {
         dut->clock = 0;
         dut->eval();
         dut->clock = 1;
         dut->eval();
         
         // 调试：显示前几个周期的状态
-        if (i < 10) {
+        if (i < 15) {
             std::cout << "   周期 " << i 
                       << ": state=" << (int)dut->io_debug_state 
                       << " cycle=" << (int)dut->io_debug_cycle
-                      << " PC=0x" << std::hex << dut->io_debug_regPC << std::dec << std::endl;
+                      << " PC=0x" << std::hex << dut->io_debug_regPC << std::dec 
+                      << std::endl;
         }
     }
     
