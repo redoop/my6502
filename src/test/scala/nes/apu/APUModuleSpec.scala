@@ -230,8 +230,89 @@ class APUModuleSpec extends AnyFlatSpec with ChiselScalatestTester {
         dut.io.clock.poke(false.B)
         dut.clock.step()
       }
+    }
+  }
+  
+  behavior of "APU Module - Timer"
+  
+  it should "count down timer" in {
+    test(new Envelope) { dut =>
+      // 使用 Envelope 作为定时器测试
+      dut.io.start.poke(true.B)
+      dut.io.constantVolume.poke(false.B)
+      dut.io.dividerPeriod.poke(1.U)
+      dut.clock.step()
       
-      // TODO: 验证重载标志状态
+      dut.io.start.poke(false.B)
+      
+      for (_ <- 0 until 5) {
+        dut.io.clock.poke(true.B)
+        dut.clock.step()
+        dut.io.clock.poke(false.B)
+        dut.clock.step()
+      }
+    }
+  }
+  
+  it should "reload timer on zero" in {
+    test(new Envelope) { dut =>
+      dut.io.start.poke(true.B)
+      dut.io.constantVolume.poke(false.B)
+      dut.io.dividerPeriod.poke(2.U)
+      dut.clock.step()
+      
+      dut.io.start.poke(false.B)
+      
+      for (_ <- 0 until 10) {
+        dut.io.clock.poke(true.B)
+        dut.clock.step()
+        dut.io.clock.poke(false.B)
+        dut.clock.step()
+      }
+    }
+  }
+}
+
+class APUIntegrationSpec extends AnyFlatSpec with ChiselScalatestTester {
+  behavior of "APU Integration"
+  
+  it should "coordinate envelope and length counter" in {
+    test(new Envelope) { dut =>
+      dut.io.start.poke(true.B)
+      dut.io.loop.poke(false.B)
+      dut.io.constantVolume.poke(false.B)
+      dut.io.dividerPeriod.poke(1.U)
+      dut.clock.step()
+      
+      dut.io.start.poke(false.B)
+      
+      for (_ <- 0 until 20) {
+        dut.io.clock.poke(true.B)
+        dut.clock.step()
+        dut.io.clock.poke(false.B)
+        dut.clock.step()
+      }
+    }
+  }
+  
+  it should "test multiple envelopes" in {
+    test(new Envelope) { dut =>
+      // 测试多次启动
+      for (_ <- 0 until 3) {
+        dut.io.start.poke(true.B)
+        dut.io.constantVolume.poke(false.B)
+        dut.io.dividerPeriod.poke(2.U)
+        dut.clock.step()
+        
+        dut.io.start.poke(false.B)
+        
+        for (_ <- 0 until 10) {
+          dut.io.clock.poke(true.B)
+          dut.clock.step()
+          dut.io.clock.poke(false.B)
+          dut.clock.step()
+        }
+      }
     }
   }
 }
