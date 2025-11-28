@@ -206,7 +206,9 @@ class CPU6502Core extends Module {
   }
 
   // 调试输出
-  io.debug := DebugBundle.fromRegisters(regs, opcode, state, cycle)
+  val debugBundle = Wire(new DebugBundle)
+  debugBundle := DebugBundle.fromRegisters(regs, opcode, state, cycle)
+  io.debug := debugBundle
 
   // 指令分发器
   def dispatchInstruction(
