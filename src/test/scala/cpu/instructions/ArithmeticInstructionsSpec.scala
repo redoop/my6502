@@ -253,3 +253,306 @@ class ArithmeticZeroPageTestModule extends Module {
   io.flagC      := result.regs.flagC
   io.done       := result.done
 }
+
+class ArithmeticAbsoluteSpec extends AnyFlatSpec with ChiselScalatestTester {
+  behavior of "ArithmeticInstructions - Absolute"
+
+  it should "ADC absolute" in {
+    test(new ArithmeticAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x6D.U)
+      dut.io.aIn.poke(0x00.U)
+      dut.io.flagCIn.poke(false.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x34.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x34.U)
+      dut.io.memDataIn.poke(0x12.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x1234.U)
+      dut.io.memDataIn.poke(0x50.U)
+      dut.clock.step()
+      dut.io.aOut.expect(0x50.U)
+      dut.io.flagC.expect(false.B)
+      dut.io.flagZ.expect(false.B)
+      dut.io.flagV.expect(false.B)
+      dut.io.flagN.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "ADC absolute with carry" in {
+    test(new ArithmeticAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x6D.U)
+      dut.io.aIn.poke(0xFF.U)
+      dut.io.flagCIn.poke(false.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x20.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x2000.U)
+      dut.io.memDataIn.poke(0x01.U)
+      dut.clock.step()
+      dut.io.aOut.expect(0x00.U)
+      dut.io.flagC.expect(true.B)
+      dut.io.flagZ.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "ADC absolute with overflow" in {
+    test(new ArithmeticAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x6D.U)
+      dut.io.aIn.poke(0x7F.U)
+      dut.io.flagCIn.poke(false.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x30.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x3000.U)
+      dut.io.memDataIn.poke(0x01.U)
+      dut.clock.step()
+      dut.io.aOut.expect(0x80.U)
+      dut.io.flagV.expect(true.B)
+      dut.io.flagN.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "SBC absolute" in {
+    test(new ArithmeticAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0xED.U)
+      dut.io.aIn.poke(0x50.U)
+      dut.io.flagCIn.poke(true.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x20.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x2000.U)
+      dut.io.memDataIn.poke(0x30.U)
+      dut.clock.step()
+      dut.io.aOut.expect(0x20.U)
+      dut.io.flagC.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "SBC absolute with borrow" in {
+    test(new ArithmeticAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0xED.U)
+      dut.io.aIn.poke(0x30.U)
+      dut.io.flagCIn.poke(true.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x40.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x4000.U)
+      dut.io.memDataIn.poke(0x50.U)
+      dut.clock.step()
+      dut.io.aOut.expect(0xE0.U)
+      dut.io.flagC.expect(false.B)
+      dut.io.flagN.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "SBC absolute with overflow" in {
+    test(new ArithmeticAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0xED.U)
+      dut.io.aIn.poke(0x80.U)
+      dut.io.flagCIn.poke(true.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x50.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x5000.U)
+      dut.io.memDataIn.poke(0x01.U)
+      dut.clock.step()
+      dut.io.aOut.expect(0x7F.U)
+      dut.io.flagV.expect(true.B)
+      dut.io.flagC.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+}
+
+class IncDecAbsoluteSpec extends AnyFlatSpec with ChiselScalatestTester {
+  behavior of "ArithmeticInstructions - INC/DEC Absolute"
+
+  it should "INC absolute" in {
+    test(new IncDecAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0xEE.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x34.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x34.U)
+      dut.io.memDataIn.poke(0x12.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x1234.U)
+      dut.io.memDataIn.poke(0x42.U)
+      dut.clock.step()
+      dut.io.cycle.poke(3.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0x43.U)
+      dut.io.flagZ.expect(false.B)
+      dut.io.flagN.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "INC absolute wrap to zero" in {
+    test(new IncDecAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0xEE.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x20.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x2000.U)
+      dut.io.memDataIn.poke(0xFF.U)
+      dut.clock.step()
+      dut.io.cycle.poke(3.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0x00.U)
+      dut.io.flagZ.expect(true.B)
+      dut.io.flagN.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "INC absolute negative result" in {
+    test(new IncDecAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0xEE.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x30.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x3000.U)
+      dut.io.memDataIn.poke(0x7F.U)
+      dut.clock.step()
+      dut.io.cycle.poke(3.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0x80.U)
+      dut.io.flagZ.expect(false.B)
+      dut.io.flagN.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "DEC absolute" in {
+    test(new IncDecAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0xCE.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x40.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x4000.U)
+      dut.io.memDataIn.poke(0x42.U)
+      dut.clock.step()
+      dut.io.cycle.poke(3.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0x41.U)
+      dut.io.flagZ.expect(false.B)
+      dut.io.flagN.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "DEC absolute to zero" in {
+    test(new IncDecAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0xCE.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x50.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x5000.U)
+      dut.io.memDataIn.poke(0x01.U)
+      dut.clock.step()
+      dut.io.cycle.poke(3.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0x00.U)
+      dut.io.flagZ.expect(true.B)
+      dut.io.flagN.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "DEC absolute wrap to 0xFF" in {
+    test(new IncDecAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0xCE.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x60.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x6000.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(3.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0xFF.U)
+      dut.io.flagZ.expect(false.B)
+      dut.io.flagN.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+}

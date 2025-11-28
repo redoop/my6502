@@ -235,3 +235,219 @@ class ShiftZeroPageTestModule extends Module {
   io.flagZ      := result.regs.flagZ
   io.done       := result.done
 }
+
+class ShiftAbsoluteSpec extends AnyFlatSpec with ChiselScalatestTester {
+  behavior of "ShiftInstructions - Absolute"
+
+  it should "ASL absolute" in {
+    test(new ShiftAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x0E.U)
+      dut.io.flagCIn.poke(false.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x34.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x34.U)
+      dut.io.memDataIn.poke(0x12.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x1234.U)
+      dut.io.memDataIn.poke(0x55.U)
+      dut.clock.step()
+      dut.io.cycle.poke(3.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0xAA.U)
+      dut.io.flagC.expect(false.B)
+      dut.io.flagN.expect(true.B)
+      dut.io.flagZ.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "LSR absolute" in {
+    test(new ShiftAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x4E.U)
+      dut.io.flagCIn.poke(false.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x20.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x2000.U)
+      dut.io.memDataIn.poke(0xAA.U)
+      dut.clock.step()
+      dut.io.cycle.poke(3.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0x55.U)
+      dut.io.flagC.expect(false.B)
+      dut.io.flagN.expect(false.B)
+      dut.io.flagZ.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "ROL absolute" in {
+    test(new ShiftAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x2E.U)
+      dut.io.flagCIn.poke(true.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x30.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x3000.U)
+      dut.io.memDataIn.poke(0x55.U)
+      dut.clock.step()
+      dut.io.cycle.poke(3.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0xAB.U)
+      dut.io.flagC.expect(false.B)
+      dut.io.flagN.expect(true.B)
+      dut.io.flagZ.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "ROR absolute" in {
+    test(new ShiftAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x6E.U)
+      dut.io.flagCIn.poke(true.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x40.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x4000.U)
+      dut.io.memDataIn.poke(0xAA.U)
+      dut.clock.step()
+      dut.io.cycle.poke(3.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0xD5.U)
+      dut.io.flagC.expect(false.B)
+      dut.io.flagN.expect(true.B)
+      dut.io.flagZ.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "ASL absolute with carry" in {
+    test(new ShiftAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x0E.U)
+      dut.io.flagCIn.poke(false.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x50.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x5000.U)
+      dut.io.memDataIn.poke(0x80.U)
+      dut.clock.step()
+      dut.io.cycle.poke(3.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0x00.U)
+      dut.io.flagC.expect(true.B)
+      dut.io.flagZ.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "LSR absolute with carry" in {
+    test(new ShiftAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x4E.U)
+      dut.io.flagCIn.poke(false.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x60.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x6000.U)
+      dut.io.memDataIn.poke(0x01.U)
+      dut.clock.step()
+      dut.io.cycle.poke(3.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0x00.U)
+      dut.io.flagC.expect(true.B)
+      dut.io.flagZ.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "ROL absolute with carry out" in {
+    test(new ShiftAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x2E.U)
+      dut.io.flagCIn.poke(false.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x70.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x7000.U)
+      dut.io.memDataIn.poke(0x80.U)
+      dut.clock.step()
+      dut.io.cycle.poke(3.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0x00.U)
+      dut.io.flagC.expect(true.B)
+      dut.io.flagZ.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "ROR absolute with carry out" in {
+    test(new ShiftAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x6E.U)
+      dut.io.flagCIn.poke(false.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x80.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x8000.U)
+      dut.io.memDataIn.poke(0x01.U)
+      dut.clock.step()
+      dut.io.cycle.poke(3.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0x00.U)
+      dut.io.flagC.expect(true.B)
+      dut.io.flagZ.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+}
