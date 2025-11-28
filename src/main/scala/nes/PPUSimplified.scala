@@ -198,40 +198,49 @@ class PPUSimplified extends Module {
   val bgColor = WireDefault(0x0F.U(6.W))
   val bgTransparent = WireDefault(true.B)
   
-  when(scanlineX < 256.U && scanlineY < 240.U) {
+  // 只在可见区域渲染
+  val inVisibleArea = scanlineX < 256.U && scanlineY < 240.U
+  val renderingEnabled = ppuMask(3) || ppuMask(4)  // 背景或精灵渲染启用
+  
+  when(inVisibleArea && renderingEnabled) {
     // ========== 背景渲染 ==========
-    val tileX = scanlineX >> 3
-    val tileY = scanlineY >> 3
-    val pixelInTileX = scanlineX(2, 0)
-    val pixelInTileY = scanlineY(2, 0)
-    
-    val nametableAddr = (tileY << 5) + tileX
-    val tileIndex = vram.read(nametableAddr)
-    
-    val attrX = tileX >> 2
-    val attrY = tileY >> 2
-    val attrAddr = 0x3C0.U + (attrY << 3) + attrX
-    val attrByte = vram.read(attrAddr)
-    val attrShift = ((tileY(1) << 2) | (tileX(1) << 1))
-    val paletteHigh = (attrByte >> attrShift) & 0x3.U
-    
-    val patternTableBase = Mux(ppuCtrl(4), 0x1000.U, 0x0000.U)
-    val patternAddr = patternTableBase + (tileIndex << 4) + pixelInTileY
-    
-    val patternLow = chrROM.read(patternAddr)
-    val patternHigh = chrROM.read(patternAddr + 8.U)
-    
-    val bitPos = 7.U - pixelInTileX
-    val colorLow = (patternLow >> bitPos) & 1.U
-    val colorHigh = (patternHigh >> bitPos) & 1.U
-    val paletteLow = (colorHigh << 1) | colorLow
-    
-    val fullPaletteIndex = (paletteHigh << 2) | paletteLow
-    val paletteAddr = Mux(paletteLow === 0.U, 0.U, fullPaletteIndex)
-    val paletteColor = palette.read(paletteAddr)
-    
-    bgColor := paletteColor(5, 0)
-    bgTransparent := paletteLow === 0.U
+    when(ppuMask(3)) {  // 背景渲染启用
+      val tileX = scanlineX >> 3
+      val tileY = scanlineY >> 3
+      val pixelInTileX = scanlineX(2, 0)
+      val pixelInTileY = scanlineY(2, 0)
+      
+      // 从 VRAM 读取 nametable
+      val nametableAddr = (tileY << 5) + tileX
+      val tileIndex = vram.read(nametableAddr)
+      
+      // 从 VRAM 读取属性表
+      val attrX = tileX >> 2
+      val attrY = tileY >> 2
+      val attrAddr = 0x3C0.U + (attrY << 3) + attrX
+      val attrByte = vram.read(attrAddr)
+      val attrShift = ((tileY(1) << 2) | (tileX(1) << 1))
+      val paletteHigh = (attrByte >> attrShift) & 0x3.U
+      
+      // 从 CHR ROM 读取图案数据
+      val patternTableBase = Mux(ppuCtrl(4), 0x1000.U, 0x0000.U)
+      val patternAddr = patternTableBase + (tileIndex << 4) + pixelInTileY
+      
+      val patternLow = chrROM.read(patternAddr)
+      val patternHigh = chrROM.read(patternAddr + 8.U)
+      
+      val bitPos = 7.U - pixelInTileX
+      val colorLow = (patternLow >> bitPos) & 1.U
+      val colorHigh = (patternHigh >> bitPos) & 1.U
+      val paletteLow = (colorHigh << 1) | colorLow
+      
+      val fullPaletteIndex = (paletteHigh << 2) | paletteLow
+      val paletteAddr = Mux(paletteLow === 0.U, 0.U, fullPaletteIndex)
+      val paletteColor = palette.read(paletteAddr)
+      
+      bgColor := paletteColor(5, 0)
+      bgTransparent := paletteLow === 0.U
+    }
     
     // ========== 精灵渲染（前 8 个精灵）==========
     // 使用优先级编码器避免组合循环
@@ -239,46 +248,49 @@ class PPUSimplified extends Module {
     val spriteHits = VecInit(Seq.fill(8)(false.B))
     val spritePriorities = VecInit(Seq.fill(8)(false.B))
     
-    // 扫描前 8 个精灵
-    for (i <- 0 until 8) {
-      val spriteBase = (i * 4).U
-      val sprY = oam.read(spriteBase)
-      val sprTile = oam.read(spriteBase + 1.U)
-      val sprAttr = oam.read(spriteBase + 2.U)
-      val sprX = oam.read(spriteBase + 3.U)
-      
-      val sprHeight = 8.U
-      val sprInYRange = (scanlineY >= sprY) && (scanlineY < (sprY + sprHeight))
-      val sprInXRange = (scanlineX >= sprX) && (scanlineX < (sprX + 8.U))
-      
-      when(sprInYRange && sprInXRange) {
-        val pixY = scanlineY - sprY
-        val pixX = scanlineX - sprX
+    // 只在精灵渲染启用时扫描
+    when(ppuMask(4)) {
+      // 扫描前 8 个精灵
+      for (i <- 0 until 8) {
+        val spriteBase = (i * 4).U
+        val sprY = oam.read(spriteBase)
+        val sprTile = oam.read(spriteBase + 1.U)
+        val sprAttr = oam.read(spriteBase + 2.U)
+        val sprX = oam.read(spriteBase + 3.U)
         
-        val flipH = sprAttr(6)
-        val flipV = sprAttr(7)
-        val actualPixelX = Mux(flipH, 7.U - pixX, pixX)
-        val actualPixelY = Mux(flipV, 7.U - pixY, pixY)
+        val sprHeight = 8.U
+        val sprInYRange = (scanlineY >= sprY) && (scanlineY < (sprY + sprHeight))
+        val sprInXRange = (scanlineX >= sprX) && (scanlineX < (sprX + 8.U))
         
-        val sprPatternTableBase = Mux(ppuCtrl(3), 0x1000.U, 0x0000.U)
-        val sprPatternAddr = sprPatternTableBase + (sprTile << 4) + actualPixelY
-        
-        val sprPatternLow = chrROM.read(sprPatternAddr)
-        val sprPatternHigh = chrROM.read(sprPatternAddr + 8.U)
-        
-        val sprBitPos = 7.U - actualPixelX
-        val sprColorLow = (sprPatternLow >> sprBitPos) & 1.U
-        val sprColorHigh = (sprPatternHigh >> sprBitPos) & 1.U
-        val sprPaletteLow = (sprColorHigh << 1) | sprColorLow
-        
-        when(sprPaletteLow =/= 0.U) {
-          val spritePaletteIdx = sprAttr(1, 0)
-          val sprFullPaletteIndex = 0x10.U + (spritePaletteIdx << 2) + sprPaletteLow
-          val sprPaletteColor = palette.read(sprFullPaletteIndex(4, 0))
+        when(sprInYRange && sprInXRange) {
+          val pixY = scanlineY - sprY
+          val pixX = scanlineX - sprX
           
-          spriteColors(i) := sprPaletteColor(5, 0)
-          spriteHits(i) := true.B
-          spritePriorities(i) := sprAttr(5)
+          val flipH = sprAttr(6)
+          val flipV = sprAttr(7)
+          val actualPixelX = Mux(flipH, 7.U - pixX, pixX)
+          val actualPixelY = Mux(flipV, 7.U - pixY, pixY)
+          
+          val sprPatternTableBase = Mux(ppuCtrl(3), 0x1000.U, 0x0000.U)
+          val sprPatternAddr = sprPatternTableBase + (sprTile << 4) + actualPixelY
+          
+          val sprPatternLow = chrROM.read(sprPatternAddr)
+          val sprPatternHigh = chrROM.read(sprPatternAddr + 8.U)
+          
+          val sprBitPos = 7.U - actualPixelX
+          val sprColorLow = (sprPatternLow >> sprBitPos) & 1.U
+          val sprColorHigh = (sprPatternHigh >> sprBitPos) & 1.U
+          val sprPaletteLow = (sprColorHigh << 1) | sprColorLow
+          
+          when(sprPaletteLow =/= 0.U) {
+            val spritePaletteIdx = sprAttr(1, 0)
+            val sprFullPaletteIndex = 0x10.U + (spritePaletteIdx << 2) + sprPaletteLow
+            val sprPaletteColor = palette.read(sprFullPaletteIndex(4, 0))
+            
+            spriteColors(i) := sprPaletteColor(5, 0)
+            spriteHits(i) := true.B
+            spritePriorities(i) := sprAttr(5)
+          }
         }
       }
     }
@@ -323,21 +335,19 @@ class PPUSimplified extends Module {
     }
     
     // ========== 合成最终颜色 ==========
-    when(!paletteInitDone) {
-      // 调色板初始化期间，使用简单的颜色映射
-      pixelColor := Mux(paletteLow === 0.U, 0x0F.U,
-                    Mux(paletteLow === 1.U, 0x00.U,
-                    Mux(paletteLow === 2.U, 0x10.U, 0x30.U)))
-    }.elsewhen(spriteFound && (!spriteBehindBg || bgTransparent)) {
+    when(spriteFound && (!spriteBehindBg || bgTransparent)) {
       // 精灵在前景，或背景透明
       pixelColor := spriteColor
     }.elsewhen(!bgTransparent) {
       // 背景不透明
       pixelColor := bgColor
     }.otherwise {
-      // 显示背景色
+      // 显示背景色（调色板地址 0）
       pixelColor := palette.read(0.U)(5, 0)
     }
+  }.otherwise {
+    // 不在可见区域或渲染未启用，输出背景色
+    pixelColor := palette.read(0.U)(5, 0)
   }
   
   // 输出
