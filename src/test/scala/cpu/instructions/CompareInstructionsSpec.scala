@@ -85,6 +85,62 @@ class CompareInstructionsSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.flagCOut.expect(true.B)
     }
   }
+
+  behavior of "CompareInstructions - Zero Page"
+
+  it should "CMP zero page" in {
+    test(new CompareZeroPageTestModule) { dut =>
+      dut.io.opcode.poke(0xC5.U)
+      dut.io.aIn.poke(0x50.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x10.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x10.U)
+      dut.io.memDataIn.poke(0x30.U)
+      dut.clock.step()
+      dut.io.flagC.expect(true.B)
+      dut.io.flagZ.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "CPX zero page" in {
+    test(new CompareZeroPageTestModule) { dut =>
+      dut.io.opcode.poke(0xE4.U)
+      dut.io.xIn.poke(0x42.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x20.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x20.U)
+      dut.io.memDataIn.poke(0x42.U)
+      dut.clock.step()
+      dut.io.flagZ.expect(true.B)
+      dut.io.flagC.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "CPY zero page" in {
+    test(new CompareZeroPageTestModule) { dut =>
+      dut.io.opcode.poke(0xC4.U)
+      dut.io.yIn.poke(0x10.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x30.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x30.U)
+      dut.io.memDataIn.poke(0x20.U)
+      dut.clock.step()
+      dut.io.flagC.expect(false.B)
+      dut.io.flagN.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
 }
 
 class CompareTestModule extends Module {
@@ -110,4 +166,33 @@ class CompareTestModule extends Module {
   io.flagCOut := result.regs.flagC
   io.flagZOut := result.regs.flagZ
   io.flagNOut := result.regs.flagN
+}
+
+class CompareZeroPageTestModule extends Module {
+  val io = IO(new Bundle {
+    val opcode     = Input(UInt(8.W))
+    val cycle      = Input(UInt(8.W))
+    val operand    = Input(UInt(8.W))
+    val memDataIn  = Input(UInt(8.W))
+    val aIn        = Input(UInt(8.W))
+    val xIn        = Input(UInt(8.W))
+    val yIn        = Input(UInt(8.W))
+    val flagC      = Output(Bool())
+    val flagZ      = Output(Bool())
+    val flagN      = Output(Bool())
+    val done       = Output(Bool())
+  })
+
+  val regs = Wire(new Registers)
+  regs := Registers.default()
+  regs.a := io.aIn
+  regs.x := io.xIn
+  regs.y := io.yIn
+
+  val result = CompareInstructions.executeZeroPageGeneric(io.opcode, io.cycle, regs, io.operand, io.memDataIn)
+
+  io.flagC := result.regs.flagC
+  io.flagZ := result.regs.flagZ
+  io.flagN := result.regs.flagN
+  io.done  := result.done
 }

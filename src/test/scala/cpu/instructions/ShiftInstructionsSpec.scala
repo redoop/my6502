@@ -98,6 +98,87 @@ class ShiftInstructionsSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.flagNOut.expect(false.B)
     }
   }
+
+  behavior of "ShiftInstructions - Zero Page"
+
+  it should "ASL zero page" in {
+    test(new ShiftZeroPageTestModule) { dut =>
+      dut.io.opcode.poke(0x06.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x10.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x10.U)
+      dut.io.memDataIn.poke(0x40.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0x80.U)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "LSR zero page" in {
+    test(new ShiftZeroPageTestModule) { dut =>
+      dut.io.opcode.poke(0x46.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x20.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x20.U)
+      dut.io.memDataIn.poke(0x81.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0x40.U)
+      dut.io.flagC.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "ROL zero page" in {
+    test(new ShiftZeroPageTestModule) { dut =>
+      dut.io.opcode.poke(0x26.U)
+      dut.io.flagCIn.poke(true.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x30.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x30.U)
+      dut.io.memDataIn.poke(0x80.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0x01.U)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "ROR zero page" in {
+    test(new ShiftZeroPageTestModule) { dut =>
+      dut.io.opcode.poke(0x66.U)
+      dut.io.flagCIn.poke(true.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x40.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x40.U)
+      dut.io.memDataIn.poke(0x01.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0x80.U)
+      dut.io.done.expect(true.B)
+    }
+  }
 }
 
 class ShiftTestModule extends Module {
@@ -122,4 +203,35 @@ class ShiftTestModule extends Module {
   io.flagCOut := result.regs.flagC
   io.flagNOut := result.regs.flagN
   io.flagZOut := result.regs.flagZ
+}
+
+class ShiftZeroPageTestModule extends Module {
+  val io = IO(new Bundle {
+    val opcode     = Input(UInt(8.W))
+    val cycle      = Input(UInt(8.W))
+    val operand    = Input(UInt(8.W))
+    val memDataIn  = Input(UInt(8.W))
+    val flagCIn    = Input(Bool())
+    val memAddr    = Output(UInt(16.W))
+    val memWrite   = Output(Bool())
+    val memDataOut = Output(UInt(8.W))
+    val flagC      = Output(Bool())
+    val flagN      = Output(Bool())
+    val flagZ      = Output(Bool())
+    val done       = Output(Bool())
+  })
+
+  val regs = Wire(new Registers)
+  regs := Registers.default()
+  regs.flagC := io.flagCIn
+
+  val result = ShiftInstructions.executeZeroPage(io.opcode, io.cycle, regs, io.operand, io.memDataIn)
+
+  io.memAddr    := result.memAddr
+  io.memWrite   := result.memWrite
+  io.memDataOut := result.memData
+  io.flagC      := result.regs.flagC
+  io.flagN      := result.regs.flagN
+  io.flagZ      := result.regs.flagZ
+  io.done       := result.done
 }
