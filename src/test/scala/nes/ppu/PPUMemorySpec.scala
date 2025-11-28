@@ -160,4 +160,96 @@ class PPUMemorySpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step()
     }
   }
+  
+  behavior of "PPU Memory - Palette"
+  
+  it should "write to background palette" in {
+    test(new PPURefactored) { dut =>
+      dut.io.cpuAddr.poke(6.U)
+      dut.io.cpuDataIn.poke(0x3F.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+      dut.io.cpuDataIn.poke(0x00.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+      
+      dut.io.cpuAddr.poke(7.U)
+      for (i <- 0 until 16) {
+        dut.io.cpuDataIn.poke(i.U)
+        dut.io.cpuWrite.poke(true.B)
+        dut.clock.step()
+      }
+    }
+  }
+  
+  it should "write to sprite palette" in {
+    test(new PPURefactored) { dut =>
+      dut.io.cpuAddr.poke(6.U)
+      dut.io.cpuDataIn.poke(0x3F.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+      dut.io.cpuDataIn.poke(0x10.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+      
+      dut.io.cpuAddr.poke(7.U)
+      for (i <- 0 until 16) {
+        dut.io.cpuDataIn.poke((i * 16).U)
+        dut.io.cpuWrite.poke(true.B)
+        dut.clock.step()
+      }
+    }
+  }
+  
+  behavior of "PPU Memory - Nametable"
+  
+  it should "write to nametable 0" in {
+    test(new PPURefactored) { dut =>
+      dut.io.cpuAddr.poke(6.U)
+      dut.io.cpuDataIn.poke(0x20.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+      dut.io.cpuDataIn.poke(0x00.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+      
+      dut.io.cpuAddr.poke(7.U)
+      for (i <- 0 until 32) {
+        dut.io.cpuDataIn.poke((i & 0xFF).U)
+        dut.io.cpuWrite.poke(true.B)
+        dut.clock.step()
+      }
+    }
+  }
+  
+  it should "write to nametable 1" in {
+    test(new PPURefactored) { dut =>
+      dut.io.cpuAddr.poke(6.U)
+      dut.io.cpuDataIn.poke(0x24.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+      dut.io.cpuDataIn.poke(0x00.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+    }
+  }
+  
+  it should "write to attribute table" in {
+    test(new PPURefactored) { dut =>
+      dut.io.cpuAddr.poke(6.U)
+      dut.io.cpuDataIn.poke(0x23.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+      dut.io.cpuDataIn.poke(0xC0.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+      
+      dut.io.cpuAddr.poke(7.U)
+      for (i <- 0 until 8) {
+        dut.io.cpuDataIn.poke((i * 0x11).U)
+        dut.io.cpuWrite.poke(true.B)
+        dut.clock.step()
+      }
+    }
+  }
 }

@@ -212,4 +212,69 @@ class APUChannelSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step()
     }
   }
+  
+  behavior of "APU Channel - Frequency Control"
+  
+  it should "set Pulse 1 frequency" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x02.U)
+      dut.io.cpuDataIn.poke(0xFE.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+      
+      dut.io.cpuAddr.poke(0x03.U)
+      dut.io.cpuDataIn.poke(0x07.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+    }
+  }
+  
+  it should "set Triangle frequency" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x0A.U)
+      dut.io.cpuDataIn.poke(0xFE.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+      
+      dut.io.cpuAddr.poke(0x0B.U)
+      dut.io.cpuDataIn.poke(0x07.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+    }
+  }
+  
+  it should "set different Noise periods" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x0E.U)
+      for (i <- 0 until 16) {
+        dut.io.cpuDataIn.poke(i.U)
+        dut.io.cpuWrite.poke(true.B)
+        dut.clock.step()
+      }
+    }
+  }
+  
+  behavior of "APU Channel - Volume Control"
+  
+  it should "set Pulse 1 volume levels" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x00.U)
+      for (i <- 0 until 16) {
+        dut.io.cpuDataIn.poke(i.U)
+        dut.io.cpuWrite.poke(true.B)
+        dut.clock.step()
+      }
+    }
+  }
+  
+  it should "set Noise volume levels" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x0C.U)
+      for (i <- 0 until 16) {
+        dut.io.cpuDataIn.poke(i.U)
+        dut.io.cpuWrite.poke(true.B)
+        dut.clock.step()
+      }
+    }
+  }
 }
