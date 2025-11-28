@@ -284,24 +284,31 @@ public:
         std::cout << "   提示: 游戏启动后会自动按 Start 键" << std::endl;
         
         uint64_t frame_count = 0;
+        uint64_t total_frames = 0;
         auto start_time = std::chrono::high_resolution_clock::now();
         auto last_report_time = start_time;
         bool last_vblank = false;
         bool auto_start_pressed = false;
         
+        // 性能优化：批量处理周期
+        const int BATCH_SIZE = 1000;  // 每批处理 1000 个周期
+        int batch_counter = 0;
+        
         while (true) {
-            handleInput();
+            // 每批次只处理一次输入
+            if (batch_counter == 0) {
+                handleInput();
+            }
             
-            // 在第 120 帧自动按 Start 键（约 4 秒后，给游戏更多初始化时间）
-            if (!auto_start_pressed && frame_count >= 120) {
-                controller1 |= 0x08;  // 按下 Start
+            // 在第 120 帧自动按 Start 键
+            if (!auto_start_pressed && total_frames >= 120) {
+                controller1 |= 0x08;
                 dut->io_controller1 = controller1;
                 std::cout << "\n🎮 自动按下 Start 键..." << std::endl;
                 auto_start_pressed = true;
             }
-            // 在第 125 帧释放 Start 键
-            if (auto_start_pressed && frame_count >= 125) {
-                controller1 &= ~0x08;  // 释放 Start
+            if (auto_start_pressed && total_frames >= 125) {
+                controller1 &= ~0x08;
                 dut->io_controller1 = controller1;
             }
             
@@ -315,16 +322,22 @@ public:
             tick();
             updateDisplay();
             
+            batch_counter++;
+            if (batch_counter >= BATCH_SIZE) {
+                batch_counter = 0;
+            }
+            
             // 检测 VBlank 上升沿来计数帧
             bool vblank = dut->io_vblank;
             if (vblank && !last_vblank) {
                 frame_count++;
+                total_frames++;
                 
-                // 每秒报告一次状态
+                // 每 3 秒报告一次状态（降低频率）
                 auto now = std::chrono::high_resolution_clock::now();
                 auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_report_time).count();
                 
-                if (elapsed >= 1000) {
+                if (elapsed >= 3000) {
                     double fps = static_cast<double>(frame_count) * 1000.0 / elapsed;
                     uint16_t pc = dut->io_debug_regPC;
                     uint8_t a = dut->io_debug_regA;
@@ -332,56 +345,31 @@ public:
                     uint8_t y = dut->io_debug_regY;
                     uint8_t sp = dut->io_debug_regSP;
                     
-                    // 每 5 秒报告一次调试信息
+                    // 每 30 秒报告一次详细调试信息（大幅降低频率）
                     static auto last_debug_time = now;
                     auto debug_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_debug_time).count();
                     
-                    if (debug_elapsed >= 5000) {
+                    if (debug_elapsed >= 30000) {
                         std::cout << "\n=== 调试信息 ===" << std::endl;
-                        std::cout << "  像素: (" << dut->io_pixelX << ", " << dut->io_pixelY << ")" << std::endl;
-                        std::cout << "  颜色: 0x" << std::hex << (int)dut->io_pixelColor << std::dec << std::endl;
-                        std::cout << "  VBlank: " << (dut->io_vblank ? "是" : "否") << std::endl;
-                        std::cout << "  CPU State: " << (int)dut->io_debug_state << std::endl;
-                        std::cout << "  CPU Cycle: " << (int)dut->io_debug_cycle << std::endl;
-                        std::cout << "  Opcode: 0x" << std::hex << (int)dut->io_debug_opcode << std::dec << std::endl;
-                        std::cout << "  Flags: Z=" << (int)dut->io_debug_flagZ 
-                                  << " N=" << (int)dut->io_debug_flagN
-                                  << " C=" << (int)dut->io_debug_flagC
-                                  << " V=" << (int)dut->io_debug_flagV << std::endl;
-                        std::cout << "  PPUCTRL: 0x" << std::hex << (int)dut->io_ppuDebug_ppuCtrl << std::dec;
-                        std::cout << " (BG table: " << (dut->io_ppuDebug_ppuCtrl & 0x10 ? "1" : "0") << ")" << std::endl;
+                        std::cout << "  总帧数: " << total_frames << std::endl;
+                        std::cout << "  CPU: PC=0x" << std::hex << pc << " A=0x" << (int)a 
+                                  << " X=0x" << (int)x << " Y=0x" << (int)y << std::dec << std::endl;
                         std::cout << "  PPUMASK: 0x" << std::hex << (int)dut->io_ppuDebug_ppuMask << std::dec;
                         std::cout << " (BG: " << (dut->io_ppuDebug_ppuMask & 0x08 ? "ON" : "OFF");
                         std::cout << ", SPR: " << (dut->io_ppuDebug_ppuMask & 0x10 ? "ON" : "OFF") << ")" << std::endl;
-                        std::cout << "  PPUSTATUS: 0x" << std::hex << (int)dut->io_ppuDebug_ppuStatus << std::dec << std::endl;
                         
-                        // Framebuffer 统计
+                        // 简化的 Framebuffer 统计
                         int non_zero_pixels = 0;
-                        std::map<uint32_t, int> color_counts;
                         for (int i = 0; i < 256 * 240; i++) {
                             if (framebuffer[i] != 0) non_zero_pixels++;
-                            color_counts[framebuffer[i]]++;
                         }
                         std::cout << "  非零像素: " << non_zero_pixels << " / " << (256 * 240) << std::endl;
-                        std::cout << "  颜色分布 (前5): ";
-                        int count = 0;
-                        for (auto it = color_counts.rbegin(); it != color_counts.rend() && count < 5; ++it, ++count) {
-                            std::cout << "0x" << std::hex << it->first << ":" << std::dec << it->second << " ";
-                        }
-                        std::cout << std::endl;
-                        
-                        // 检查当前像素的详细信息
-                        uint16_t test_x = 128;
-                        uint16_t test_y = 120;
-                        std::cout << "  测试像素 (" << test_x << "," << test_y << "): ";
-                        std::cout << "颜色=0x" << std::hex << framebuffer[test_y * 256 + test_x] << std::dec << std::endl;
-                        
                         std::cout << "===================" << std::endl;
                         
                         last_debug_time = now;
                     }
                     
-                    std::cout << "\r帧: " << frame_count 
+                    std::cout << "\r帧: " << total_frames 
                               << " | FPS: " << std::fixed << std::setprecision(1) << fps 
                               << " | PC: 0x" << std::hex << pc 
                               << " | A: 0x" << (int)a

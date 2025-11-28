@@ -215,17 +215,45 @@ docs/
 │   ├── 09_RELEASE_NOTES.md       发布说明
 │   └── 10_QUICK_REFERENCE.md     快速参考
 │
-├── 导航文档 (4 个)
+├── 导航文档 (3 个)
 │   ├── INDEX.md                  文档索引
 │   ├── README.md                 文档导航
-│   ├── DOCUMENTATION_SUMMARY.md  整理说明
-│   └── ARCHIVE_SUMMARY.md        归档总结
-│
-├── 参考文档 (1 个)
 │   └── ARCHITECTURE.md           完整架构文档
 │
 ├── 图片 (1 个)
 │   └── my6502.png                芯片布局图
+│
+├── logs/ (工作日志和技术文档 - 20 个)
+│   ├── README.md                 日志说明
+│   │
+│   ├── 当前状态 (3 个)
+│   │   ├── current-status.md     当前项目状态
+│   │   ├── next-steps.md         下一步计划
+│   │   └── GAME_STATUS.md        游戏测试状态
+│   │
+│   ├── 技术文档 (7 个)
+│   │   ├── stage3-guide.md       Stage 3 指南
+│   │   ├── stage3-optimization.md Stage 3 优化
+│   │   ├── optimization-summary.md 优化总结
+│   │   ├── performance-optimization.md 性能优化
+│   │   ├── ppu-registers.md      PPU 寄存器
+│   │   ├── VERILATOR_PERFORMANCE.md Verilator 性能
+│   │   └── README_NES.md         NES 说明
+│   │
+│   ├── 调试记录 (5 个)
+│   │   ├── debugging-strategy.md 调试策略
+│   │   ├── quick-start-debugging.md 快速调试
+│   │   ├── bug-resolution.md     Bug 解决
+│   │   ├── bug-analysis-dex-loop.md DEX 循环分析
+│   │   └── verification-complete.md 验证记录
+│   │
+│   ├── 分析报告 (1 个)
+│   │   └── initialization-analysis.md 初始化分析
+│   │
+│   └── 整理记录 (3 个)
+│       ├── FINAL_STRUCTURE.md    文档结构
+│       ├── ARCHIVE_SUMMARY.md    归档总结
+│       └── MIGRATION_LOG.md      迁移日志
 │
 └── archive/ (65 个)
     ├── README.md                 归档说明
