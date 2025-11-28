@@ -25,6 +25,11 @@ class PPU extends Module {
     val cpuWrite = Input(Bool())
     val cpuRead = Input(Bool())
     
+    // OAM DMA 接口
+    val oamDmaAddr = Input(UInt(8.W))
+    val oamDmaData = Input(UInt(8.W))
+    val oamDmaWrite = Input(Bool())
+    
     // 视频输出 (简化)
     val pixelX = Output(UInt(9.W))      // 0-255 (可见) + blanking
     val pixelY = Output(UInt(9.W))      // 0-239 (可见) + vblank
@@ -92,9 +97,11 @@ class PPU extends Module {
   val scanlineX = RegInit(0.U(9.W))
   val scanlineY = RegInit(0.U(9.W))
   
-  // VBlank 标志
+  // VBlank 和状态标志
   val vblankFlag = RegInit(false.B)
   val nmiOccurred = RegInit(false.B)
+  val sprite0Hit = RegInit(false.B)
+  val spriteOverflow = RegInit(false.B)
   
   // 扫描线计数 (简化的时序)
   scanlineX := scanlineX + 1.U
@@ -118,17 +125,45 @@ class PPU extends Module {
   when(scanlineY === 261.U && scanlineX === 1.U) {
     vblankFlag := false.B
     nmiOccurred := false.B
+    sprite0Hit := false.B
+    spriteOverflow := false.B
+  }
+  
+  // Sprite 0 碰撞检测（简化版本）
+  when(scanlineY < 240.U && scanlineX < 256.U && ppuMask(3) && ppuMask(4)) {
+    val sprite0Y = oam.read(0.U)
+    val sprite0X = oam.read(3.U)
+    val spriteHeight = Mux(ppuCtrl(5), 16.U, 8.U)
+    
+    // 检查 Sprite 0 是否在当前像素位置
+    val sprite0InRange = (scanlineY >= sprite0Y) && 
+                         (scanlineY < (sprite0Y + spriteHeight)) &&
+                         (scanlineX >= sprite0X) && 
+                         (scanlineX < (sprite0X + 8.U))
+    
+    // 简化：如果 Sprite 0 在范围内且背景和精灵都启用，就设置碰撞
+    when(sprite0InRange && !bgTransparent && spriteFound) {
+      sprite0Hit := true.B
+    }
   }
   
   // CPU 读写寄存器
   io.cpuDataOut := 0.U
   
+  // 延迟清除 VBlank 标志（在读取的下一个周期清除）
+  val vblankClearNext = RegInit(false.B)
+  when(vblankClearNext) {
+    vblankFlag := false.B
+    nmiOccurred := false.B
+    vblankClearNext := false.B
+  }
+  
   when(io.cpuRead) {
     switch(io.cpuAddr) {
       is(0x2.U) {  // PPUSTATUS
-        io.cpuDataOut := Cat(vblankFlag, 0.U(7.W))
-        vblankFlag := false.B  // 读取后清除
-        nmiOccurred := false.B  // 同时清除 NMI 标志
+        // Bit 7: VBlank, Bit 6: Sprite 0 Hit, Bit 5: Sprite Overflow
+        io.cpuDataOut := Cat(vblankFlag, sprite0Hit, spriteOverflow, 0.U(5.W))
+        vblankClearNext := true.B  // 下一个周期清除
         ppuAddrLatch := false.B
       }
       is(0x4.U) {  // OAMDATA
@@ -149,6 +184,11 @@ class PPU extends Module {
         ppuAddrReg := ppuAddrReg + 1.U
       }
     }
+  }
+  
+  // OAM DMA 写入
+  when(io.oamDmaWrite) {
+    oam.write(io.oamDmaAddr, io.oamDmaData)
   }
   
   when(io.cpuWrite) {
@@ -204,28 +244,41 @@ class PPU extends Module {
     chrROM.write(io.chrLoadAddr, io.chrLoadData)
   }
   
-  // 渲染逻辑 - 完整的 nametable 渲染
+  // ========== 渲染逻辑 ==========
+  
+  // 主渲染逻辑
   val renderX = scanlineX
   val renderY = scanlineY
   val pixelColor = WireDefault(0x0F.U(6.W))  // 默认黑色
   
-  // 只在可见区域渲染
+  // 背景渲染（带滚动支持）
+  val bgColor = WireDefault(0.U(6.W))
+  val bgTransparent = WireDefault(true.B)
+  
   when(renderX < 256.U && renderY < 240.U) {
+    // 应用滚动偏移
+    val scrolledX = renderX + ppuScrollX
+    val scrolledY = renderY + ppuScrollY
+    
     // 计算 tile 坐标
-    val tileX = renderX >> 3
-    val tileY = renderY >> 3
-    val pixelInTileX = renderX(2, 0)
-    val pixelInTileY = renderY(2, 0)
+    val tileX = scrolledX >> 3
+    val tileY = scrolledY >> 3
+    val pixelInTileX = scrolledX(2, 0)
+    val pixelInTileY = scrolledY(2, 0)
+    
+    // 选择 nametable（支持 4 个 nametable 的镜像）
+    val nametableSelect = (ppuCtrl(1, 0))
+    val nametableBase = nametableSelect << 10  // 每个 nametable 1KB
     
     // 从 nametable 读取 tile 索引
-    val nametableAddr = (tileY << 5) + tileX
-    val tileIndex = vram.read(nametableAddr)
+    val nametableAddr = nametableBase + (tileY(4, 0) << 5) + tileX(4, 0)
+    val tileIndex = vram.read(nametableAddr(10, 0))
     
     // 计算 attribute table 地址和调色板
-    val attrX = tileX >> 2
-    val attrY = tileY >> 2
-    val attrAddr = 0x3C0.U + (attrY << 3) + attrX
-    val attrByte = vram.read(attrAddr)
+    val attrX = tileX(4, 0) >> 2
+    val attrY = tileY(4, 0) >> 2
+    val attrAddr = nametableBase + 0x3C0.U + (attrY << 3) + attrX
+    val attrByte = vram.read(attrAddr(10, 0))
     val attrShift = ((tileY(1) << 2) | (tileX(1) << 1))
     val paletteHigh = (attrByte >> attrShift) & 0x3.U
     
@@ -246,19 +299,102 @@ class PPU extends Module {
     // 组合完整的调色板索引
     val fullPaletteIndex = (paletteHigh << 2) | paletteLow
     
-    // 从调色板读取颜色
-    val paletteAddr = Mux(paletteLow === 0.U, 0.U, fullPaletteIndex)
-    val paletteColor = palette.read(paletteAddr)
+    // 从调色板读取颜色（背景调色板在 0x00-0x0F）
+    val bgPaletteAddr = Mux(paletteLow === 0.U, 0.U, fullPaletteIndex)
+    val bgPaletteColor = palette.read(bgPaletteAddr)
     
-    // 使用调色板颜色，如果调色板初始化未完成，使用简单的颜色映射
+    bgColor := bgPaletteColor(5, 0)
+    bgTransparent := paletteLow === 0.U
+  }
+  
+  // 精灵渲染
+  val spriteColor = WireDefault(0.U(6.W))
+  val spriteFound = WireDefault(false.B)
+  val spritePriority = WireDefault(false.B)  // false=前景, true=背景后
+  
+  when(renderX < 256.U && renderY < 240.U) {
+    // 精灵数据结构：
+    // Byte 0: Y 坐标
+    // Byte 1: Tile 索引
+    // Byte 2: 属性 (76543210)
+    //         ||||||++- 调色板 (4-7)
+    //         |||||+--- 优先级 (0=前景, 1=背景后)
+    //         ||||+---- 水平翻转
+    //         |||+----- 垂直翻转
+    // Byte 3: X 坐标
+    
+    // 扫描所有 64 个精灵（从后往前，优先级高的在前）
+    for (i <- 63 to 0 by -1) {
+      val spriteBase = (i * 4).U
+      val sprY = oam.read(spriteBase)
+      val sprTile = oam.read(spriteBase + 1.U)
+      val sprAttr = oam.read(spriteBase + 2.U)
+      val sprX = oam.read(spriteBase + 3.U)
+      
+      // 检查精灵是否在当前扫描线
+      val spriteHeight = Mux(ppuCtrl(5), 16.U, 8.U)  // 8x8 或 8x16
+      val inYRange = (renderY >= sprY) && (renderY < (sprY + spriteHeight))
+      val inXRange = (renderX >= sprX) && (renderX < (sprX + 8.U))
+      
+      when(inYRange && inXRange && !spriteFound) {
+        // 计算精灵内的像素坐标
+        val pixY = renderY - sprY
+        val pixX = renderX - sprX
+        
+        // 处理翻转
+        val flipH = sprAttr(6)
+        val flipV = sprAttr(7)
+        val actualPixelX = Mux(flipH, 7.U - pixX, pixX)
+        val actualPixelY = Mux(flipV, (spriteHeight - 1.U) - pixY, pixY)
+        
+        // 计算 pattern table 地址
+        val patternTableBase = Mux(ppuCtrl(3), 0x1000.U, 0x0000.U)
+        val patternAddr = patternTableBase + (sprTile << 4) + actualPixelY
+        
+        // 读取 pattern 数据
+        val patternLow = chrROM.read(patternAddr)
+        val patternHigh = chrROM.read(patternAddr + 8.U)
+        
+        // 提取像素颜色
+        val bitPos = 7.U - actualPixelX
+        val colorLow = (patternLow >> bitPos) & 1.U
+        val colorHigh = (patternHigh >> bitPos) & 1.U
+        val sprPaletteLow = (colorHigh << 1) | colorLow
+        
+        // 如果不是透明像素
+        when(sprPaletteLow =/= 0.U) {
+          // 精灵调色板在 0x10-0x1F
+          val spritePaletteIdx = sprAttr(1, 0)
+          val fullPaletteIndex = 0x10.U + (spritePaletteIdx << 2) + sprPaletteLow
+          val sprPaletteColor = palette.read(fullPaletteIndex(4, 0))
+          
+          spriteColor := sprPaletteColor(5, 0)
+          spriteFound := true.B
+          spritePriority := sprAttr(5)  // 优先级位
+        }
+      }
+    }
+  }
+  
+  // 合成最终颜色
+  when(renderX < 256.U && renderY < 240.U) {
+    // 检查渲染使能
+    val bgEnabled = ppuMask(3)
+    val spriteEnabled = ppuMask(4)
+    
+    // 合成最终颜色
     when(!paletteInitDone) {
       // 调色板初始化期间，使用简单的颜色映射
-      pixelColor := Mux(paletteLow === 0.U, 0x0F.U,
-                    Mux(paletteLow === 1.U, 0x00.U,
-                    Mux(paletteLow === 2.U, 0x10.U, 0x30.U)))
+      pixelColor := 0x0F.U
+    }.elsewhen(spriteEnabled && spriteFound && (!spritePriority || bgTransparent)) {
+      // 精灵在前景，或背景透明
+      pixelColor := spriteColor
+    }.elsewhen(bgEnabled && !bgTransparent) {
+      // 显示背景
+      pixelColor := bgColor
     }.otherwise {
-      // 使用调色板颜色
-      pixelColor := paletteColor(5, 0)
+      // 显示背景色（调色板索引 0）
+      pixelColor := palette.read(0.U)(5, 0)
     }
   }
   
@@ -272,7 +408,7 @@ class PPU extends Module {
   // 调试输出
   io.debug.ppuCtrl := ppuCtrl
   io.debug.ppuMask := ppuMask
-  io.debug.ppuStatus := Cat(vblankFlag, 0.U(7.W))
+  io.debug.ppuStatus := Cat(vblankFlag, sprite0Hit, spriteOverflow, 0.U(5.W))
   io.debug.ppuAddrReg := ppuAddrReg
   io.debug.paletteInitDone := paletteInitDone
 }

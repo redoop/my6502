@@ -30,19 +30,19 @@ class CPU6502Core extends Module {
   
   // NMI 边沿检测
   val nmiLast = RegInit(false.B)
-  val nmiEdge = RegInit(false.B)
+  val nmiPending = RegInit(false.B)
   
-  // 更新 nmiLast
+  // 始终更新 nmiLast
   nmiLast := io.nmi
   
-  // 检测 NMI 上升沿（只在 Fetch 状态时检测，避免重复触发）
-  when(state === sFetch && io.nmi && !nmiLast) {
-    nmiEdge := true.B
+  // 检测 NMI 上升沿并设置 pending 标志
+  when(io.nmi && !nmiLast) {
+    nmiPending := true.B
   }
   
-  // 在进入 NMI 状态时清除边沿标志
-  when(state === sNMI && cycle === 0.U) {
-    nmiEdge := false.B
+  // 在开始处理 NMI 时清除 pending 标志
+  when(state === sFetch && nmiPending) {
+    nmiPending := false.B
   }
 
   // 默认内存接口信号
@@ -62,7 +62,7 @@ class CPU6502Core extends Module {
     cycle := 0.U
     opcode := 0.U
     operand := 0.U
-    nmiEdge := false.B
+    nmiPending := false.B
     nmiLast := false.B
   }.otherwise {
     // 正常执行状态机
@@ -114,8 +114,8 @@ class CPU6502Core extends Module {
         }
     
         is(sFetch) {
-          // 检查是否有 NMI 中断（暂时禁用用于测试）
-          when(false.B && nmiEdge) {
+          // 检查是否有 NMI 中断
+          when(nmiPending) {
             cycle := 0.U
             state := sNMI
           }.otherwise {

@@ -39,7 +39,7 @@ class NESSystem extends Module {
 
   // 实例化组件
   val cpu = Module(new CPU6502Refactored)
-  val ppu = Module(new PPU)
+  val ppu = Module(new PPUSimplified)
   val memory = Module(new MemoryController)
   
   // Reset 和 NMI 连接
@@ -59,6 +59,11 @@ class NESSystem extends Module {
   memory.io.ppuDataOut := ppu.io.cpuDataOut
   ppu.io.cpuWrite := memory.io.ppuWrite
   ppu.io.cpuRead := memory.io.ppuRead
+  
+  // OAM DMA 连接
+  ppu.io.oamDmaAddr := memory.io.oamDmaAddr
+  ppu.io.oamDmaData := memory.io.oamDmaData
+  ppu.io.oamDmaWrite := memory.io.oamDmaWrite
   
   // 控制器连接
   memory.io.controller1 := io.controller1

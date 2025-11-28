@@ -18,7 +18,8 @@ module CPU6502Core(
   output [7:0]  io_debug_opcode,
   output [1:0]  io_debug_state,
   output [2:0]  io_debug_cycle,
-  input         io_reset
+  input         io_reset,
+  input         io_nmi
 );
   reg [7:0] regs_a; // @[CPU6502Core.scala 21:21]
   reg [7:0] regs_x; // @[CPU6502Core.scala 21:21]
@@ -35,11 +36,14 @@ module CPU6502Core(
   reg [7:0] opcode; // @[CPU6502Core.scala 27:24]
   reg [15:0] operand; // @[CPU6502Core.scala 28:24]
   reg [2:0] cycle; // @[CPU6502Core.scala 29:24]
-  wire  _T_5 = cycle == 3'h0; // @[CPU6502Core.scala 44:32]
-  wire  _T_9 = cycle == 3'h1; // @[CPU6502Core.scala 78:28]
-  wire  _T_10 = cycle == 3'h2; // @[CPU6502Core.scala 84:28]
-  wire  _T_11 = cycle == 3'h3; // @[CPU6502Core.scala 91:28]
-  wire  _T_12 = cycle == 3'h4; // @[CPU6502Core.scala 97:28]
+  reg  nmiLast; // @[CPU6502Core.scala 32:24]
+  reg  nmiPending; // @[CPU6502Core.scala 33:27]
+  wire  _GEN_0 = io_nmi & ~nmiLast | nmiPending; // @[CPU6502Core.scala 39:28 40:16 33:27]
+  wire  _T_5 = cycle == 3'h0; // @[CPU6502Core.scala 72:22]
+  wire  _T_6 = cycle == 3'h1; // @[CPU6502Core.scala 78:28]
+  wire  _T_7 = cycle == 3'h2; // @[CPU6502Core.scala 84:28]
+  wire  _T_8 = cycle == 3'h3; // @[CPU6502Core.scala 91:28]
+  wire  _T_9 = cycle == 3'h4; // @[CPU6502Core.scala 97:28]
   wire [15:0] resetVector = {io_memDataIn,operand[7:0]}; // @[Cat.scala 33:92]
   wire [2:0] _GEN_4 = cycle == 3'h4 ? 3'h5 : 3'h0; // @[CPU6502Core.scala 101:19 111:19 97:37]
   wire [15:0] _GEN_5 = cycle == 3'h4 ? regs_pc : resetVector; // @[CPU6502Core.scala 108:21 21:21 97:37]
@@ -65,8 +69,12 @@ module CPU6502Core(
   wire [7:0] _GEN_29 = cycle == 3'h1 ? regs_sp : _GEN_21; // @[CPU6502Core.scala 21:21 78:37]
   wire  _GEN_30 = cycle == 3'h1 ? regs_flagI : _GEN_22; // @[CPU6502Core.scala 21:21 78:37]
   wire [2:0] _GEN_31 = cycle == 3'h1 ? state : _GEN_23; // @[CPU6502Core.scala 25:22 78:37]
-  wire [15:0] _GEN_32 = _T_5 ? 16'hfffc : _GEN_24; // @[CPU6502Core.scala 72:31 74:24]
+  wire [15:0] _GEN_32 = cycle == 3'h0 ? 16'hfffc : _GEN_24; // @[CPU6502Core.scala 72:31 74:24]
   wire [15:0] _regs_pc_T_1 = regs_pc + 16'h1; // @[CPU6502Core.scala 125:32]
+  wire [2:0] _GEN_41 = nmiPending ? 3'h3 : 3'h2; // @[CPU6502Core.scala 118:28 120:19 127:19]
+  wire  _GEN_43 = nmiPending ? 1'h0 : 1'h1; // @[CPU6502Core.scala 118:28 52:17 123:24]
+  wire [7:0] _GEN_44 = nmiPending ? opcode : io_memDataIn; // @[CPU6502Core.scala 118:28 124:20 27:24]
+  wire [15:0] _GEN_45 = nmiPending ? regs_pc : _regs_pc_T_1; // @[CPU6502Core.scala 118:28 125:21 21:21]
   wire  _execResult_T = 8'h18 == opcode; // @[CPU6502Core.scala 222:20]
   wire  _execResult_T_1 = 8'h38 == opcode; // @[CPU6502Core.scala 222:20]
   wire  _execResult_T_2 = 8'hd8 == opcode; // @[CPU6502Core.scala 222:20]
@@ -627,10 +635,11 @@ module CPU6502Core(
   wire  _GEN_1914 = _execResult_T_175 ? ~regs_flagZ : _GEN_1913; // @[Branch.scala 20:20 22:31]
   wire  execResult_result_takeBranch = _execResult_T_174 ? regs_flagZ : _GEN_1914; // @[Branch.scala 20:20 21:31]
   wire [7:0] execResult_result_offset = io_memDataIn; // @[Branch.scala 32:28]
-  wire [15:0] _GEN_4206 = {{8{execResult_result_offset[7]}},execResult_result_offset}; // @[Branch.scala 34:51]
-  wire [15:0] _execResult_result_newRegs_pc_T_88 = $signed(regs_pc) + $signed(_GEN_4206); // @[Branch.scala 34:61]
+  wire [15:0] _execResult_result_newRegs_pc_T_84 = regs_pc + 16'h1; // @[Branch.scala 36:43]
+  wire [15:0] _GEN_4206 = {{8{execResult_result_offset[7]}},execResult_result_offset}; // @[Branch.scala 36:50]
+  wire [15:0] _execResult_result_newRegs_pc_T_88 = $signed(_execResult_result_newRegs_pc_T_84) + $signed(_GEN_4206); // @[Branch.scala 36:60]
   wire [15:0] execResult_result_newRegs_36_pc = execResult_result_takeBranch ? _execResult_result_newRegs_pc_T_88 :
-    regs_pc; // @[Branch.scala 34:22]
+    _regs_pc_T_1; // @[Branch.scala 36:22]
   wire  _execResult_T_189 = 8'ha9 == opcode; // @[CPU6502Core.scala 222:20]
   wire  _execResult_T_190 = 8'ha2 == opcode; // @[CPU6502Core.scala 222:20]
   wire  _execResult_T_191 = 8'ha0 == opcode; // @[CPU6502Core.scala 222:20]
@@ -2237,41 +2246,41 @@ module CPU6502Core(
   wire [15:0] _GEN_3967 = cycle == 3'h5 ? regs_pc : resetVector; // @[CPU6502Core.scala 185:37 195:21 21:21]
   wire  _GEN_3968 = cycle == 3'h5 ? regs_flagI : 1'h1; // @[CPU6502Core.scala 185:37 21:21 196:24]
   wire [2:0] _GEN_3969 = cycle == 3'h5 ? state : 3'h1; // @[CPU6502Core.scala 185:37 198:19 25:22]
-  wire [15:0] _GEN_3970 = _T_12 ? 16'hfffa : 16'hfffb; // @[CPU6502Core.scala 179:37 181:24]
-  wire [15:0] _GEN_3972 = _T_12 ? {{8'd0}, io_memDataIn} : operand; // @[CPU6502Core.scala 179:37 183:21 28:24]
-  wire [2:0] _GEN_3973 = _T_12 ? 3'h5 : _GEN_3966; // @[CPU6502Core.scala 179:37 184:19]
-  wire [15:0] _GEN_3974 = _T_12 ? regs_pc : _GEN_3967; // @[CPU6502Core.scala 179:37 21:21]
-  wire  _GEN_3975 = _T_12 ? regs_flagI : _GEN_3968; // @[CPU6502Core.scala 179:37 21:21]
-  wire [2:0] _GEN_3976 = _T_12 ? state : _GEN_3969; // @[CPU6502Core.scala 179:37 25:22]
-  wire [15:0] _GEN_3977 = _T_11 ? execResult_result_result_46_memAddr : _GEN_3970; // @[CPU6502Core.scala 170:37 174:24]
-  wire [7:0] _GEN_3978 = _T_11 ? status : 8'h0; // @[CPU6502Core.scala 170:37 175:27 50:17]
-  wire [7:0] _GEN_3980 = _T_11 ? execResult_result_newRegs_45_sp : regs_sp; // @[CPU6502Core.scala 170:37 177:21 21:21]
-  wire [2:0] _GEN_3981 = _T_11 ? 3'h4 : _GEN_3973; // @[CPU6502Core.scala 170:37 178:19]
-  wire  _GEN_3982 = _T_11 ? 1'h0 : 1'h1; // @[CPU6502Core.scala 170:37 52:17]
-  wire [15:0] _GEN_3983 = _T_11 ? operand : _GEN_3972; // @[CPU6502Core.scala 170:37 28:24]
-  wire [15:0] _GEN_3984 = _T_11 ? regs_pc : _GEN_3974; // @[CPU6502Core.scala 170:37 21:21]
-  wire  _GEN_3985 = _T_11 ? regs_flagI : _GEN_3975; // @[CPU6502Core.scala 170:37 21:21]
-  wire [2:0] _GEN_3986 = _T_11 ? state : _GEN_3976; // @[CPU6502Core.scala 170:37 25:22]
-  wire [15:0] _GEN_3987 = _T_10 ? execResult_result_result_46_memAddr : _GEN_3977; // @[CPU6502Core.scala 163:37 165:24]
-  wire [7:0] _GEN_3988 = _T_10 ? regs_pc[7:0] : _GEN_3978; // @[CPU6502Core.scala 163:37 166:27]
-  wire  _GEN_3989 = _T_10 | _T_11; // @[CPU6502Core.scala 163:37 167:25]
-  wire [7:0] _GEN_3990 = _T_10 ? execResult_result_newRegs_45_sp : _GEN_3980; // @[CPU6502Core.scala 163:37 168:21]
-  wire [2:0] _GEN_3991 = _T_10 ? 3'h3 : _GEN_3981; // @[CPU6502Core.scala 163:37 169:19]
-  wire  _GEN_3992 = _T_10 ? 1'h0 : _GEN_3982; // @[CPU6502Core.scala 163:37 52:17]
-  wire [15:0] _GEN_3993 = _T_10 ? operand : _GEN_3983; // @[CPU6502Core.scala 163:37 28:24]
-  wire [15:0] _GEN_3994 = _T_10 ? regs_pc : _GEN_3984; // @[CPU6502Core.scala 163:37 21:21]
-  wire  _GEN_3995 = _T_10 ? regs_flagI : _GEN_3985; // @[CPU6502Core.scala 163:37 21:21]
-  wire [2:0] _GEN_3996 = _T_10 ? state : _GEN_3986; // @[CPU6502Core.scala 163:37 25:22]
-  wire [15:0] _GEN_3997 = _T_9 ? execResult_result_result_46_memAddr : _GEN_3987; // @[CPU6502Core.scala 156:37 158:24]
-  wire [7:0] _GEN_3998 = _T_9 ? regs_pc[15:8] : _GEN_3988; // @[CPU6502Core.scala 156:37 159:27]
-  wire  _GEN_3999 = _T_9 | _GEN_3989; // @[CPU6502Core.scala 156:37 160:25]
-  wire [7:0] _GEN_4000 = _T_9 ? execResult_result_newRegs_45_sp : _GEN_3990; // @[CPU6502Core.scala 156:37 161:21]
-  wire [2:0] _GEN_4001 = _T_9 ? 3'h2 : _GEN_3991; // @[CPU6502Core.scala 156:37 162:19]
-  wire  _GEN_4002 = _T_9 ? 1'h0 : _GEN_3992; // @[CPU6502Core.scala 156:37 52:17]
-  wire [15:0] _GEN_4003 = _T_9 ? operand : _GEN_3993; // @[CPU6502Core.scala 156:37 28:24]
-  wire [15:0] _GEN_4004 = _T_9 ? regs_pc : _GEN_3994; // @[CPU6502Core.scala 156:37 21:21]
-  wire  _GEN_4005 = _T_9 ? regs_flagI : _GEN_3995; // @[CPU6502Core.scala 156:37 21:21]
-  wire [2:0] _GEN_4006 = _T_9 ? state : _GEN_3996; // @[CPU6502Core.scala 156:37 25:22]
+  wire [15:0] _GEN_3970 = _T_9 ? 16'hfffa : 16'hfffb; // @[CPU6502Core.scala 179:37 181:24]
+  wire [15:0] _GEN_3972 = _T_9 ? {{8'd0}, io_memDataIn} : operand; // @[CPU6502Core.scala 179:37 183:21 28:24]
+  wire [2:0] _GEN_3973 = _T_9 ? 3'h5 : _GEN_3966; // @[CPU6502Core.scala 179:37 184:19]
+  wire [15:0] _GEN_3974 = _T_9 ? regs_pc : _GEN_3967; // @[CPU6502Core.scala 179:37 21:21]
+  wire  _GEN_3975 = _T_9 ? regs_flagI : _GEN_3968; // @[CPU6502Core.scala 179:37 21:21]
+  wire [2:0] _GEN_3976 = _T_9 ? state : _GEN_3969; // @[CPU6502Core.scala 179:37 25:22]
+  wire [15:0] _GEN_3977 = _T_8 ? execResult_result_result_46_memAddr : _GEN_3970; // @[CPU6502Core.scala 170:37 174:24]
+  wire [7:0] _GEN_3978 = _T_8 ? status : 8'h0; // @[CPU6502Core.scala 170:37 175:27 50:17]
+  wire [7:0] _GEN_3980 = _T_8 ? execResult_result_newRegs_45_sp : regs_sp; // @[CPU6502Core.scala 170:37 177:21 21:21]
+  wire [2:0] _GEN_3981 = _T_8 ? 3'h4 : _GEN_3973; // @[CPU6502Core.scala 170:37 178:19]
+  wire  _GEN_3982 = _T_8 ? 1'h0 : 1'h1; // @[CPU6502Core.scala 170:37 52:17]
+  wire [15:0] _GEN_3983 = _T_8 ? operand : _GEN_3972; // @[CPU6502Core.scala 170:37 28:24]
+  wire [15:0] _GEN_3984 = _T_8 ? regs_pc : _GEN_3974; // @[CPU6502Core.scala 170:37 21:21]
+  wire  _GEN_3985 = _T_8 ? regs_flagI : _GEN_3975; // @[CPU6502Core.scala 170:37 21:21]
+  wire [2:0] _GEN_3986 = _T_8 ? state : _GEN_3976; // @[CPU6502Core.scala 170:37 25:22]
+  wire [15:0] _GEN_3987 = _T_7 ? execResult_result_result_46_memAddr : _GEN_3977; // @[CPU6502Core.scala 163:37 165:24]
+  wire [7:0] _GEN_3988 = _T_7 ? regs_pc[7:0] : _GEN_3978; // @[CPU6502Core.scala 163:37 166:27]
+  wire  _GEN_3989 = _T_7 | _T_8; // @[CPU6502Core.scala 163:37 167:25]
+  wire [7:0] _GEN_3990 = _T_7 ? execResult_result_newRegs_45_sp : _GEN_3980; // @[CPU6502Core.scala 163:37 168:21]
+  wire [2:0] _GEN_3991 = _T_7 ? 3'h3 : _GEN_3981; // @[CPU6502Core.scala 163:37 169:19]
+  wire  _GEN_3992 = _T_7 ? 1'h0 : _GEN_3982; // @[CPU6502Core.scala 163:37 52:17]
+  wire [15:0] _GEN_3993 = _T_7 ? operand : _GEN_3983; // @[CPU6502Core.scala 163:37 28:24]
+  wire [15:0] _GEN_3994 = _T_7 ? regs_pc : _GEN_3984; // @[CPU6502Core.scala 163:37 21:21]
+  wire  _GEN_3995 = _T_7 ? regs_flagI : _GEN_3985; // @[CPU6502Core.scala 163:37 21:21]
+  wire [2:0] _GEN_3996 = _T_7 ? state : _GEN_3986; // @[CPU6502Core.scala 163:37 25:22]
+  wire [15:0] _GEN_3997 = _T_6 ? execResult_result_result_46_memAddr : _GEN_3987; // @[CPU6502Core.scala 156:37 158:24]
+  wire [7:0] _GEN_3998 = _T_6 ? regs_pc[15:8] : _GEN_3988; // @[CPU6502Core.scala 156:37 159:27]
+  wire  _GEN_3999 = _T_6 | _GEN_3989; // @[CPU6502Core.scala 156:37 160:25]
+  wire [7:0] _GEN_4000 = _T_6 ? execResult_result_newRegs_45_sp : _GEN_3990; // @[CPU6502Core.scala 156:37 161:21]
+  wire [2:0] _GEN_4001 = _T_6 ? 3'h2 : _GEN_3991; // @[CPU6502Core.scala 156:37 162:19]
+  wire  _GEN_4002 = _T_6 ? 1'h0 : _GEN_3992; // @[CPU6502Core.scala 156:37 52:17]
+  wire [15:0] _GEN_4003 = _T_6 ? operand : _GEN_3993; // @[CPU6502Core.scala 156:37 28:24]
+  wire [15:0] _GEN_4004 = _T_6 ? regs_pc : _GEN_3994; // @[CPU6502Core.scala 156:37 21:21]
+  wire  _GEN_4005 = _T_6 ? regs_flagI : _GEN_3995; // @[CPU6502Core.scala 156:37 21:21]
+  wire [2:0] _GEN_4006 = _T_6 ? state : _GEN_3996; // @[CPU6502Core.scala 156:37 25:22]
   wire [2:0] _GEN_4007 = _T_5 ? 3'h1 : _GEN_4001; // @[CPU6502Core.scala 153:31 155:19]
   wire [15:0] _GEN_4008 = _T_5 ? regs_pc : _GEN_3997; // @[CPU6502Core.scala 153:31 49:17]
   wire [7:0] _GEN_4009 = _T_5 ? 8'h0 : _GEN_3998; // @[CPU6502Core.scala 153:31 50:17]
@@ -2375,10 +2384,11 @@ module CPU6502Core(
   wire [2:0] _GEN_4063 = 3'h2 == state ? _GEN_3962 : _GEN_4017; // @[CPU6502Core.scala 69:19]
   wire [2:0] _GEN_4064 = 3'h2 == state ? _GEN_3963 : _GEN_4026; // @[CPU6502Core.scala 69:19]
   wire [15:0] _GEN_4067 = 3'h1 == state ? regs_pc : _GEN_4046; // @[CPU6502Core.scala 69:19]
+  wire  _GEN_4068 = 3'h1 == state ? _GEN_43 : _GEN_4049; // @[CPU6502Core.scala 69:19]
   wire [7:0] _GEN_4090 = 3'h1 == state ? 8'h0 : _GEN_4047; // @[CPU6502Core.scala 50:17 69:19]
   wire  _GEN_4091 = 3'h1 == state ? 1'h0 : _GEN_4048; // @[CPU6502Core.scala 51:17 69:19]
   wire [15:0] _GEN_4104 = 3'h0 == state ? _GEN_32 : _GEN_4067; // @[CPU6502Core.scala 69:19]
-  wire  _GEN_4105 = 3'h0 == state | (3'h1 == state | _GEN_4049); // @[CPU6502Core.scala 69:19]
+  wire  _GEN_4105 = 3'h0 == state | _GEN_4068; // @[CPU6502Core.scala 69:19]
   wire [7:0] _GEN_4132 = 3'h0 == state ? 8'h0 : _GEN_4090; // @[CPU6502Core.scala 50:17 69:19]
   wire  _GEN_4133 = 3'h0 == state ? 1'h0 : _GEN_4091; // @[CPU6502Core.scala 51:17 69:19]
   assign io_memAddr = io_reset ? regs_pc : _GEN_4104; // @[CPU6502Core.scala 49:17 59:18]
@@ -2429,7 +2439,7 @@ module CPU6502Core(
       regs_sp <= 8'hff; // @[CPU6502Core.scala 21:21]
     end else if (!(io_reset)) begin // @[CPU6502Core.scala 59:18]
       if (3'h0 == state) begin // @[CPU6502Core.scala 69:19]
-        if (!(_T_5)) begin // @[CPU6502Core.scala 72:31]
+        if (!(cycle == 3'h0)) begin // @[CPU6502Core.scala 72:31]
           regs_sp <= _GEN_29;
         end
       end else if (!(3'h1 == state)) begin // @[CPU6502Core.scala 69:19]
@@ -2440,11 +2450,11 @@ module CPU6502Core(
       regs_pc <= 16'h0; // @[CPU6502Core.scala 21:21]
     end else if (!(io_reset)) begin // @[CPU6502Core.scala 59:18]
       if (3'h0 == state) begin // @[CPU6502Core.scala 69:19]
-        if (!(_T_5)) begin // @[CPU6502Core.scala 72:31]
+        if (!(cycle == 3'h0)) begin // @[CPU6502Core.scala 72:31]
           regs_pc <= _GEN_28;
         end
       end else if (3'h1 == state) begin // @[CPU6502Core.scala 69:19]
-        regs_pc <= _regs_pc_T_1;
+        regs_pc <= _GEN_45;
       end else begin
         regs_pc <= _GEN_4054;
       end
@@ -2471,7 +2481,7 @@ module CPU6502Core(
       regs_flagI <= 1'h0; // @[CPU6502Core.scala 21:21]
     end else if (!(io_reset)) begin // @[CPU6502Core.scala 59:18]
       if (3'h0 == state) begin // @[CPU6502Core.scala 69:19]
-        if (!(_T_5)) begin // @[CPU6502Core.scala 72:31]
+        if (!(cycle == 3'h0)) begin // @[CPU6502Core.scala 72:31]
           regs_flagI <= _GEN_30;
         end
       end else if (!(3'h1 == state)) begin // @[CPU6502Core.scala 69:19]
@@ -2510,11 +2520,11 @@ module CPU6502Core(
     end else if (io_reset) begin // @[CPU6502Core.scala 59:18]
       state <= 3'h0; // @[CPU6502Core.scala 61:11]
     end else if (3'h0 == state) begin // @[CPU6502Core.scala 69:19]
-      if (!(_T_5)) begin // @[CPU6502Core.scala 72:31]
+      if (!(cycle == 3'h0)) begin // @[CPU6502Core.scala 72:31]
         state <= _GEN_31;
       end
     end else if (3'h1 == state) begin // @[CPU6502Core.scala 69:19]
-      state <= 3'h2;
+      state <= _GEN_41;
     end else begin
       state <= _GEN_4064;
     end
@@ -2524,7 +2534,7 @@ module CPU6502Core(
       opcode <= 8'h0; // @[CPU6502Core.scala 63:12]
     end else if (!(3'h0 == state)) begin // @[CPU6502Core.scala 69:19]
       if (3'h1 == state) begin // @[CPU6502Core.scala 69:19]
-        opcode <= io_memDataIn;
+        opcode <= _GEN_44;
       end
     end
     if (reset) begin // @[CPU6502Core.scala 28:24]
@@ -2532,7 +2542,7 @@ module CPU6502Core(
     end else if (io_reset) begin // @[CPU6502Core.scala 59:18]
       operand <= 16'h0; // @[CPU6502Core.scala 64:13]
     end else if (3'h0 == state) begin // @[CPU6502Core.scala 69:19]
-      if (!(_T_5)) begin // @[CPU6502Core.scala 72:31]
+      if (!(cycle == 3'h0)) begin // @[CPU6502Core.scala 72:31]
         operand <= _GEN_27;
       end
     end else if (!(3'h1 == state)) begin // @[CPU6502Core.scala 69:19]
@@ -2543,7 +2553,7 @@ module CPU6502Core(
     end else if (io_reset) begin // @[CPU6502Core.scala 59:18]
       cycle <= 3'h0; // @[CPU6502Core.scala 62:11]
     end else if (3'h0 == state) begin // @[CPU6502Core.scala 69:19]
-      if (_T_5) begin // @[CPU6502Core.scala 72:31]
+      if (cycle == 3'h0) begin // @[CPU6502Core.scala 72:31]
         cycle <= 3'h1; // @[CPU6502Core.scala 76:19]
       end else begin
         cycle <= _GEN_26;
@@ -2552,6 +2562,22 @@ module CPU6502Core(
       cycle <= 3'h0;
     end else begin
       cycle <= _GEN_4063;
+    end
+    if (reset) begin // @[CPU6502Core.scala 32:24]
+      nmiLast <= 1'h0; // @[CPU6502Core.scala 32:24]
+    end else if (io_reset) begin // @[CPU6502Core.scala 59:18]
+      nmiLast <= 1'h0; // @[CPU6502Core.scala 66:13]
+    end else begin
+      nmiLast <= io_nmi; // @[CPU6502Core.scala 36:11]
+    end
+    if (reset) begin // @[CPU6502Core.scala 33:27]
+      nmiPending <= 1'h0; // @[CPU6502Core.scala 33:27]
+    end else if (io_reset) begin // @[CPU6502Core.scala 59:18]
+      nmiPending <= 1'h0; // @[CPU6502Core.scala 65:16]
+    end else if (state == 3'h1 & nmiPending) begin // @[CPU6502Core.scala 44:40]
+      nmiPending <= 1'h0; // @[CPU6502Core.scala 45:16]
+    end else begin
+      nmiPending <= _GEN_0;
     end
   end
 endmodule
@@ -2575,7 +2601,8 @@ module CPU6502Refactored(
   output [7:0]  io_debug_opcode,
   output [1:0]  io_debug_state,
   output [2:0]  io_debug_cycle,
-  input         io_reset
+  input         io_reset,
+  input         io_nmi
 );
   wire  core_clock; // @[CPU6502Refactored.scala 20:20]
   wire  core_reset; // @[CPU6502Refactored.scala 20:20]
@@ -2597,6 +2624,7 @@ module CPU6502Refactored(
   wire [1:0] core_io_debug_state; // @[CPU6502Refactored.scala 20:20]
   wire [2:0] core_io_debug_cycle; // @[CPU6502Refactored.scala 20:20]
   wire  core_io_reset; // @[CPU6502Refactored.scala 20:20]
+  wire  core_io_nmi; // @[CPU6502Refactored.scala 20:20]
   CPU6502Core core ( // @[CPU6502Refactored.scala 20:20]
     .clock(core_clock),
     .reset(core_reset),
@@ -2617,7 +2645,8 @@ module CPU6502Refactored(
     .io_debug_opcode(core_io_debug_opcode),
     .io_debug_state(core_io_debug_state),
     .io_debug_cycle(core_io_debug_cycle),
-    .io_reset(core_io_reset)
+    .io_reset(core_io_reset),
+    .io_nmi(core_io_nmi)
   );
   assign io_memAddr = core_io_memAddr; // @[CPU6502Refactored.scala 22:17]
   assign io_memDataOut = core_io_memDataOut; // @[CPU6502Refactored.scala 23:17]
@@ -2639,8 +2668,9 @@ module CPU6502Refactored(
   assign core_reset = reset;
   assign core_io_memDataIn = io_memDataIn; // @[CPU6502Refactored.scala 24:21]
   assign core_io_reset = io_reset; // @[CPU6502Refactored.scala 28:17]
+  assign core_io_nmi = io_nmi; // @[CPU6502Refactored.scala 29:17]
 endmodule
-module PPU(
+module PPUSimplified(
   input         clock,
   input         reset,
   input  [2:0]  io_cpuAddr,
@@ -2648,10 +2678,14 @@ module PPU(
   output [7:0]  io_cpuDataOut,
   input         io_cpuWrite,
   input         io_cpuRead,
+  input  [7:0]  io_oamDmaAddr,
+  input  [7:0]  io_oamDmaData,
+  input         io_oamDmaWrite,
   output [8:0]  io_pixelX,
   output [8:0]  io_pixelY,
   output [5:0]  io_pixelColor,
   output        io_vblank,
+  output        io_nmiOut,
   input         io_chrLoadEn,
   input  [12:0] io_chrLoadAddr,
   input  [7:0]  io_chrLoadData,
@@ -2661,69 +2695,244 @@ module PPU(
   output [15:0] io_debug_ppuAddrReg,
   output        io_debug_paletteInitDone
 );
-  reg [7:0] vram [0:2047]; // @[PPU.scala 61:17]
-  wire  vram_io_cpuDataOut_MPORT_2_en; // @[PPU.scala 61:17]
-  wire [10:0] vram_io_cpuDataOut_MPORT_2_addr; // @[PPU.scala 61:17]
-  wire [7:0] vram_io_cpuDataOut_MPORT_2_data; // @[PPU.scala 61:17]
-  wire  vram_tileIndex_en; // @[PPU.scala 61:17]
-  wire [10:0] vram_tileIndex_addr; // @[PPU.scala 61:17]
-  wire [7:0] vram_tileIndex_data; // @[PPU.scala 61:17]
-  wire  vram_attrByte_en; // @[PPU.scala 61:17]
-  wire [10:0] vram_attrByte_addr; // @[PPU.scala 61:17]
-  wire [7:0] vram_attrByte_data; // @[PPU.scala 61:17]
-  wire [7:0] vram_MPORT_3_data; // @[PPU.scala 61:17]
-  wire [10:0] vram_MPORT_3_addr; // @[PPU.scala 61:17]
-  wire  vram_MPORT_3_mask; // @[PPU.scala 61:17]
-  wire  vram_MPORT_3_en; // @[PPU.scala 61:17]
-  reg [7:0] oam [0:255]; // @[PPU.scala 62:16]
-  wire  oam_io_cpuDataOut_MPORT_en; // @[PPU.scala 62:16]
-  wire [7:0] oam_io_cpuDataOut_MPORT_addr; // @[PPU.scala 62:16]
-  wire [7:0] oam_io_cpuDataOut_MPORT_data; // @[PPU.scala 62:16]
-  wire [7:0] oam_MPORT_1_data; // @[PPU.scala 62:16]
-  wire [7:0] oam_MPORT_1_addr; // @[PPU.scala 62:16]
-  wire  oam_MPORT_1_mask; // @[PPU.scala 62:16]
-  wire  oam_MPORT_1_en; // @[PPU.scala 62:16]
-  reg [7:0] palette [0:31]; // @[PPU.scala 63:20]
-  wire  palette_io_cpuDataOut_MPORT_3_en; // @[PPU.scala 63:20]
-  wire [4:0] palette_io_cpuDataOut_MPORT_3_addr; // @[PPU.scala 63:20]
-  wire [7:0] palette_io_cpuDataOut_MPORT_3_data; // @[PPU.scala 63:20]
-  wire  palette_paletteColor_en; // @[PPU.scala 63:20]
-  wire [4:0] palette_paletteColor_addr; // @[PPU.scala 63:20]
-  wire [7:0] palette_paletteColor_data; // @[PPU.scala 63:20]
-  wire [7:0] palette_MPORT_data; // @[PPU.scala 63:20]
-  wire [4:0] palette_MPORT_addr; // @[PPU.scala 63:20]
-  wire  palette_MPORT_mask; // @[PPU.scala 63:20]
-  wire  palette_MPORT_en; // @[PPU.scala 63:20]
-  wire [7:0] palette_MPORT_4_data; // @[PPU.scala 63:20]
-  wire [4:0] palette_MPORT_4_addr; // @[PPU.scala 63:20]
-  wire  palette_MPORT_4_mask; // @[PPU.scala 63:20]
-  wire  palette_MPORT_4_en; // @[PPU.scala 63:20]
-  reg [7:0] chrROM [0:8191]; // @[PPU.scala 64:19]
-  wire  chrROM_io_cpuDataOut_MPORT_1_en; // @[PPU.scala 64:19]
-  wire [12:0] chrROM_io_cpuDataOut_MPORT_1_addr; // @[PPU.scala 64:19]
-  wire [7:0] chrROM_io_cpuDataOut_MPORT_1_data; // @[PPU.scala 64:19]
-  wire  chrROM_patternLow_en; // @[PPU.scala 64:19]
-  wire [12:0] chrROM_patternLow_addr; // @[PPU.scala 64:19]
-  wire [7:0] chrROM_patternLow_data; // @[PPU.scala 64:19]
-  wire  chrROM_patternHigh_en; // @[PPU.scala 64:19]
-  wire [12:0] chrROM_patternHigh_addr; // @[PPU.scala 64:19]
-  wire [7:0] chrROM_patternHigh_data; // @[PPU.scala 64:19]
-  wire [7:0] chrROM_MPORT_2_data; // @[PPU.scala 64:19]
-  wire [12:0] chrROM_MPORT_2_addr; // @[PPU.scala 64:19]
-  wire  chrROM_MPORT_2_mask; // @[PPU.scala 64:19]
-  wire  chrROM_MPORT_2_en; // @[PPU.scala 64:19]
-  wire [7:0] chrROM_MPORT_5_data; // @[PPU.scala 64:19]
-  wire [12:0] chrROM_MPORT_5_addr; // @[PPU.scala 64:19]
-  wire  chrROM_MPORT_5_mask; // @[PPU.scala 64:19]
-  wire  chrROM_MPORT_5_en; // @[PPU.scala 64:19]
-  reg [7:0] ppuCtrl; // @[PPU.scala 51:24]
-  reg [7:0] ppuMask; // @[PPU.scala 52:24]
-  reg [7:0] oamAddr; // @[PPU.scala 54:24]
-  reg  ppuAddrLatch; // @[PPU.scala 57:29]
-  reg [15:0] ppuAddrReg; // @[PPU.scala 58:27]
-  reg  paletteInitDone; // @[PPU.scala 67:32]
-  reg [4:0] paletteInitAddr; // @[PPU.scala 68:32]
-  wire  _T = ~paletteInitDone; // @[PPU.scala 70:8]
+  reg [7:0] vram [0:2047]; // @[PPUSimplified.scala 53:17]
+  wire  vram_io_cpuDataOut_MPORT_2_en; // @[PPUSimplified.scala 53:17]
+  wire [10:0] vram_io_cpuDataOut_MPORT_2_addr; // @[PPUSimplified.scala 53:17]
+  wire [7:0] vram_io_cpuDataOut_MPORT_2_data; // @[PPUSimplified.scala 53:17]
+  wire  vram_tileIndex_en; // @[PPUSimplified.scala 53:17]
+  wire [10:0] vram_tileIndex_addr; // @[PPUSimplified.scala 53:17]
+  wire [7:0] vram_tileIndex_data; // @[PPUSimplified.scala 53:17]
+  wire  vram_attrByte_en; // @[PPUSimplified.scala 53:17]
+  wire [10:0] vram_attrByte_addr; // @[PPUSimplified.scala 53:17]
+  wire [7:0] vram_attrByte_data; // @[PPUSimplified.scala 53:17]
+  wire [7:0] vram_MPORT_4_data; // @[PPUSimplified.scala 53:17]
+  wire [10:0] vram_MPORT_4_addr; // @[PPUSimplified.scala 53:17]
+  wire  vram_MPORT_4_mask; // @[PPUSimplified.scala 53:17]
+  wire  vram_MPORT_4_en; // @[PPUSimplified.scala 53:17]
+  reg [7:0] oam [0:255]; // @[PPUSimplified.scala 54:16]
+  wire  oam_io_cpuDataOut_MPORT_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_io_cpuDataOut_MPORT_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_io_cpuDataOut_MPORT_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprY_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprY_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprY_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprTile_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprTile_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprTile_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprAttr_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprAttr_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprAttr_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprX_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprX_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprX_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprY_1_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprY_1_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprY_1_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprTile_1_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprTile_1_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprTile_1_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprAttr_1_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprAttr_1_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprAttr_1_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprX_1_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprX_1_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprX_1_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprY_2_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprY_2_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprY_2_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprTile_2_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprTile_2_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprTile_2_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprAttr_2_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprAttr_2_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprAttr_2_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprX_2_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprX_2_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprX_2_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprY_3_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprY_3_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprY_3_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprTile_3_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprTile_3_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprTile_3_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprAttr_3_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprAttr_3_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprAttr_3_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprX_3_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprX_3_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprX_3_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprY_4_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprY_4_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprY_4_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprTile_4_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprTile_4_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprTile_4_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprAttr_4_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprAttr_4_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprAttr_4_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprX_4_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprX_4_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprX_4_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprY_5_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprY_5_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprY_5_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprTile_5_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprTile_5_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprTile_5_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprAttr_5_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprAttr_5_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprAttr_5_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprX_5_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprX_5_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprX_5_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprY_6_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprY_6_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprY_6_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprTile_6_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprTile_6_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprTile_6_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprAttr_6_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprAttr_6_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprAttr_6_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprX_6_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprX_6_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprX_6_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprY_7_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprY_7_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprY_7_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprTile_7_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprTile_7_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprTile_7_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprAttr_7_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprAttr_7_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprAttr_7_data; // @[PPUSimplified.scala 54:16]
+  wire  oam_sprX_7_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprX_7_addr; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_sprX_7_data; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_MPORT_1_data; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_MPORT_1_addr; // @[PPUSimplified.scala 54:16]
+  wire  oam_MPORT_1_mask; // @[PPUSimplified.scala 54:16]
+  wire  oam_MPORT_1_en; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_MPORT_2_data; // @[PPUSimplified.scala 54:16]
+  wire [7:0] oam_MPORT_2_addr; // @[PPUSimplified.scala 54:16]
+  wire  oam_MPORT_2_mask; // @[PPUSimplified.scala 54:16]
+  wire  oam_MPORT_2_en; // @[PPUSimplified.scala 54:16]
+  reg [7:0] palette [0:31]; // @[PPUSimplified.scala 55:20]
+  wire  palette_io_cpuDataOut_MPORT_3_en; // @[PPUSimplified.scala 55:20]
+  wire [4:0] palette_io_cpuDataOut_MPORT_3_addr; // @[PPUSimplified.scala 55:20]
+  wire [7:0] palette_io_cpuDataOut_MPORT_3_data; // @[PPUSimplified.scala 55:20]
+  wire  palette_paletteColor_en; // @[PPUSimplified.scala 55:20]
+  wire [4:0] palette_paletteColor_addr; // @[PPUSimplified.scala 55:20]
+  wire [7:0] palette_paletteColor_data; // @[PPUSimplified.scala 55:20]
+  wire  palette_sprPaletteColor_en; // @[PPUSimplified.scala 55:20]
+  wire [4:0] palette_sprPaletteColor_addr; // @[PPUSimplified.scala 55:20]
+  wire [7:0] palette_sprPaletteColor_data; // @[PPUSimplified.scala 55:20]
+  wire  palette_sprPaletteColor_1_en; // @[PPUSimplified.scala 55:20]
+  wire [4:0] palette_sprPaletteColor_1_addr; // @[PPUSimplified.scala 55:20]
+  wire [7:0] palette_sprPaletteColor_1_data; // @[PPUSimplified.scala 55:20]
+  wire  palette_sprPaletteColor_2_en; // @[PPUSimplified.scala 55:20]
+  wire [4:0] palette_sprPaletteColor_2_addr; // @[PPUSimplified.scala 55:20]
+  wire [7:0] palette_sprPaletteColor_2_data; // @[PPUSimplified.scala 55:20]
+  wire  palette_sprPaletteColor_3_en; // @[PPUSimplified.scala 55:20]
+  wire [4:0] palette_sprPaletteColor_3_addr; // @[PPUSimplified.scala 55:20]
+  wire [7:0] palette_sprPaletteColor_3_data; // @[PPUSimplified.scala 55:20]
+  wire  palette_sprPaletteColor_4_en; // @[PPUSimplified.scala 55:20]
+  wire [4:0] palette_sprPaletteColor_4_addr; // @[PPUSimplified.scala 55:20]
+  wire [7:0] palette_sprPaletteColor_4_data; // @[PPUSimplified.scala 55:20]
+  wire  palette_sprPaletteColor_5_en; // @[PPUSimplified.scala 55:20]
+  wire [4:0] palette_sprPaletteColor_5_addr; // @[PPUSimplified.scala 55:20]
+  wire [7:0] palette_sprPaletteColor_5_data; // @[PPUSimplified.scala 55:20]
+  wire  palette_sprPaletteColor_6_en; // @[PPUSimplified.scala 55:20]
+  wire [4:0] palette_sprPaletteColor_6_addr; // @[PPUSimplified.scala 55:20]
+  wire [7:0] palette_sprPaletteColor_6_data; // @[PPUSimplified.scala 55:20]
+  wire  palette_sprPaletteColor_7_en; // @[PPUSimplified.scala 55:20]
+  wire [4:0] palette_sprPaletteColor_7_addr; // @[PPUSimplified.scala 55:20]
+  wire [7:0] palette_sprPaletteColor_7_data; // @[PPUSimplified.scala 55:20]
+  wire  palette_pixelColor_MPORT_en; // @[PPUSimplified.scala 55:20]
+  wire [4:0] palette_pixelColor_MPORT_addr; // @[PPUSimplified.scala 55:20]
+  wire [7:0] palette_pixelColor_MPORT_data; // @[PPUSimplified.scala 55:20]
+  wire [7:0] palette_MPORT_data; // @[PPUSimplified.scala 55:20]
+  wire [4:0] palette_MPORT_addr; // @[PPUSimplified.scala 55:20]
+  wire  palette_MPORT_mask; // @[PPUSimplified.scala 55:20]
+  wire  palette_MPORT_en; // @[PPUSimplified.scala 55:20]
+  wire [7:0] palette_MPORT_5_data; // @[PPUSimplified.scala 55:20]
+  wire [4:0] palette_MPORT_5_addr; // @[PPUSimplified.scala 55:20]
+  wire  palette_MPORT_5_mask; // @[PPUSimplified.scala 55:20]
+  wire  palette_MPORT_5_en; // @[PPUSimplified.scala 55:20]
+  reg [7:0] chrROM [0:8191]; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_io_cpuDataOut_MPORT_1_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_io_cpuDataOut_MPORT_1_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_io_cpuDataOut_MPORT_1_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_patternLow_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_patternLow_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_patternLow_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_patternHigh_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_patternHigh_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_patternHigh_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_sprPatternLow_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_sprPatternLow_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_sprPatternLow_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_sprPatternHigh_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_sprPatternHigh_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_sprPatternHigh_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_sprPatternLow_1_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_sprPatternLow_1_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_sprPatternLow_1_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_sprPatternHigh_1_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_sprPatternHigh_1_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_sprPatternHigh_1_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_sprPatternLow_2_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_sprPatternLow_2_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_sprPatternLow_2_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_sprPatternHigh_2_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_sprPatternHigh_2_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_sprPatternHigh_2_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_sprPatternLow_3_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_sprPatternLow_3_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_sprPatternLow_3_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_sprPatternHigh_3_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_sprPatternHigh_3_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_sprPatternHigh_3_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_sprPatternLow_4_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_sprPatternLow_4_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_sprPatternLow_4_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_sprPatternHigh_4_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_sprPatternHigh_4_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_sprPatternHigh_4_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_sprPatternLow_5_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_sprPatternLow_5_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_sprPatternLow_5_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_sprPatternHigh_5_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_sprPatternHigh_5_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_sprPatternHigh_5_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_sprPatternLow_6_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_sprPatternLow_6_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_sprPatternLow_6_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_sprPatternHigh_6_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_sprPatternHigh_6_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_sprPatternHigh_6_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_sprPatternLow_7_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_sprPatternLow_7_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_sprPatternLow_7_data; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_sprPatternHigh_7_en; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_sprPatternHigh_7_addr; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_sprPatternHigh_7_data; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_MPORT_3_data; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_MPORT_3_addr; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_MPORT_3_mask; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_MPORT_3_en; // @[PPUSimplified.scala 56:19]
+  wire [7:0] chrROM_MPORT_6_data; // @[PPUSimplified.scala 56:19]
+  wire [12:0] chrROM_MPORT_6_addr; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_MPORT_6_mask; // @[PPUSimplified.scala 56:19]
+  wire  chrROM_MPORT_6_en; // @[PPUSimplified.scala 56:19]
+  reg [7:0] ppuCtrl; // @[PPUSimplified.scala 44:24]
+  reg [7:0] ppuMask; // @[PPUSimplified.scala 45:24]
+  reg [7:0] oamAddr; // @[PPUSimplified.scala 46:24]
+  reg  ppuAddrLatch; // @[PPUSimplified.scala 49:29]
+  reg [15:0] ppuAddrReg; // @[PPUSimplified.scala 50:27]
+  reg  paletteInitDone; // @[PPUSimplified.scala 59:32]
+  reg [4:0] paletteInitAddr; // @[PPUSimplified.scala 60:32]
+  wire  _T = ~paletteInitDone; // @[PPUSimplified.scala 62:8]
   wire [5:0] _GEN_1 = 5'h1 == paletteInitAddr ? 6'h0 : 6'hf; // @[]
   wire [5:0] _GEN_2 = 5'h2 == paletteInitAddr ? 6'h10 : _GEN_1; // @[]
   wire [5:0] _GEN_3 = 5'h3 == paletteInitAddr ? 6'h30 : _GEN_2; // @[]
@@ -2755,300 +2964,867 @@ module PPU(
   wire [5:0] _GEN_29 = 5'h1d == paletteInitAddr ? 6'h12 : _GEN_28; // @[]
   wire [5:0] _GEN_30 = 5'h1e == paletteInitAddr ? 6'h22 : _GEN_29; // @[]
   wire [5:0] _GEN_31 = 5'h1f == paletteInitAddr ? 6'h32 : _GEN_30; // @[]
-  wire [4:0] _paletteInitAddr_T_1 = paletteInitAddr + 5'h1; // @[PPU.scala 84:40]
-  wire  _GEN_32 = paletteInitAddr == 5'h1f | paletteInitDone; // @[PPU.scala 86:36 87:23 67:32]
-  reg [8:0] renderX; // @[PPU.scala 92:26]
-  reg [8:0] renderY; // @[PPU.scala 93:26]
-  reg  vblankFlag; // @[PPU.scala 96:27]
-  wire [8:0] _scanlineX_T_1 = renderX + 9'h1; // @[PPU.scala 100:26]
-  wire [8:0] _scanlineY_T_1 = renderY + 9'h1; // @[PPU.scala 103:28]
-  wire  _T_3 = renderY == 9'h105; // @[PPU.scala 105:20]
-  wire  _T_5 = renderX == 9'h1; // @[PPU.scala 111:41]
-  wire  _GEN_44 = renderY == 9'hf1 & renderX == 9'h1 | vblankFlag; // @[PPU.scala 111:50 112:16 96:27]
-  wire  _GEN_46 = _T_3 & _T_5 ? 1'h0 : _GEN_44; // @[PPU.scala 118:50 119:16]
-  wire [7:0] _io_cpuDataOut_T = {vblankFlag,7'h0}; // @[Cat.scala 33:92]
-  wire  _T_12 = 3'h4 == io_cpuAddr; // @[PPU.scala 127:24]
-  wire  _T_13 = 3'h7 == io_cpuAddr; // @[PPU.scala 127:24]
-  wire  _T_14 = ppuAddrReg < 16'h2000; // @[PPU.scala 139:25]
-  wire  _T_15 = ppuAddrReg < 16'h3f00; // @[PPU.scala 142:31]
-  wire [7:0] _GEN_51 = ppuAddrReg < 16'h3f00 ? vram_io_cpuDataOut_MPORT_2_data : palette_io_cpuDataOut_MPORT_3_data; // @[PPU.scala 142:43 144:25 147:25]
-  wire  _GEN_54 = ppuAddrReg < 16'h3f00 ? 1'h0 : 1'h1; // @[PPU.scala 142:43 63:20 147:40]
-  wire [7:0] _GEN_58 = ppuAddrReg < 16'h2000 ? chrROM_io_cpuDataOut_MPORT_1_data : _GEN_51; // @[PPU.scala 139:37 141:25]
-  wire  _GEN_61 = ppuAddrReg < 16'h2000 ? 1'h0 : _T_15; // @[PPU.scala 139:37 61:17]
-  wire  _GEN_64 = ppuAddrReg < 16'h2000 ? 1'h0 : _GEN_54; // @[PPU.scala 139:37 63:20]
-  wire [15:0] _ppuAddrReg_T_1 = ppuAddrReg + 16'h1; // @[PPU.scala 149:34]
-  wire  _GEN_67 = 3'h7 == io_cpuAddr & _T_14; // @[PPU.scala 127:24 64:19]
-  wire [7:0] _GEN_68 = 3'h7 == io_cpuAddr ? _GEN_58 : 8'h0; // @[PPU.scala 124:17 127:24]
-  wire  _GEN_71 = 3'h7 == io_cpuAddr & _GEN_61; // @[PPU.scala 127:24 61:17]
-  wire  _GEN_74 = 3'h7 == io_cpuAddr & _GEN_64; // @[PPU.scala 127:24 63:20]
-  wire [15:0] _GEN_75 = 3'h7 == io_cpuAddr ? _ppuAddrReg_T_1 : ppuAddrReg; // @[PPU.scala 127:24 149:20 58:27]
-  wire [7:0] _GEN_79 = 3'h4 == io_cpuAddr ? oam_io_cpuDataOut_MPORT_data : _GEN_68; // @[PPU.scala 127:24 135:23]
-  wire  _GEN_82 = 3'h4 == io_cpuAddr ? 1'h0 : 3'h7 == io_cpuAddr & _T_14; // @[PPU.scala 127:24 64:19]
-  wire  _GEN_85 = 3'h4 == io_cpuAddr ? 1'h0 : 3'h7 == io_cpuAddr & _GEN_61; // @[PPU.scala 127:24 61:17]
-  wire  _GEN_88 = 3'h4 == io_cpuAddr ? 1'h0 : 3'h7 == io_cpuAddr & _GEN_64; // @[PPU.scala 127:24 63:20]
-  wire [15:0] _GEN_89 = 3'h4 == io_cpuAddr ? ppuAddrReg : _GEN_75; // @[PPU.scala 127:24 58:27]
-  wire [7:0] _GEN_90 = 3'h2 == io_cpuAddr ? _io_cpuDataOut_T : _GEN_79; // @[PPU.scala 127:24 129:23]
-  wire  _GEN_93 = 3'h2 == io_cpuAddr ? 1'h0 : ppuAddrLatch; // @[PPU.scala 127:24 132:22 57:29]
-  wire  _GEN_96 = 3'h2 == io_cpuAddr ? 1'h0 : 3'h4 == io_cpuAddr; // @[PPU.scala 127:24 62:16]
-  wire  _GEN_99 = 3'h2 == io_cpuAddr ? 1'h0 : _GEN_82; // @[PPU.scala 127:24 64:19]
-  wire  _GEN_102 = 3'h2 == io_cpuAddr ? 1'h0 : _GEN_85; // @[PPU.scala 127:24 61:17]
-  wire  _GEN_105 = 3'h2 == io_cpuAddr ? 1'h0 : _GEN_88; // @[PPU.scala 127:24 63:20]
-  wire [15:0] _GEN_106 = 3'h2 == io_cpuAddr ? ppuAddrReg : _GEN_89; // @[PPU.scala 127:24 58:27]
-  wire  _GEN_110 = io_cpuRead ? _GEN_93 : ppuAddrLatch; // @[PPU.scala 126:20 57:29]
-  wire [15:0] _GEN_123 = io_cpuRead ? _GEN_106 : ppuAddrReg; // @[PPU.scala 126:20 58:27]
-  wire [7:0] _oamAddr_T_1 = oamAddr + 8'h1; // @[PPU.scala 167:28]
-  wire  _T_21 = ~ppuAddrLatch; // @[PPU.scala 170:14]
+  wire [4:0] _paletteInitAddr_T_1 = paletteInitAddr + 5'h1; // @[PPUSimplified.scala 75:40]
+  wire  _GEN_32 = paletteInitAddr == 5'h1f | paletteInitDone; // @[PPUSimplified.scala 77:36 78:23 59:32]
+  reg [8:0] scanlineX; // @[PPUSimplified.scala 83:26]
+  reg [8:0] scanlineY; // @[PPUSimplified.scala 84:26]
+  wire [8:0] _scanlineX_T_1 = scanlineX + 9'h1; // @[PPUSimplified.scala 86:26]
+  wire [8:0] _scanlineY_T_1 = scanlineY + 9'h1; // @[PPUSimplified.scala 89:28]
+  wire  _T_3 = scanlineY == 9'h105; // @[PPUSimplified.scala 90:20]
+  reg  vblankFlag; // @[PPUSimplified.scala 96:27]
+  reg  nmiOccurred; // @[PPUSimplified.scala 97:28]
+  wire  _T_5 = scanlineX == 9'h1; // @[PPUSimplified.scala 100:41]
+  wire  _GEN_43 = ppuCtrl[7] | nmiOccurred; // @[PPUSimplified.scala 102:22 103:19 97:28]
+  wire  _GEN_44 = scanlineY == 9'hf1 & scanlineX == 9'h1 | vblankFlag; // @[PPUSimplified.scala 100:50 101:16 96:27]
+  reg  vblankClearNext; // @[PPUSimplified.scala 116:32]
+  wire  _GEN_51 = vblankClearNext ? 1'h0 : vblankClearNext; // @[PPUSimplified.scala 117:25 120:21 116:32]
+  wire [1:0] io_cpuDataOut_hi = {vblankFlag,1'h0}; // @[Cat.scala 33:92]
+  wire [7:0] _io_cpuDataOut_T = {vblankFlag,1'h0,6'h0}; // @[Cat.scala 33:92]
+  wire  _T_12 = 3'h4 == io_cpuAddr; // @[PPUSimplified.scala 124:24]
+  wire  _T_13 = 3'h7 == io_cpuAddr; // @[PPUSimplified.scala 124:24]
+  wire  _T_14 = ppuAddrReg < 16'h2000; // @[PPUSimplified.scala 134:25]
+  wire  _T_15 = ppuAddrReg < 16'h3f00; // @[PPUSimplified.scala 136:31]
+  wire [7:0] _GEN_55 = ppuAddrReg < 16'h3f00 ? vram_io_cpuDataOut_MPORT_2_data : palette_io_cpuDataOut_MPORT_3_data; // @[PPUSimplified.scala 136:43 137:25 139:25]
+  wire  _GEN_58 = ppuAddrReg < 16'h3f00 ? 1'h0 : 1'h1; // @[PPUSimplified.scala 136:43 55:20 139:40]
+  wire [7:0] _GEN_62 = ppuAddrReg < 16'h2000 ? chrROM_io_cpuDataOut_MPORT_1_data : _GEN_55; // @[PPUSimplified.scala 134:37 135:25]
+  wire  _GEN_65 = ppuAddrReg < 16'h2000 ? 1'h0 : _T_15; // @[PPUSimplified.scala 134:37 53:17]
+  wire  _GEN_68 = ppuAddrReg < 16'h2000 ? 1'h0 : _GEN_58; // @[PPUSimplified.scala 134:37 55:20]
+  wire [15:0] _ppuAddrReg_T_1 = ppuAddrReg + 16'h1; // @[PPUSimplified.scala 141:34]
+  wire  _GEN_71 = 3'h7 == io_cpuAddr & _T_14; // @[PPUSimplified.scala 124:24 56:19]
+  wire [7:0] _GEN_72 = 3'h7 == io_cpuAddr ? _GEN_62 : 8'h0; // @[PPUSimplified.scala 114:17 124:24]
+  wire  _GEN_75 = 3'h7 == io_cpuAddr & _GEN_65; // @[PPUSimplified.scala 124:24 53:17]
+  wire  _GEN_78 = 3'h7 == io_cpuAddr & _GEN_68; // @[PPUSimplified.scala 124:24 55:20]
+  wire [15:0] _GEN_79 = 3'h7 == io_cpuAddr ? _ppuAddrReg_T_1 : ppuAddrReg; // @[PPUSimplified.scala 124:24 141:20 50:27]
+  wire [7:0] _GEN_83 = 3'h4 == io_cpuAddr ? oam_io_cpuDataOut_MPORT_data : _GEN_72; // @[PPUSimplified.scala 124:24 131:23]
+  wire  _GEN_86 = 3'h4 == io_cpuAddr ? 1'h0 : 3'h7 == io_cpuAddr & _T_14; // @[PPUSimplified.scala 124:24 56:19]
+  wire  _GEN_89 = 3'h4 == io_cpuAddr ? 1'h0 : 3'h7 == io_cpuAddr & _GEN_65; // @[PPUSimplified.scala 124:24 53:17]
+  wire  _GEN_92 = 3'h4 == io_cpuAddr ? 1'h0 : 3'h7 == io_cpuAddr & _GEN_68; // @[PPUSimplified.scala 124:24 55:20]
+  wire [15:0] _GEN_93 = 3'h4 == io_cpuAddr ? ppuAddrReg : _GEN_79; // @[PPUSimplified.scala 124:24 50:27]
+  wire [7:0] _GEN_94 = 3'h2 == io_cpuAddr ? _io_cpuDataOut_T : _GEN_83; // @[PPUSimplified.scala 124:24 126:23]
+  wire  _GEN_95 = 3'h2 == io_cpuAddr | _GEN_51; // @[PPUSimplified.scala 124:24 127:25]
+  wire  _GEN_96 = 3'h2 == io_cpuAddr ? 1'h0 : ppuAddrLatch; // @[PPUSimplified.scala 124:24 128:22 49:29]
+  wire  _GEN_99 = 3'h2 == io_cpuAddr ? 1'h0 : 3'h4 == io_cpuAddr; // @[PPUSimplified.scala 124:24 54:16]
+  wire  _GEN_102 = 3'h2 == io_cpuAddr ? 1'h0 : _GEN_86; // @[PPUSimplified.scala 124:24 56:19]
+  wire  _GEN_105 = 3'h2 == io_cpuAddr ? 1'h0 : _GEN_89; // @[PPUSimplified.scala 124:24 53:17]
+  wire  _GEN_108 = 3'h2 == io_cpuAddr ? 1'h0 : _GEN_92; // @[PPUSimplified.scala 124:24 55:20]
+  wire [15:0] _GEN_109 = 3'h2 == io_cpuAddr ? ppuAddrReg : _GEN_93; // @[PPUSimplified.scala 124:24 50:27]
+  wire  _GEN_112 = io_cpuRead ? _GEN_96 : ppuAddrLatch; // @[PPUSimplified.scala 123:20 49:29]
+  wire [15:0] _GEN_125 = io_cpuRead ? _GEN_109 : ppuAddrReg; // @[PPUSimplified.scala 123:20 50:27]
+  wire [7:0] _oamAddr_T_1 = oamAddr + 8'h1; // @[PPUSimplified.scala 158:28]
+  wire  _T_21 = ~ppuAddrLatch; // @[PPUSimplified.scala 161:14]
   wire [13:0] _ppuAddrReg_T_3 = {io_cpuDataIn[5:0],8'h0}; // @[Cat.scala 33:92]
   wire [15:0] _ppuAddrReg_T_5 = {ppuAddrReg[15:8],io_cpuDataIn}; // @[Cat.scala 33:92]
-  wire [15:0] _GEN_126 = _T_21 ? {{2'd0}, _ppuAddrReg_T_3} : _ppuAddrReg_T_5; // @[PPU.scala 178:29 179:22 181:22]
-  wire [15:0] _GEN_167 = _T_13 ? _ppuAddrReg_T_1 : _GEN_123; // @[PPU.scala 155:24 197:20]
-  wire [15:0] _GEN_168 = 3'h6 == io_cpuAddr ? _GEN_126 : _GEN_167; // @[PPU.scala 155:24]
-  wire  _GEN_169 = 3'h6 == io_cpuAddr ? _T_21 : _GEN_110; // @[PPU.scala 155:24 183:22]
-  wire  _GEN_172 = 3'h6 == io_cpuAddr ? 1'h0 : _GEN_67; // @[PPU.scala 155:24 64:19]
-  wire  _GEN_177 = 3'h6 == io_cpuAddr ? 1'h0 : _GEN_71; // @[PPU.scala 155:24 61:17]
-  wire  _GEN_182 = 3'h6 == io_cpuAddr ? 1'h0 : _GEN_74; // @[PPU.scala 155:24 63:20]
-  wire  _GEN_187 = 3'h5 == io_cpuAddr ? _T_21 : _GEN_169; // @[PPU.scala 155:24 175:22]
-  wire [15:0] _GEN_188 = 3'h5 == io_cpuAddr ? _GEN_123 : _GEN_168; // @[PPU.scala 155:24]
-  wire  _GEN_191 = 3'h5 == io_cpuAddr ? 1'h0 : _GEN_172; // @[PPU.scala 155:24 64:19]
-  wire  _GEN_196 = 3'h5 == io_cpuAddr ? 1'h0 : _GEN_177; // @[PPU.scala 155:24 61:17]
-  wire  _GEN_201 = 3'h5 == io_cpuAddr ? 1'h0 : _GEN_182; // @[PPU.scala 155:24 63:20]
-  wire [7:0] _GEN_209 = _T_12 ? _oamAddr_T_1 : oamAddr; // @[PPU.scala 155:24 167:17 54:24]
-  wire  _GEN_212 = _T_12 ? _GEN_110 : _GEN_187; // @[PPU.scala 155:24]
-  wire [15:0] _GEN_213 = _T_12 ? _GEN_123 : _GEN_188; // @[PPU.scala 155:24]
-  wire  _GEN_216 = _T_12 ? 1'h0 : _GEN_191; // @[PPU.scala 155:24 64:19]
-  wire  _GEN_221 = _T_12 ? 1'h0 : _GEN_196; // @[PPU.scala 155:24 61:17]
-  wire  _GEN_226 = _T_12 ? 1'h0 : _GEN_201; // @[PPU.scala 155:24 63:20]
-  wire [7:0] _GEN_229 = 3'h3 == io_cpuAddr ? io_cpuDataIn : _GEN_209; // @[PPU.scala 155:24 163:17]
-  wire  _GEN_232 = 3'h3 == io_cpuAddr ? 1'h0 : _T_12; // @[PPU.scala 155:24 62:16]
-  wire  _GEN_237 = 3'h3 == io_cpuAddr ? _GEN_110 : _GEN_212; // @[PPU.scala 155:24]
-  wire [15:0] _GEN_238 = 3'h3 == io_cpuAddr ? _GEN_123 : _GEN_213; // @[PPU.scala 155:24]
-  wire  _GEN_241 = 3'h3 == io_cpuAddr ? 1'h0 : _GEN_216; // @[PPU.scala 155:24 64:19]
-  wire  _GEN_246 = 3'h3 == io_cpuAddr ? 1'h0 : _GEN_221; // @[PPU.scala 155:24 61:17]
-  wire  _GEN_251 = 3'h3 == io_cpuAddr ? 1'h0 : _GEN_226; // @[PPU.scala 155:24 63:20]
-  wire  _GEN_258 = 3'h1 == io_cpuAddr ? 1'h0 : _GEN_232; // @[PPU.scala 155:24 62:16]
-  wire  _GEN_267 = 3'h1 == io_cpuAddr ? 1'h0 : _GEN_241; // @[PPU.scala 155:24 64:19]
-  wire  _GEN_272 = 3'h1 == io_cpuAddr ? 1'h0 : _GEN_246; // @[PPU.scala 155:24 61:17]
-  wire  _GEN_277 = 3'h1 == io_cpuAddr ? 1'h0 : _GEN_251; // @[PPU.scala 155:24 63:20]
-  wire  _GEN_285 = 3'h0 == io_cpuAddr ? 1'h0 : _GEN_258; // @[PPU.scala 155:24 62:16]
-  wire  _GEN_294 = 3'h0 == io_cpuAddr ? 1'h0 : _GEN_267; // @[PPU.scala 155:24 64:19]
-  wire  _GEN_299 = 3'h0 == io_cpuAddr ? 1'h0 : _GEN_272; // @[PPU.scala 155:24 61:17]
-  wire  _GEN_304 = 3'h0 == io_cpuAddr ? 1'h0 : _GEN_277; // @[PPU.scala 155:24 63:20]
-  wire  _T_30 = renderX < 9'h100; // @[PPU.scala 213:16]
-  wire  _T_31 = renderY < 9'hf0; // @[PPU.scala 213:35]
-  wire [5:0] tileX = renderX[8:3]; // @[PPU.scala 215:25]
-  wire [5:0] tileY = renderY[8:3]; // @[PPU.scala 216:25]
-  wire [2:0] pixelInTileX = renderX[2:0]; // @[PPU.scala 217:31]
-  wire [2:0] pixelInTileY = renderY[2:0]; // @[PPU.scala 218:31]
-  wire [10:0] _nametableAddr_T = {tileY, 5'h0}; // @[PPU.scala 221:32]
-  wire [10:0] _GEN_348 = {{5'd0}, tileX}; // @[PPU.scala 221:38]
-  wire [3:0] attrX = tileX[5:2]; // @[PPU.scala 225:23]
-  wire [3:0] attrY = tileY[5:2]; // @[PPU.scala 226:23]
-  wire [6:0] _attrAddr_T = {attrY, 3'h0}; // @[PPU.scala 227:37]
-  wire [9:0] _GEN_349 = {{3'd0}, _attrAddr_T}; // @[PPU.scala 227:28]
-  wire [9:0] _attrAddr_T_2 = 10'h3c0 + _GEN_349; // @[PPU.scala 227:28]
-  wire [9:0] _GEN_350 = {{6'd0}, attrX}; // @[PPU.scala 227:43]
-  wire [9:0] attrAddr = _attrAddr_T_2 + _GEN_350; // @[PPU.scala 227:43]
-  wire [2:0] _attrShift_T_1 = {tileY[1], 2'h0}; // @[PPU.scala 229:32]
-  wire [1:0] _attrShift_T_3 = {tileX[1], 1'h0}; // @[PPU.scala 229:50]
-  wire [2:0] _GEN_351 = {{1'd0}, _attrShift_T_3}; // @[PPU.scala 229:38]
-  wire [2:0] attrShift = _attrShift_T_1 | _GEN_351; // @[PPU.scala 229:38]
-  wire [7:0] _paletteHigh_T = vram_attrByte_data >> attrShift; // @[PPU.scala 230:33]
-  wire [7:0] paletteHigh = _paletteHigh_T & 8'h3; // @[PPU.scala 230:47]
-  wire [12:0] patternTableBase = ppuCtrl[4] ? 13'h1000 : 13'h0; // @[PPU.scala 233:31]
-  wire [11:0] _patternAddr_T = {vram_tileIndex_data, 4'h0}; // @[PPU.scala 234:53]
-  wire [12:0] _GEN_352 = {{1'd0}, _patternAddr_T}; // @[PPU.scala 234:40]
-  wire [12:0] _patternAddr_T_2 = patternTableBase + _GEN_352; // @[PPU.scala 234:40]
-  wire [12:0] _GEN_353 = {{10'd0}, pixelInTileY}; // @[PPU.scala 234:59]
-  wire [12:0] patternAddr = _patternAddr_T_2 + _GEN_353; // @[PPU.scala 234:59]
-  wire [2:0] bitPos = 3'h7 - pixelInTileX; // @[PPU.scala 241:22]
-  wire [7:0] _colorLow_T = chrROM_patternLow_data >> bitPos; // @[PPU.scala 242:32]
-  wire [7:0] colorLow = _colorLow_T & 8'h1; // @[PPU.scala 242:43]
-  wire [7:0] _colorHigh_T = chrROM_patternHigh_data >> bitPos; // @[PPU.scala 243:34]
-  wire [7:0] colorHigh = _colorHigh_T & 8'h1; // @[PPU.scala 243:45]
-  wire [8:0] _paletteLow_T = {colorHigh, 1'h0}; // @[PPU.scala 244:33]
-  wire [8:0] _GEN_354 = {{1'd0}, colorLow}; // @[PPU.scala 244:39]
-  wire [8:0] paletteLow = _paletteLow_T | _GEN_354; // @[PPU.scala 244:39]
-  wire [9:0] _fullPaletteIndex_T = {paletteHigh, 2'h0}; // @[PPU.scala 247:41]
-  wire [9:0] _GEN_355 = {{1'd0}, paletteLow}; // @[PPU.scala 247:47]
-  wire [9:0] fullPaletteIndex = _fullPaletteIndex_T | _GEN_355; // @[PPU.scala 247:47]
-  wire  _paletteAddr_T = paletteLow == 9'h0; // @[PPU.scala 250:38]
-  wire [9:0] paletteAddr = paletteLow == 9'h0 ? 10'h0 : fullPaletteIndex; // @[PPU.scala 250:26]
-  wire [5:0] _pixelColor_T_3 = paletteLow == 9'h2 ? 6'h10 : 6'h30; // @[PPU.scala 258:24]
-  wire [5:0] _pixelColor_T_4 = paletteLow == 9'h1 ? 6'h0 : _pixelColor_T_3; // @[PPU.scala 257:24]
-  wire [5:0] _pixelColor_T_5 = _paletteAddr_T ? 6'hf : _pixelColor_T_4; // @[PPU.scala 256:24]
-  wire [5:0] _GEN_339 = _T ? _pixelColor_T_5 : palette_paletteColor_data[5:0]; // @[PPU.scala 254:28 256:18 261:18]
-  assign vram_io_cpuDataOut_MPORT_2_en = io_cpuRead & _GEN_102;
+  wire [15:0] _GEN_133 = _T_21 ? {{2'd0}, _ppuAddrReg_T_3} : _ppuAddrReg_T_5; // @[PPUSimplified.scala 169:29 170:22 172:22]
+  wire [15:0] _GEN_174 = _T_13 ? _ppuAddrReg_T_1 : _GEN_125; // @[PPUSimplified.scala 152:24 184:20]
+  wire [15:0] _GEN_175 = 3'h6 == io_cpuAddr ? _GEN_133 : _GEN_174; // @[PPUSimplified.scala 152:24]
+  wire  _GEN_176 = 3'h6 == io_cpuAddr ? _T_21 : _GEN_112; // @[PPUSimplified.scala 152:24 174:22]
+  wire  _GEN_179 = 3'h6 == io_cpuAddr ? 1'h0 : _GEN_71; // @[PPUSimplified.scala 152:24 56:19]
+  wire  _GEN_184 = 3'h6 == io_cpuAddr ? 1'h0 : _GEN_75; // @[PPUSimplified.scala 152:24 53:17]
+  wire  _GEN_189 = 3'h6 == io_cpuAddr ? 1'h0 : _GEN_78; // @[PPUSimplified.scala 152:24 55:20]
+  wire  _GEN_194 = 3'h5 == io_cpuAddr ? _T_21 : _GEN_176; // @[PPUSimplified.scala 152:24 166:22]
+  wire [15:0] _GEN_195 = 3'h5 == io_cpuAddr ? _GEN_125 : _GEN_175; // @[PPUSimplified.scala 152:24]
+  wire  _GEN_198 = 3'h5 == io_cpuAddr ? 1'h0 : _GEN_179; // @[PPUSimplified.scala 152:24 56:19]
+  wire  _GEN_203 = 3'h5 == io_cpuAddr ? 1'h0 : _GEN_184; // @[PPUSimplified.scala 152:24 53:17]
+  wire  _GEN_208 = 3'h5 == io_cpuAddr ? 1'h0 : _GEN_189; // @[PPUSimplified.scala 152:24 55:20]
+  wire [7:0] _GEN_216 = _T_12 ? _oamAddr_T_1 : oamAddr; // @[PPUSimplified.scala 152:24 158:17 46:24]
+  wire  _GEN_219 = _T_12 ? _GEN_112 : _GEN_194; // @[PPUSimplified.scala 152:24]
+  wire [15:0] _GEN_220 = _T_12 ? _GEN_125 : _GEN_195; // @[PPUSimplified.scala 152:24]
+  wire  _GEN_223 = _T_12 ? 1'h0 : _GEN_198; // @[PPUSimplified.scala 152:24 56:19]
+  wire  _GEN_228 = _T_12 ? 1'h0 : _GEN_203; // @[PPUSimplified.scala 152:24 53:17]
+  wire  _GEN_233 = _T_12 ? 1'h0 : _GEN_208; // @[PPUSimplified.scala 152:24 55:20]
+  wire [7:0] _GEN_236 = 3'h3 == io_cpuAddr ? io_cpuDataIn : _GEN_216; // @[PPUSimplified.scala 152:24 155:27]
+  wire  _GEN_239 = 3'h3 == io_cpuAddr ? 1'h0 : _T_12; // @[PPUSimplified.scala 152:24 54:16]
+  wire  _GEN_244 = 3'h3 == io_cpuAddr ? _GEN_112 : _GEN_219; // @[PPUSimplified.scala 152:24]
+  wire [15:0] _GEN_245 = 3'h3 == io_cpuAddr ? _GEN_125 : _GEN_220; // @[PPUSimplified.scala 152:24]
+  wire  _GEN_248 = 3'h3 == io_cpuAddr ? 1'h0 : _GEN_223; // @[PPUSimplified.scala 152:24 56:19]
+  wire  _GEN_253 = 3'h3 == io_cpuAddr ? 1'h0 : _GEN_228; // @[PPUSimplified.scala 152:24 53:17]
+  wire  _GEN_258 = 3'h3 == io_cpuAddr ? 1'h0 : _GEN_233; // @[PPUSimplified.scala 152:24 55:20]
+  wire  _GEN_265 = 3'h1 == io_cpuAddr ? 1'h0 : _GEN_239; // @[PPUSimplified.scala 152:24 54:16]
+  wire  _GEN_274 = 3'h1 == io_cpuAddr ? 1'h0 : _GEN_248; // @[PPUSimplified.scala 152:24 56:19]
+  wire  _GEN_279 = 3'h1 == io_cpuAddr ? 1'h0 : _GEN_253; // @[PPUSimplified.scala 152:24 53:17]
+  wire  _GEN_284 = 3'h1 == io_cpuAddr ? 1'h0 : _GEN_258; // @[PPUSimplified.scala 152:24 55:20]
+  wire  _GEN_292 = 3'h0 == io_cpuAddr ? 1'h0 : _GEN_265; // @[PPUSimplified.scala 152:24 54:16]
+  wire  _GEN_301 = 3'h0 == io_cpuAddr ? 1'h0 : _GEN_274; // @[PPUSimplified.scala 152:24 56:19]
+  wire  _GEN_306 = 3'h0 == io_cpuAddr ? 1'h0 : _GEN_279; // @[PPUSimplified.scala 152:24 53:17]
+  wire  _GEN_311 = 3'h0 == io_cpuAddr ? 1'h0 : _GEN_284; // @[PPUSimplified.scala 152:24 55:20]
+  wire  _T_30 = scanlineX < 9'h100; // @[PPUSimplified.scala 201:18]
+  wire  _T_31 = scanlineY < 9'hf0; // @[PPUSimplified.scala 201:39]
+  wire  _T_32 = scanlineX < 9'h100 & scanlineY < 9'hf0; // @[PPUSimplified.scala 201:26]
+  wire [5:0] tileX = scanlineX[8:3]; // @[PPUSimplified.scala 203:27]
+  wire [5:0] tileY = scanlineY[8:3]; // @[PPUSimplified.scala 204:27]
+  wire [2:0] pixelInTileX = scanlineX[2:0]; // @[PPUSimplified.scala 205:33]
+  wire [2:0] pixelInTileY = scanlineY[2:0]; // @[PPUSimplified.scala 206:33]
+  wire [10:0] _nametableAddr_T = {tileY, 5'h0}; // @[PPUSimplified.scala 208:32]
+  wire [10:0] _GEN_595 = {{5'd0}, tileX}; // @[PPUSimplified.scala 208:38]
+  wire [3:0] attrX = tileX[5:2]; // @[PPUSimplified.scala 211:23]
+  wire [3:0] attrY = tileY[5:2]; // @[PPUSimplified.scala 212:23]
+  wire [6:0] _attrAddr_T = {attrY, 3'h0}; // @[PPUSimplified.scala 213:37]
+  wire [9:0] _GEN_596 = {{3'd0}, _attrAddr_T}; // @[PPUSimplified.scala 213:28]
+  wire [9:0] _attrAddr_T_2 = 10'h3c0 + _GEN_596; // @[PPUSimplified.scala 213:28]
+  wire [9:0] _GEN_597 = {{6'd0}, attrX}; // @[PPUSimplified.scala 213:43]
+  wire [9:0] attrAddr = _attrAddr_T_2 + _GEN_597; // @[PPUSimplified.scala 213:43]
+  wire [2:0] _attrShift_T_1 = {tileY[1], 2'h0}; // @[PPUSimplified.scala 215:32]
+  wire [1:0] _attrShift_T_3 = {tileX[1], 1'h0}; // @[PPUSimplified.scala 215:50]
+  wire [2:0] _GEN_598 = {{1'd0}, _attrShift_T_3}; // @[PPUSimplified.scala 215:38]
+  wire [2:0] attrShift = _attrShift_T_1 | _GEN_598; // @[PPUSimplified.scala 215:38]
+  wire [7:0] _paletteHigh_T = vram_attrByte_data >> attrShift; // @[PPUSimplified.scala 216:33]
+  wire [7:0] paletteHigh = _paletteHigh_T & 8'h3; // @[PPUSimplified.scala 216:47]
+  wire [12:0] patternTableBase = ppuCtrl[4] ? 13'h1000 : 13'h0; // @[PPUSimplified.scala 218:31]
+  wire [11:0] _patternAddr_T = {vram_tileIndex_data, 4'h0}; // @[PPUSimplified.scala 219:53]
+  wire [12:0] _GEN_599 = {{1'd0}, _patternAddr_T}; // @[PPUSimplified.scala 219:40]
+  wire [12:0] _patternAddr_T_2 = patternTableBase + _GEN_599; // @[PPUSimplified.scala 219:40]
+  wire [12:0] _GEN_600 = {{10'd0}, pixelInTileY}; // @[PPUSimplified.scala 219:59]
+  wire [12:0] patternAddr = _patternAddr_T_2 + _GEN_600; // @[PPUSimplified.scala 219:59]
+  wire [2:0] bitPos = 3'h7 - pixelInTileX; // @[PPUSimplified.scala 224:22]
+  wire [7:0] _colorLow_T = chrROM_patternLow_data >> bitPos; // @[PPUSimplified.scala 225:32]
+  wire [7:0] colorLow = _colorLow_T & 8'h1; // @[PPUSimplified.scala 225:43]
+  wire [7:0] _colorHigh_T = chrROM_patternHigh_data >> bitPos; // @[PPUSimplified.scala 226:34]
+  wire [7:0] colorHigh = _colorHigh_T & 8'h1; // @[PPUSimplified.scala 226:45]
+  wire [8:0] _paletteLow_T = {colorHigh, 1'h0}; // @[PPUSimplified.scala 227:33]
+  wire [8:0] _GEN_601 = {{1'd0}, colorLow}; // @[PPUSimplified.scala 227:39]
+  wire [8:0] paletteLow = _paletteLow_T | _GEN_601; // @[PPUSimplified.scala 227:39]
+  wire [9:0] _fullPaletteIndex_T = {paletteHigh, 2'h0}; // @[PPUSimplified.scala 229:41]
+  wire [9:0] _GEN_602 = {{1'd0}, paletteLow}; // @[PPUSimplified.scala 229:47]
+  wire [9:0] fullPaletteIndex = _fullPaletteIndex_T | _GEN_602; // @[PPUSimplified.scala 229:47]
+  wire  _paletteAddr_T = paletteLow == 9'h0; // @[PPUSimplified.scala 230:38]
+  wire [9:0] paletteAddr = paletteLow == 9'h0 ? 10'h0 : fullPaletteIndex; // @[PPUSimplified.scala 230:26]
+  wire [8:0] _GEN_603 = {{1'd0}, oam_sprY_data}; // @[PPUSimplified.scala 251:36]
+  wire [7:0] _sprInYRange_T_2 = oam_sprY_data + 8'h8; // @[PPUSimplified.scala 251:67]
+  wire [8:0] _GEN_604 = {{1'd0}, _sprInYRange_T_2}; // @[PPUSimplified.scala 251:59]
+  wire  sprInYRange = scanlineY >= _GEN_603 & scanlineY < _GEN_604; // @[PPUSimplified.scala 251:45]
+  wire [8:0] _GEN_605 = {{1'd0}, oam_sprX_data}; // @[PPUSimplified.scala 252:36]
+  wire [7:0] _sprInXRange_T_2 = oam_sprX_data + 8'h8; // @[PPUSimplified.scala 252:67]
+  wire [8:0] _GEN_606 = {{1'd0}, _sprInXRange_T_2}; // @[PPUSimplified.scala 252:59]
+  wire  sprInXRange = scanlineX >= _GEN_605 & scanlineX < _GEN_606; // @[PPUSimplified.scala 252:45]
+  wire  _T_33 = sprInYRange & sprInXRange; // @[PPUSimplified.scala 254:24]
+  wire [8:0] pixY = scanlineY - _GEN_603; // @[PPUSimplified.scala 255:30]
+  wire [8:0] pixX = scanlineX - _GEN_605; // @[PPUSimplified.scala 256:30]
+  wire  flipH = oam_sprAttr_data[6]; // @[PPUSimplified.scala 258:28]
+  wire  flipV = oam_sprAttr_data[7]; // @[PPUSimplified.scala 259:28]
+  wire [8:0] _actualPixelX_T_1 = 9'h7 - pixX; // @[PPUSimplified.scala 260:43]
+  wire [8:0] actualPixelX = flipH ? _actualPixelX_T_1 : pixX; // @[PPUSimplified.scala 260:31]
+  wire [8:0] _actualPixelY_T_1 = 9'h7 - pixY; // @[PPUSimplified.scala 261:43]
+  wire [8:0] actualPixelY = flipV ? _actualPixelY_T_1 : pixY; // @[PPUSimplified.scala 261:31]
+  wire [12:0] sprPatternTableBase = ppuCtrl[3] ? 13'h1000 : 13'h0; // @[PPUSimplified.scala 263:38]
+  wire [11:0] _sprPatternAddr_T = {oam_sprTile_data, 4'h0}; // @[PPUSimplified.scala 264:61]
+  wire [12:0] _GEN_609 = {{1'd0}, _sprPatternAddr_T}; // @[PPUSimplified.scala 264:50]
+  wire [12:0] _sprPatternAddr_T_2 = sprPatternTableBase + _GEN_609; // @[PPUSimplified.scala 264:50]
+  wire [12:0] _GEN_610 = {{4'd0}, actualPixelY}; // @[PPUSimplified.scala 264:67]
+  wire [12:0] sprPatternAddr = _sprPatternAddr_T_2 + _GEN_610; // @[PPUSimplified.scala 264:67]
+  wire [8:0] sprBitPos = 9'h7 - actualPixelX; // @[PPUSimplified.scala 269:29]
+  wire [7:0] _sprColorLow_T = chrROM_sprPatternLow_data >> sprBitPos; // @[PPUSimplified.scala 270:42]
+  wire [7:0] sprColorLow = _sprColorLow_T & 8'h1; // @[PPUSimplified.scala 270:56]
+  wire [7:0] _sprColorHigh_T = chrROM_sprPatternHigh_data >> sprBitPos; // @[PPUSimplified.scala 271:44]
+  wire [7:0] sprColorHigh = _sprColorHigh_T & 8'h1; // @[PPUSimplified.scala 271:58]
+  wire [8:0] _sprPaletteLow_T = {sprColorHigh, 1'h0}; // @[PPUSimplified.scala 272:43]
+  wire [8:0] _GEN_611 = {{1'd0}, sprColorLow}; // @[PPUSimplified.scala 272:49]
+  wire [8:0] sprPaletteLow = _sprPaletteLow_T | _GEN_611; // @[PPUSimplified.scala 272:49]
+  wire  _T_34 = sprPaletteLow != 9'h0; // @[PPUSimplified.scala 274:28]
+  wire [1:0] spritePaletteIdx = oam_sprAttr_data[1:0]; // @[PPUSimplified.scala 275:41]
+  wire [3:0] _sprFullPaletteIndex_T = {spritePaletteIdx, 2'h0}; // @[PPUSimplified.scala 276:64]
+  wire [4:0] _GEN_612 = {{1'd0}, _sprFullPaletteIndex_T}; // @[PPUSimplified.scala 276:44]
+  wire [4:0] _sprFullPaletteIndex_T_2 = 5'h10 + _GEN_612; // @[PPUSimplified.scala 276:44]
+  wire [8:0] _GEN_613 = {{4'd0}, _sprFullPaletteIndex_T_2}; // @[PPUSimplified.scala 276:70]
+  wire [8:0] sprFullPaletteIndex = _GEN_613 + sprPaletteLow; // @[PPUSimplified.scala 276:70]
+  wire [5:0] _GEN_349 = sprPaletteLow != 9'h0 ? palette_sprPaletteColor_data[5:0] : 6'h0; // @[PPUSimplified.scala 274:37 279:27 238:31]
+  wire  _GEN_350 = sprPaletteLow != 9'h0 & oam_sprAttr_data[5]; // @[PPUSimplified.scala 274:37 281:31 240:35]
+  wire  spriteHits_0 = sprInYRange & sprInXRange & _T_34; // @[PPUSimplified.scala 254:40 55:20]
+  wire [5:0] spriteColors_0 = sprInYRange & sprInXRange ? _GEN_349 : 6'h0; // @[PPUSimplified.scala 238:31 254:40]
+  wire  spritePriorities_0 = sprInYRange & sprInXRange & _GEN_350; // @[PPUSimplified.scala 240:35 254:40]
+  wire [8:0] _GEN_614 = {{1'd0}, oam_sprY_1_data}; // @[PPUSimplified.scala 251:36]
+  wire [7:0] _sprInYRange_T_6 = oam_sprY_1_data + 8'h8; // @[PPUSimplified.scala 251:67]
+  wire [8:0] _GEN_615 = {{1'd0}, _sprInYRange_T_6}; // @[PPUSimplified.scala 251:59]
+  wire  sprInYRange_1 = scanlineY >= _GEN_614 & scanlineY < _GEN_615; // @[PPUSimplified.scala 251:45]
+  wire [8:0] _GEN_616 = {{1'd0}, oam_sprX_1_data}; // @[PPUSimplified.scala 252:36]
+  wire [7:0] _sprInXRange_T_6 = oam_sprX_1_data + 8'h8; // @[PPUSimplified.scala 252:67]
+  wire [8:0] _GEN_617 = {{1'd0}, _sprInXRange_T_6}; // @[PPUSimplified.scala 252:59]
+  wire  sprInXRange_1 = scanlineX >= _GEN_616 & scanlineX < _GEN_617; // @[PPUSimplified.scala 252:45]
+  wire  _T_35 = sprInYRange_1 & sprInXRange_1; // @[PPUSimplified.scala 254:24]
+  wire [8:0] pixY_1 = scanlineY - _GEN_614; // @[PPUSimplified.scala 255:30]
+  wire [8:0] pixX_1 = scanlineX - _GEN_616; // @[PPUSimplified.scala 256:30]
+  wire  flipH_1 = oam_sprAttr_1_data[6]; // @[PPUSimplified.scala 258:28]
+  wire  flipV_1 = oam_sprAttr_1_data[7]; // @[PPUSimplified.scala 259:28]
+  wire [8:0] _actualPixelX_T_3 = 9'h7 - pixX_1; // @[PPUSimplified.scala 260:43]
+  wire [8:0] actualPixelX_1 = flipH_1 ? _actualPixelX_T_3 : pixX_1; // @[PPUSimplified.scala 260:31]
+  wire [8:0] _actualPixelY_T_3 = 9'h7 - pixY_1; // @[PPUSimplified.scala 261:43]
+  wire [8:0] actualPixelY_1 = flipV_1 ? _actualPixelY_T_3 : pixY_1; // @[PPUSimplified.scala 261:31]
+  wire [11:0] _sprPatternAddr_T_4 = {oam_sprTile_1_data, 4'h0}; // @[PPUSimplified.scala 264:61]
+  wire [12:0] _GEN_620 = {{1'd0}, _sprPatternAddr_T_4}; // @[PPUSimplified.scala 264:50]
+  wire [12:0] _sprPatternAddr_T_6 = sprPatternTableBase + _GEN_620; // @[PPUSimplified.scala 264:50]
+  wire [12:0] _GEN_621 = {{4'd0}, actualPixelY_1}; // @[PPUSimplified.scala 264:67]
+  wire [12:0] sprPatternAddr_1 = _sprPatternAddr_T_6 + _GEN_621; // @[PPUSimplified.scala 264:67]
+  wire [8:0] sprBitPos_1 = 9'h7 - actualPixelX_1; // @[PPUSimplified.scala 269:29]
+  wire [7:0] _sprColorLow_T_1 = chrROM_sprPatternLow_1_data >> sprBitPos_1; // @[PPUSimplified.scala 270:42]
+  wire [7:0] sprColorLow_1 = _sprColorLow_T_1 & 8'h1; // @[PPUSimplified.scala 270:56]
+  wire [7:0] _sprColorHigh_T_1 = chrROM_sprPatternHigh_1_data >> sprBitPos_1; // @[PPUSimplified.scala 271:44]
+  wire [7:0] sprColorHigh_1 = _sprColorHigh_T_1 & 8'h1; // @[PPUSimplified.scala 271:58]
+  wire [8:0] _sprPaletteLow_T_1 = {sprColorHigh_1, 1'h0}; // @[PPUSimplified.scala 272:43]
+  wire [8:0] _GEN_622 = {{1'd0}, sprColorLow_1}; // @[PPUSimplified.scala 272:49]
+  wire [8:0] sprPaletteLow_1 = _sprPaletteLow_T_1 | _GEN_622; // @[PPUSimplified.scala 272:49]
+  wire  _T_36 = sprPaletteLow_1 != 9'h0; // @[PPUSimplified.scala 274:28]
+  wire [1:0] spritePaletteIdx_1 = oam_sprAttr_1_data[1:0]; // @[PPUSimplified.scala 275:41]
+  wire [3:0] _sprFullPaletteIndex_T_4 = {spritePaletteIdx_1, 2'h0}; // @[PPUSimplified.scala 276:64]
+  wire [4:0] _GEN_623 = {{1'd0}, _sprFullPaletteIndex_T_4}; // @[PPUSimplified.scala 276:44]
+  wire [4:0] _sprFullPaletteIndex_T_6 = 5'h10 + _GEN_623; // @[PPUSimplified.scala 276:44]
+  wire [8:0] _GEN_624 = {{4'd0}, _sprFullPaletteIndex_T_6}; // @[PPUSimplified.scala 276:70]
+  wire [8:0] sprFullPaletteIndex_1 = _GEN_624 + sprPaletteLow_1; // @[PPUSimplified.scala 276:70]
+  wire [5:0] _GEN_363 = sprPaletteLow_1 != 9'h0 ? palette_sprPaletteColor_1_data[5:0] : 6'h0; // @[PPUSimplified.scala 274:37 279:27 238:31]
+  wire  _GEN_364 = sprPaletteLow_1 != 9'h0 & oam_sprAttr_1_data[5]; // @[PPUSimplified.scala 274:37 281:31 240:35]
+  wire  spriteHits_1 = sprInYRange_1 & sprInXRange_1 & _T_36; // @[PPUSimplified.scala 254:40 55:20]
+  wire [5:0] spriteColors_1 = sprInYRange_1 & sprInXRange_1 ? _GEN_363 : 6'h0; // @[PPUSimplified.scala 238:31 254:40]
+  wire  spritePriorities_1 = sprInYRange_1 & sprInXRange_1 & _GEN_364; // @[PPUSimplified.scala 240:35 254:40]
+  wire [8:0] _GEN_625 = {{1'd0}, oam_sprY_2_data}; // @[PPUSimplified.scala 251:36]
+  wire [7:0] _sprInYRange_T_10 = oam_sprY_2_data + 8'h8; // @[PPUSimplified.scala 251:67]
+  wire [8:0] _GEN_626 = {{1'd0}, _sprInYRange_T_10}; // @[PPUSimplified.scala 251:59]
+  wire  sprInYRange_2 = scanlineY >= _GEN_625 & scanlineY < _GEN_626; // @[PPUSimplified.scala 251:45]
+  wire [8:0] _GEN_627 = {{1'd0}, oam_sprX_2_data}; // @[PPUSimplified.scala 252:36]
+  wire [7:0] _sprInXRange_T_10 = oam_sprX_2_data + 8'h8; // @[PPUSimplified.scala 252:67]
+  wire [8:0] _GEN_628 = {{1'd0}, _sprInXRange_T_10}; // @[PPUSimplified.scala 252:59]
+  wire  sprInXRange_2 = scanlineX >= _GEN_627 & scanlineX < _GEN_628; // @[PPUSimplified.scala 252:45]
+  wire  _T_37 = sprInYRange_2 & sprInXRange_2; // @[PPUSimplified.scala 254:24]
+  wire [8:0] pixY_2 = scanlineY - _GEN_625; // @[PPUSimplified.scala 255:30]
+  wire [8:0] pixX_2 = scanlineX - _GEN_627; // @[PPUSimplified.scala 256:30]
+  wire  flipH_2 = oam_sprAttr_2_data[6]; // @[PPUSimplified.scala 258:28]
+  wire  flipV_2 = oam_sprAttr_2_data[7]; // @[PPUSimplified.scala 259:28]
+  wire [8:0] _actualPixelX_T_5 = 9'h7 - pixX_2; // @[PPUSimplified.scala 260:43]
+  wire [8:0] actualPixelX_2 = flipH_2 ? _actualPixelX_T_5 : pixX_2; // @[PPUSimplified.scala 260:31]
+  wire [8:0] _actualPixelY_T_5 = 9'h7 - pixY_2; // @[PPUSimplified.scala 261:43]
+  wire [8:0] actualPixelY_2 = flipV_2 ? _actualPixelY_T_5 : pixY_2; // @[PPUSimplified.scala 261:31]
+  wire [11:0] _sprPatternAddr_T_8 = {oam_sprTile_2_data, 4'h0}; // @[PPUSimplified.scala 264:61]
+  wire [12:0] _GEN_631 = {{1'd0}, _sprPatternAddr_T_8}; // @[PPUSimplified.scala 264:50]
+  wire [12:0] _sprPatternAddr_T_10 = sprPatternTableBase + _GEN_631; // @[PPUSimplified.scala 264:50]
+  wire [12:0] _GEN_632 = {{4'd0}, actualPixelY_2}; // @[PPUSimplified.scala 264:67]
+  wire [12:0] sprPatternAddr_2 = _sprPatternAddr_T_10 + _GEN_632; // @[PPUSimplified.scala 264:67]
+  wire [8:0] sprBitPos_2 = 9'h7 - actualPixelX_2; // @[PPUSimplified.scala 269:29]
+  wire [7:0] _sprColorLow_T_2 = chrROM_sprPatternLow_2_data >> sprBitPos_2; // @[PPUSimplified.scala 270:42]
+  wire [7:0] sprColorLow_2 = _sprColorLow_T_2 & 8'h1; // @[PPUSimplified.scala 270:56]
+  wire [7:0] _sprColorHigh_T_2 = chrROM_sprPatternHigh_2_data >> sprBitPos_2; // @[PPUSimplified.scala 271:44]
+  wire [7:0] sprColorHigh_2 = _sprColorHigh_T_2 & 8'h1; // @[PPUSimplified.scala 271:58]
+  wire [8:0] _sprPaletteLow_T_2 = {sprColorHigh_2, 1'h0}; // @[PPUSimplified.scala 272:43]
+  wire [8:0] _GEN_633 = {{1'd0}, sprColorLow_2}; // @[PPUSimplified.scala 272:49]
+  wire [8:0] sprPaletteLow_2 = _sprPaletteLow_T_2 | _GEN_633; // @[PPUSimplified.scala 272:49]
+  wire  _T_38 = sprPaletteLow_2 != 9'h0; // @[PPUSimplified.scala 274:28]
+  wire [1:0] spritePaletteIdx_2 = oam_sprAttr_2_data[1:0]; // @[PPUSimplified.scala 275:41]
+  wire [3:0] _sprFullPaletteIndex_T_8 = {spritePaletteIdx_2, 2'h0}; // @[PPUSimplified.scala 276:64]
+  wire [4:0] _GEN_634 = {{1'd0}, _sprFullPaletteIndex_T_8}; // @[PPUSimplified.scala 276:44]
+  wire [4:0] _sprFullPaletteIndex_T_10 = 5'h10 + _GEN_634; // @[PPUSimplified.scala 276:44]
+  wire [8:0] _GEN_635 = {{4'd0}, _sprFullPaletteIndex_T_10}; // @[PPUSimplified.scala 276:70]
+  wire [8:0] sprFullPaletteIndex_2 = _GEN_635 + sprPaletteLow_2; // @[PPUSimplified.scala 276:70]
+  wire [5:0] _GEN_377 = sprPaletteLow_2 != 9'h0 ? palette_sprPaletteColor_2_data[5:0] : 6'h0; // @[PPUSimplified.scala 274:37 279:27 238:31]
+  wire  _GEN_378 = sprPaletteLow_2 != 9'h0 & oam_sprAttr_2_data[5]; // @[PPUSimplified.scala 274:37 281:31 240:35]
+  wire  spriteHits_2 = sprInYRange_2 & sprInXRange_2 & _T_38; // @[PPUSimplified.scala 254:40 55:20]
+  wire [5:0] spriteColors_2 = sprInYRange_2 & sprInXRange_2 ? _GEN_377 : 6'h0; // @[PPUSimplified.scala 238:31 254:40]
+  wire  spritePriorities_2 = sprInYRange_2 & sprInXRange_2 & _GEN_378; // @[PPUSimplified.scala 240:35 254:40]
+  wire [8:0] _GEN_636 = {{1'd0}, oam_sprY_3_data}; // @[PPUSimplified.scala 251:36]
+  wire [7:0] _sprInYRange_T_14 = oam_sprY_3_data + 8'h8; // @[PPUSimplified.scala 251:67]
+  wire [8:0] _GEN_637 = {{1'd0}, _sprInYRange_T_14}; // @[PPUSimplified.scala 251:59]
+  wire  sprInYRange_3 = scanlineY >= _GEN_636 & scanlineY < _GEN_637; // @[PPUSimplified.scala 251:45]
+  wire [8:0] _GEN_638 = {{1'd0}, oam_sprX_3_data}; // @[PPUSimplified.scala 252:36]
+  wire [7:0] _sprInXRange_T_14 = oam_sprX_3_data + 8'h8; // @[PPUSimplified.scala 252:67]
+  wire [8:0] _GEN_639 = {{1'd0}, _sprInXRange_T_14}; // @[PPUSimplified.scala 252:59]
+  wire  sprInXRange_3 = scanlineX >= _GEN_638 & scanlineX < _GEN_639; // @[PPUSimplified.scala 252:45]
+  wire  _T_39 = sprInYRange_3 & sprInXRange_3; // @[PPUSimplified.scala 254:24]
+  wire [8:0] pixY_3 = scanlineY - _GEN_636; // @[PPUSimplified.scala 255:30]
+  wire [8:0] pixX_3 = scanlineX - _GEN_638; // @[PPUSimplified.scala 256:30]
+  wire  flipH_3 = oam_sprAttr_3_data[6]; // @[PPUSimplified.scala 258:28]
+  wire  flipV_3 = oam_sprAttr_3_data[7]; // @[PPUSimplified.scala 259:28]
+  wire [8:0] _actualPixelX_T_7 = 9'h7 - pixX_3; // @[PPUSimplified.scala 260:43]
+  wire [8:0] actualPixelX_3 = flipH_3 ? _actualPixelX_T_7 : pixX_3; // @[PPUSimplified.scala 260:31]
+  wire [8:0] _actualPixelY_T_7 = 9'h7 - pixY_3; // @[PPUSimplified.scala 261:43]
+  wire [8:0] actualPixelY_3 = flipV_3 ? _actualPixelY_T_7 : pixY_3; // @[PPUSimplified.scala 261:31]
+  wire [11:0] _sprPatternAddr_T_12 = {oam_sprTile_3_data, 4'h0}; // @[PPUSimplified.scala 264:61]
+  wire [12:0] _GEN_642 = {{1'd0}, _sprPatternAddr_T_12}; // @[PPUSimplified.scala 264:50]
+  wire [12:0] _sprPatternAddr_T_14 = sprPatternTableBase + _GEN_642; // @[PPUSimplified.scala 264:50]
+  wire [12:0] _GEN_643 = {{4'd0}, actualPixelY_3}; // @[PPUSimplified.scala 264:67]
+  wire [12:0] sprPatternAddr_3 = _sprPatternAddr_T_14 + _GEN_643; // @[PPUSimplified.scala 264:67]
+  wire [8:0] sprBitPos_3 = 9'h7 - actualPixelX_3; // @[PPUSimplified.scala 269:29]
+  wire [7:0] _sprColorLow_T_3 = chrROM_sprPatternLow_3_data >> sprBitPos_3; // @[PPUSimplified.scala 270:42]
+  wire [7:0] sprColorLow_3 = _sprColorLow_T_3 & 8'h1; // @[PPUSimplified.scala 270:56]
+  wire [7:0] _sprColorHigh_T_3 = chrROM_sprPatternHigh_3_data >> sprBitPos_3; // @[PPUSimplified.scala 271:44]
+  wire [7:0] sprColorHigh_3 = _sprColorHigh_T_3 & 8'h1; // @[PPUSimplified.scala 271:58]
+  wire [8:0] _sprPaletteLow_T_3 = {sprColorHigh_3, 1'h0}; // @[PPUSimplified.scala 272:43]
+  wire [8:0] _GEN_644 = {{1'd0}, sprColorLow_3}; // @[PPUSimplified.scala 272:49]
+  wire [8:0] sprPaletteLow_3 = _sprPaletteLow_T_3 | _GEN_644; // @[PPUSimplified.scala 272:49]
+  wire  _T_40 = sprPaletteLow_3 != 9'h0; // @[PPUSimplified.scala 274:28]
+  wire [1:0] spritePaletteIdx_3 = oam_sprAttr_3_data[1:0]; // @[PPUSimplified.scala 275:41]
+  wire [3:0] _sprFullPaletteIndex_T_12 = {spritePaletteIdx_3, 2'h0}; // @[PPUSimplified.scala 276:64]
+  wire [4:0] _GEN_645 = {{1'd0}, _sprFullPaletteIndex_T_12}; // @[PPUSimplified.scala 276:44]
+  wire [4:0] _sprFullPaletteIndex_T_14 = 5'h10 + _GEN_645; // @[PPUSimplified.scala 276:44]
+  wire [8:0] _GEN_646 = {{4'd0}, _sprFullPaletteIndex_T_14}; // @[PPUSimplified.scala 276:70]
+  wire [8:0] sprFullPaletteIndex_3 = _GEN_646 + sprPaletteLow_3; // @[PPUSimplified.scala 276:70]
+  wire [5:0] _GEN_391 = sprPaletteLow_3 != 9'h0 ? palette_sprPaletteColor_3_data[5:0] : 6'h0; // @[PPUSimplified.scala 274:37 279:27 238:31]
+  wire  _GEN_392 = sprPaletteLow_3 != 9'h0 & oam_sprAttr_3_data[5]; // @[PPUSimplified.scala 274:37 281:31 240:35]
+  wire  spriteHits_3 = sprInYRange_3 & sprInXRange_3 & _T_40; // @[PPUSimplified.scala 254:40 55:20]
+  wire [5:0] spriteColors_3 = sprInYRange_3 & sprInXRange_3 ? _GEN_391 : 6'h0; // @[PPUSimplified.scala 238:31 254:40]
+  wire  spritePriorities_3 = sprInYRange_3 & sprInXRange_3 & _GEN_392; // @[PPUSimplified.scala 240:35 254:40]
+  wire [8:0] _GEN_647 = {{1'd0}, oam_sprY_4_data}; // @[PPUSimplified.scala 251:36]
+  wire [7:0] _sprInYRange_T_18 = oam_sprY_4_data + 8'h8; // @[PPUSimplified.scala 251:67]
+  wire [8:0] _GEN_648 = {{1'd0}, _sprInYRange_T_18}; // @[PPUSimplified.scala 251:59]
+  wire  sprInYRange_4 = scanlineY >= _GEN_647 & scanlineY < _GEN_648; // @[PPUSimplified.scala 251:45]
+  wire [8:0] _GEN_649 = {{1'd0}, oam_sprX_4_data}; // @[PPUSimplified.scala 252:36]
+  wire [7:0] _sprInXRange_T_18 = oam_sprX_4_data + 8'h8; // @[PPUSimplified.scala 252:67]
+  wire [8:0] _GEN_650 = {{1'd0}, _sprInXRange_T_18}; // @[PPUSimplified.scala 252:59]
+  wire  sprInXRange_4 = scanlineX >= _GEN_649 & scanlineX < _GEN_650; // @[PPUSimplified.scala 252:45]
+  wire  _T_41 = sprInYRange_4 & sprInXRange_4; // @[PPUSimplified.scala 254:24]
+  wire [8:0] pixY_4 = scanlineY - _GEN_647; // @[PPUSimplified.scala 255:30]
+  wire [8:0] pixX_4 = scanlineX - _GEN_649; // @[PPUSimplified.scala 256:30]
+  wire  flipH_4 = oam_sprAttr_4_data[6]; // @[PPUSimplified.scala 258:28]
+  wire  flipV_4 = oam_sprAttr_4_data[7]; // @[PPUSimplified.scala 259:28]
+  wire [8:0] _actualPixelX_T_9 = 9'h7 - pixX_4; // @[PPUSimplified.scala 260:43]
+  wire [8:0] actualPixelX_4 = flipH_4 ? _actualPixelX_T_9 : pixX_4; // @[PPUSimplified.scala 260:31]
+  wire [8:0] _actualPixelY_T_9 = 9'h7 - pixY_4; // @[PPUSimplified.scala 261:43]
+  wire [8:0] actualPixelY_4 = flipV_4 ? _actualPixelY_T_9 : pixY_4; // @[PPUSimplified.scala 261:31]
+  wire [11:0] _sprPatternAddr_T_16 = {oam_sprTile_4_data, 4'h0}; // @[PPUSimplified.scala 264:61]
+  wire [12:0] _GEN_653 = {{1'd0}, _sprPatternAddr_T_16}; // @[PPUSimplified.scala 264:50]
+  wire [12:0] _sprPatternAddr_T_18 = sprPatternTableBase + _GEN_653; // @[PPUSimplified.scala 264:50]
+  wire [12:0] _GEN_654 = {{4'd0}, actualPixelY_4}; // @[PPUSimplified.scala 264:67]
+  wire [12:0] sprPatternAddr_4 = _sprPatternAddr_T_18 + _GEN_654; // @[PPUSimplified.scala 264:67]
+  wire [8:0] sprBitPos_4 = 9'h7 - actualPixelX_4; // @[PPUSimplified.scala 269:29]
+  wire [7:0] _sprColorLow_T_4 = chrROM_sprPatternLow_4_data >> sprBitPos_4; // @[PPUSimplified.scala 270:42]
+  wire [7:0] sprColorLow_4 = _sprColorLow_T_4 & 8'h1; // @[PPUSimplified.scala 270:56]
+  wire [7:0] _sprColorHigh_T_4 = chrROM_sprPatternHigh_4_data >> sprBitPos_4; // @[PPUSimplified.scala 271:44]
+  wire [7:0] sprColorHigh_4 = _sprColorHigh_T_4 & 8'h1; // @[PPUSimplified.scala 271:58]
+  wire [8:0] _sprPaletteLow_T_4 = {sprColorHigh_4, 1'h0}; // @[PPUSimplified.scala 272:43]
+  wire [8:0] _GEN_655 = {{1'd0}, sprColorLow_4}; // @[PPUSimplified.scala 272:49]
+  wire [8:0] sprPaletteLow_4 = _sprPaletteLow_T_4 | _GEN_655; // @[PPUSimplified.scala 272:49]
+  wire  _T_42 = sprPaletteLow_4 != 9'h0; // @[PPUSimplified.scala 274:28]
+  wire [1:0] spritePaletteIdx_4 = oam_sprAttr_4_data[1:0]; // @[PPUSimplified.scala 275:41]
+  wire [3:0] _sprFullPaletteIndex_T_16 = {spritePaletteIdx_4, 2'h0}; // @[PPUSimplified.scala 276:64]
+  wire [4:0] _GEN_656 = {{1'd0}, _sprFullPaletteIndex_T_16}; // @[PPUSimplified.scala 276:44]
+  wire [4:0] _sprFullPaletteIndex_T_18 = 5'h10 + _GEN_656; // @[PPUSimplified.scala 276:44]
+  wire [8:0] _GEN_657 = {{4'd0}, _sprFullPaletteIndex_T_18}; // @[PPUSimplified.scala 276:70]
+  wire [8:0] sprFullPaletteIndex_4 = _GEN_657 + sprPaletteLow_4; // @[PPUSimplified.scala 276:70]
+  wire [5:0] _GEN_405 = sprPaletteLow_4 != 9'h0 ? palette_sprPaletteColor_4_data[5:0] : 6'h0; // @[PPUSimplified.scala 274:37 279:27 238:31]
+  wire  _GEN_406 = sprPaletteLow_4 != 9'h0 & oam_sprAttr_4_data[5]; // @[PPUSimplified.scala 274:37 281:31 240:35]
+  wire  spriteHits_4 = sprInYRange_4 & sprInXRange_4 & _T_42; // @[PPUSimplified.scala 254:40 55:20]
+  wire [5:0] spriteColors_4 = sprInYRange_4 & sprInXRange_4 ? _GEN_405 : 6'h0; // @[PPUSimplified.scala 238:31 254:40]
+  wire  spritePriorities_4 = sprInYRange_4 & sprInXRange_4 & _GEN_406; // @[PPUSimplified.scala 240:35 254:40]
+  wire [8:0] _GEN_658 = {{1'd0}, oam_sprY_5_data}; // @[PPUSimplified.scala 251:36]
+  wire [7:0] _sprInYRange_T_22 = oam_sprY_5_data + 8'h8; // @[PPUSimplified.scala 251:67]
+  wire [8:0] _GEN_659 = {{1'd0}, _sprInYRange_T_22}; // @[PPUSimplified.scala 251:59]
+  wire  sprInYRange_5 = scanlineY >= _GEN_658 & scanlineY < _GEN_659; // @[PPUSimplified.scala 251:45]
+  wire [8:0] _GEN_660 = {{1'd0}, oam_sprX_5_data}; // @[PPUSimplified.scala 252:36]
+  wire [7:0] _sprInXRange_T_22 = oam_sprX_5_data + 8'h8; // @[PPUSimplified.scala 252:67]
+  wire [8:0] _GEN_661 = {{1'd0}, _sprInXRange_T_22}; // @[PPUSimplified.scala 252:59]
+  wire  sprInXRange_5 = scanlineX >= _GEN_660 & scanlineX < _GEN_661; // @[PPUSimplified.scala 252:45]
+  wire  _T_43 = sprInYRange_5 & sprInXRange_5; // @[PPUSimplified.scala 254:24]
+  wire [8:0] pixY_5 = scanlineY - _GEN_658; // @[PPUSimplified.scala 255:30]
+  wire [8:0] pixX_5 = scanlineX - _GEN_660; // @[PPUSimplified.scala 256:30]
+  wire  flipH_5 = oam_sprAttr_5_data[6]; // @[PPUSimplified.scala 258:28]
+  wire  flipV_5 = oam_sprAttr_5_data[7]; // @[PPUSimplified.scala 259:28]
+  wire [8:0] _actualPixelX_T_11 = 9'h7 - pixX_5; // @[PPUSimplified.scala 260:43]
+  wire [8:0] actualPixelX_5 = flipH_5 ? _actualPixelX_T_11 : pixX_5; // @[PPUSimplified.scala 260:31]
+  wire [8:0] _actualPixelY_T_11 = 9'h7 - pixY_5; // @[PPUSimplified.scala 261:43]
+  wire [8:0] actualPixelY_5 = flipV_5 ? _actualPixelY_T_11 : pixY_5; // @[PPUSimplified.scala 261:31]
+  wire [11:0] _sprPatternAddr_T_20 = {oam_sprTile_5_data, 4'h0}; // @[PPUSimplified.scala 264:61]
+  wire [12:0] _GEN_664 = {{1'd0}, _sprPatternAddr_T_20}; // @[PPUSimplified.scala 264:50]
+  wire [12:0] _sprPatternAddr_T_22 = sprPatternTableBase + _GEN_664; // @[PPUSimplified.scala 264:50]
+  wire [12:0] _GEN_665 = {{4'd0}, actualPixelY_5}; // @[PPUSimplified.scala 264:67]
+  wire [12:0] sprPatternAddr_5 = _sprPatternAddr_T_22 + _GEN_665; // @[PPUSimplified.scala 264:67]
+  wire [8:0] sprBitPos_5 = 9'h7 - actualPixelX_5; // @[PPUSimplified.scala 269:29]
+  wire [7:0] _sprColorLow_T_5 = chrROM_sprPatternLow_5_data >> sprBitPos_5; // @[PPUSimplified.scala 270:42]
+  wire [7:0] sprColorLow_5 = _sprColorLow_T_5 & 8'h1; // @[PPUSimplified.scala 270:56]
+  wire [7:0] _sprColorHigh_T_5 = chrROM_sprPatternHigh_5_data >> sprBitPos_5; // @[PPUSimplified.scala 271:44]
+  wire [7:0] sprColorHigh_5 = _sprColorHigh_T_5 & 8'h1; // @[PPUSimplified.scala 271:58]
+  wire [8:0] _sprPaletteLow_T_5 = {sprColorHigh_5, 1'h0}; // @[PPUSimplified.scala 272:43]
+  wire [8:0] _GEN_666 = {{1'd0}, sprColorLow_5}; // @[PPUSimplified.scala 272:49]
+  wire [8:0] sprPaletteLow_5 = _sprPaletteLow_T_5 | _GEN_666; // @[PPUSimplified.scala 272:49]
+  wire  _T_44 = sprPaletteLow_5 != 9'h0; // @[PPUSimplified.scala 274:28]
+  wire [1:0] spritePaletteIdx_5 = oam_sprAttr_5_data[1:0]; // @[PPUSimplified.scala 275:41]
+  wire [3:0] _sprFullPaletteIndex_T_20 = {spritePaletteIdx_5, 2'h0}; // @[PPUSimplified.scala 276:64]
+  wire [4:0] _GEN_667 = {{1'd0}, _sprFullPaletteIndex_T_20}; // @[PPUSimplified.scala 276:44]
+  wire [4:0] _sprFullPaletteIndex_T_22 = 5'h10 + _GEN_667; // @[PPUSimplified.scala 276:44]
+  wire [8:0] _GEN_668 = {{4'd0}, _sprFullPaletteIndex_T_22}; // @[PPUSimplified.scala 276:70]
+  wire [8:0] sprFullPaletteIndex_5 = _GEN_668 + sprPaletteLow_5; // @[PPUSimplified.scala 276:70]
+  wire [5:0] _GEN_419 = sprPaletteLow_5 != 9'h0 ? palette_sprPaletteColor_5_data[5:0] : 6'h0; // @[PPUSimplified.scala 274:37 279:27 238:31]
+  wire  _GEN_420 = sprPaletteLow_5 != 9'h0 & oam_sprAttr_5_data[5]; // @[PPUSimplified.scala 274:37 281:31 240:35]
+  wire  spriteHits_5 = sprInYRange_5 & sprInXRange_5 & _T_44; // @[PPUSimplified.scala 254:40 55:20]
+  wire [5:0] spriteColors_5 = sprInYRange_5 & sprInXRange_5 ? _GEN_419 : 6'h0; // @[PPUSimplified.scala 238:31 254:40]
+  wire  spritePriorities_5 = sprInYRange_5 & sprInXRange_5 & _GEN_420; // @[PPUSimplified.scala 240:35 254:40]
+  wire [8:0] _GEN_669 = {{1'd0}, oam_sprY_6_data}; // @[PPUSimplified.scala 251:36]
+  wire [7:0] _sprInYRange_T_26 = oam_sprY_6_data + 8'h8; // @[PPUSimplified.scala 251:67]
+  wire [8:0] _GEN_670 = {{1'd0}, _sprInYRange_T_26}; // @[PPUSimplified.scala 251:59]
+  wire  sprInYRange_6 = scanlineY >= _GEN_669 & scanlineY < _GEN_670; // @[PPUSimplified.scala 251:45]
+  wire [8:0] _GEN_671 = {{1'd0}, oam_sprX_6_data}; // @[PPUSimplified.scala 252:36]
+  wire [7:0] _sprInXRange_T_26 = oam_sprX_6_data + 8'h8; // @[PPUSimplified.scala 252:67]
+  wire [8:0] _GEN_672 = {{1'd0}, _sprInXRange_T_26}; // @[PPUSimplified.scala 252:59]
+  wire  sprInXRange_6 = scanlineX >= _GEN_671 & scanlineX < _GEN_672; // @[PPUSimplified.scala 252:45]
+  wire  _T_45 = sprInYRange_6 & sprInXRange_6; // @[PPUSimplified.scala 254:24]
+  wire [8:0] pixY_6 = scanlineY - _GEN_669; // @[PPUSimplified.scala 255:30]
+  wire [8:0] pixX_6 = scanlineX - _GEN_671; // @[PPUSimplified.scala 256:30]
+  wire  flipH_6 = oam_sprAttr_6_data[6]; // @[PPUSimplified.scala 258:28]
+  wire  flipV_6 = oam_sprAttr_6_data[7]; // @[PPUSimplified.scala 259:28]
+  wire [8:0] _actualPixelX_T_13 = 9'h7 - pixX_6; // @[PPUSimplified.scala 260:43]
+  wire [8:0] actualPixelX_6 = flipH_6 ? _actualPixelX_T_13 : pixX_6; // @[PPUSimplified.scala 260:31]
+  wire [8:0] _actualPixelY_T_13 = 9'h7 - pixY_6; // @[PPUSimplified.scala 261:43]
+  wire [8:0] actualPixelY_6 = flipV_6 ? _actualPixelY_T_13 : pixY_6; // @[PPUSimplified.scala 261:31]
+  wire [11:0] _sprPatternAddr_T_24 = {oam_sprTile_6_data, 4'h0}; // @[PPUSimplified.scala 264:61]
+  wire [12:0] _GEN_675 = {{1'd0}, _sprPatternAddr_T_24}; // @[PPUSimplified.scala 264:50]
+  wire [12:0] _sprPatternAddr_T_26 = sprPatternTableBase + _GEN_675; // @[PPUSimplified.scala 264:50]
+  wire [12:0] _GEN_676 = {{4'd0}, actualPixelY_6}; // @[PPUSimplified.scala 264:67]
+  wire [12:0] sprPatternAddr_6 = _sprPatternAddr_T_26 + _GEN_676; // @[PPUSimplified.scala 264:67]
+  wire [8:0] sprBitPos_6 = 9'h7 - actualPixelX_6; // @[PPUSimplified.scala 269:29]
+  wire [7:0] _sprColorLow_T_6 = chrROM_sprPatternLow_6_data >> sprBitPos_6; // @[PPUSimplified.scala 270:42]
+  wire [7:0] sprColorLow_6 = _sprColorLow_T_6 & 8'h1; // @[PPUSimplified.scala 270:56]
+  wire [7:0] _sprColorHigh_T_6 = chrROM_sprPatternHigh_6_data >> sprBitPos_6; // @[PPUSimplified.scala 271:44]
+  wire [7:0] sprColorHigh_6 = _sprColorHigh_T_6 & 8'h1; // @[PPUSimplified.scala 271:58]
+  wire [8:0] _sprPaletteLow_T_6 = {sprColorHigh_6, 1'h0}; // @[PPUSimplified.scala 272:43]
+  wire [8:0] _GEN_677 = {{1'd0}, sprColorLow_6}; // @[PPUSimplified.scala 272:49]
+  wire [8:0] sprPaletteLow_6 = _sprPaletteLow_T_6 | _GEN_677; // @[PPUSimplified.scala 272:49]
+  wire  _T_46 = sprPaletteLow_6 != 9'h0; // @[PPUSimplified.scala 274:28]
+  wire [1:0] spritePaletteIdx_6 = oam_sprAttr_6_data[1:0]; // @[PPUSimplified.scala 275:41]
+  wire [3:0] _sprFullPaletteIndex_T_24 = {spritePaletteIdx_6, 2'h0}; // @[PPUSimplified.scala 276:64]
+  wire [4:0] _GEN_678 = {{1'd0}, _sprFullPaletteIndex_T_24}; // @[PPUSimplified.scala 276:44]
+  wire [4:0] _sprFullPaletteIndex_T_26 = 5'h10 + _GEN_678; // @[PPUSimplified.scala 276:44]
+  wire [8:0] _GEN_679 = {{4'd0}, _sprFullPaletteIndex_T_26}; // @[PPUSimplified.scala 276:70]
+  wire [8:0] sprFullPaletteIndex_6 = _GEN_679 + sprPaletteLow_6; // @[PPUSimplified.scala 276:70]
+  wire [5:0] _GEN_433 = sprPaletteLow_6 != 9'h0 ? palette_sprPaletteColor_6_data[5:0] : 6'h0; // @[PPUSimplified.scala 274:37 279:27 238:31]
+  wire  _GEN_434 = sprPaletteLow_6 != 9'h0 & oam_sprAttr_6_data[5]; // @[PPUSimplified.scala 274:37 281:31 240:35]
+  wire  spriteHits_6 = sprInYRange_6 & sprInXRange_6 & _T_46; // @[PPUSimplified.scala 254:40 55:20]
+  wire [5:0] spriteColors_6 = sprInYRange_6 & sprInXRange_6 ? _GEN_433 : 6'h0; // @[PPUSimplified.scala 238:31 254:40]
+  wire  spritePriorities_6 = sprInYRange_6 & sprInXRange_6 & _GEN_434; // @[PPUSimplified.scala 240:35 254:40]
+  wire [8:0] _GEN_680 = {{1'd0}, oam_sprY_7_data}; // @[PPUSimplified.scala 251:36]
+  wire [7:0] _sprInYRange_T_30 = oam_sprY_7_data + 8'h8; // @[PPUSimplified.scala 251:67]
+  wire [8:0] _GEN_681 = {{1'd0}, _sprInYRange_T_30}; // @[PPUSimplified.scala 251:59]
+  wire  sprInYRange_7 = scanlineY >= _GEN_680 & scanlineY < _GEN_681; // @[PPUSimplified.scala 251:45]
+  wire [8:0] _GEN_682 = {{1'd0}, oam_sprX_7_data}; // @[PPUSimplified.scala 252:36]
+  wire [7:0] _sprInXRange_T_30 = oam_sprX_7_data + 8'h8; // @[PPUSimplified.scala 252:67]
+  wire [8:0] _GEN_683 = {{1'd0}, _sprInXRange_T_30}; // @[PPUSimplified.scala 252:59]
+  wire  sprInXRange_7 = scanlineX >= _GEN_682 & scanlineX < _GEN_683; // @[PPUSimplified.scala 252:45]
+  wire  _T_47 = sprInYRange_7 & sprInXRange_7; // @[PPUSimplified.scala 254:24]
+  wire [8:0] pixY_7 = scanlineY - _GEN_680; // @[PPUSimplified.scala 255:30]
+  wire [8:0] pixX_7 = scanlineX - _GEN_682; // @[PPUSimplified.scala 256:30]
+  wire  flipH_7 = oam_sprAttr_7_data[6]; // @[PPUSimplified.scala 258:28]
+  wire  flipV_7 = oam_sprAttr_7_data[7]; // @[PPUSimplified.scala 259:28]
+  wire [8:0] _actualPixelX_T_15 = 9'h7 - pixX_7; // @[PPUSimplified.scala 260:43]
+  wire [8:0] actualPixelX_7 = flipH_7 ? _actualPixelX_T_15 : pixX_7; // @[PPUSimplified.scala 260:31]
+  wire [8:0] _actualPixelY_T_15 = 9'h7 - pixY_7; // @[PPUSimplified.scala 261:43]
+  wire [8:0] actualPixelY_7 = flipV_7 ? _actualPixelY_T_15 : pixY_7; // @[PPUSimplified.scala 261:31]
+  wire [11:0] _sprPatternAddr_T_28 = {oam_sprTile_7_data, 4'h0}; // @[PPUSimplified.scala 264:61]
+  wire [12:0] _GEN_686 = {{1'd0}, _sprPatternAddr_T_28}; // @[PPUSimplified.scala 264:50]
+  wire [12:0] _sprPatternAddr_T_30 = sprPatternTableBase + _GEN_686; // @[PPUSimplified.scala 264:50]
+  wire [12:0] _GEN_687 = {{4'd0}, actualPixelY_7}; // @[PPUSimplified.scala 264:67]
+  wire [12:0] sprPatternAddr_7 = _sprPatternAddr_T_30 + _GEN_687; // @[PPUSimplified.scala 264:67]
+  wire [8:0] sprBitPos_7 = 9'h7 - actualPixelX_7; // @[PPUSimplified.scala 269:29]
+  wire [7:0] _sprColorLow_T_7 = chrROM_sprPatternLow_7_data >> sprBitPos_7; // @[PPUSimplified.scala 270:42]
+  wire [7:0] sprColorLow_7 = _sprColorLow_T_7 & 8'h1; // @[PPUSimplified.scala 270:56]
+  wire [7:0] _sprColorHigh_T_7 = chrROM_sprPatternHigh_7_data >> sprBitPos_7; // @[PPUSimplified.scala 271:44]
+  wire [7:0] sprColorHigh_7 = _sprColorHigh_T_7 & 8'h1; // @[PPUSimplified.scala 271:58]
+  wire [8:0] _sprPaletteLow_T_7 = {sprColorHigh_7, 1'h0}; // @[PPUSimplified.scala 272:43]
+  wire [8:0] _GEN_688 = {{1'd0}, sprColorLow_7}; // @[PPUSimplified.scala 272:49]
+  wire [8:0] sprPaletteLow_7 = _sprPaletteLow_T_7 | _GEN_688; // @[PPUSimplified.scala 272:49]
+  wire  _T_48 = sprPaletteLow_7 != 9'h0; // @[PPUSimplified.scala 274:28]
+  wire [1:0] spritePaletteIdx_7 = oam_sprAttr_7_data[1:0]; // @[PPUSimplified.scala 275:41]
+  wire [3:0] _sprFullPaletteIndex_T_28 = {spritePaletteIdx_7, 2'h0}; // @[PPUSimplified.scala 276:64]
+  wire [4:0] _GEN_689 = {{1'd0}, _sprFullPaletteIndex_T_28}; // @[PPUSimplified.scala 276:44]
+  wire [4:0] _sprFullPaletteIndex_T_30 = 5'h10 + _GEN_689; // @[PPUSimplified.scala 276:44]
+  wire [8:0] _GEN_690 = {{4'd0}, _sprFullPaletteIndex_T_30}; // @[PPUSimplified.scala 276:70]
+  wire [8:0] sprFullPaletteIndex_7 = _GEN_690 + sprPaletteLow_7; // @[PPUSimplified.scala 276:70]
+  wire [5:0] _GEN_447 = sprPaletteLow_7 != 9'h0 ? palette_sprPaletteColor_7_data[5:0] : 6'h0; // @[PPUSimplified.scala 274:37 279:27 238:31]
+  wire  _GEN_448 = sprPaletteLow_7 != 9'h0 & oam_sprAttr_7_data[5]; // @[PPUSimplified.scala 274:37 281:31 240:35]
+  wire  spriteHits_7 = sprInYRange_7 & sprInXRange_7 & _T_48; // @[PPUSimplified.scala 254:40 55:20]
+  wire [5:0] spriteColors_7 = sprInYRange_7 & sprInXRange_7 ? _GEN_447 : 6'h0; // @[PPUSimplified.scala 238:31 254:40]
+  wire  spritePriorities_7 = sprInYRange_7 & sprInXRange_7 & _GEN_448; // @[PPUSimplified.scala 240:35 254:40]
+  wire [5:0] _GEN_458 = spriteHits_7 ? spriteColors_7 : 6'h0; // @[PPUSimplified.scala 319:31 320:19 287:34]
+  wire  _GEN_460 = spriteHits_7 & spritePriorities_7; // @[PPUSimplified.scala 319:31 322:22 289:37]
+  wire [5:0] _GEN_461 = spriteHits_6 ? spriteColors_6 : _GEN_458; // @[PPUSimplified.scala 315:31 316:19]
+  wire  _GEN_462 = spriteHits_6 | spriteHits_7; // @[PPUSimplified.scala 315:31 317:19]
+  wire  _GEN_463 = spriteHits_6 ? spritePriorities_6 : _GEN_460; // @[PPUSimplified.scala 315:31 318:22]
+  wire [5:0] _GEN_464 = spriteHits_5 ? spriteColors_5 : _GEN_461; // @[PPUSimplified.scala 311:31 312:19]
+  wire  _GEN_465 = spriteHits_5 | _GEN_462; // @[PPUSimplified.scala 311:31 313:19]
+  wire  _GEN_466 = spriteHits_5 ? spritePriorities_5 : _GEN_463; // @[PPUSimplified.scala 311:31 314:22]
+  wire [5:0] _GEN_467 = spriteHits_4 ? spriteColors_4 : _GEN_464; // @[PPUSimplified.scala 307:31 308:19]
+  wire  _GEN_468 = spriteHits_4 | _GEN_465; // @[PPUSimplified.scala 307:31 309:19]
+  wire  _GEN_469 = spriteHits_4 ? spritePriorities_4 : _GEN_466; // @[PPUSimplified.scala 307:31 310:22]
+  wire [5:0] _GEN_470 = spriteHits_3 ? spriteColors_3 : _GEN_467; // @[PPUSimplified.scala 303:31 304:19]
+  wire  _GEN_471 = spriteHits_3 | _GEN_468; // @[PPUSimplified.scala 303:31 305:19]
+  wire  _GEN_472 = spriteHits_3 ? spritePriorities_3 : _GEN_469; // @[PPUSimplified.scala 303:31 306:22]
+  wire [5:0] _GEN_473 = spriteHits_2 ? spriteColors_2 : _GEN_470; // @[PPUSimplified.scala 299:31 300:19]
+  wire  _GEN_474 = spriteHits_2 | _GEN_471; // @[PPUSimplified.scala 299:31 301:19]
+  wire  _GEN_475 = spriteHits_2 ? spritePriorities_2 : _GEN_472; // @[PPUSimplified.scala 299:31 302:22]
+  wire [5:0] _GEN_476 = spriteHits_1 ? spriteColors_1 : _GEN_473; // @[PPUSimplified.scala 295:31 296:19]
+  wire  _GEN_477 = spriteHits_1 | _GEN_474; // @[PPUSimplified.scala 295:31 297:19]
+  wire  _GEN_478 = spriteHits_1 ? spritePriorities_1 : _GEN_475; // @[PPUSimplified.scala 295:31 298:22]
+  wire [5:0] spriteColor = spriteHits_0 ? spriteColors_0 : _GEN_476; // @[PPUSimplified.scala 291:25 292:19]
+  wire  spriteFound = spriteHits_0 | _GEN_477; // @[PPUSimplified.scala 291:25 293:19]
+  wire  spriteBehindBg = spriteHits_0 ? spritePriorities_0 : _GEN_478; // @[PPUSimplified.scala 291:25 294:22]
+  wire [5:0] _pixelColor_T_3 = paletteLow == 9'h2 ? 6'h10 : 6'h30; // @[PPUSimplified.scala 330:24]
+  wire [5:0] _pixelColor_T_4 = paletteLow == 9'h1 ? 6'h0 : _pixelColor_T_3; // @[PPUSimplified.scala 329:24]
+  wire [5:0] _pixelColor_T_5 = _paletteAddr_T ? 6'hf : _pixelColor_T_4; // @[PPUSimplified.scala 328:24]
+  wire  bgTransparent = scanlineX < 9'h100 & scanlineY < 9'hf0 ? _paletteAddr_T : 1'h1; // @[PPUSimplified.scala 201:48 234:19 199:34]
+  wire [5:0] bgColor = scanlineX < 9'h100 & scanlineY < 9'hf0 ? palette_paletteColor_data[5:0] : 6'hf; // @[PPUSimplified.scala 201:48 233:13 198:28]
+  wire [5:0] _GEN_482 = ~bgTransparent ? bgColor : palette_pixelColor_MPORT_data[5:0]; // @[PPUSimplified.scala 334:32 336:18 339:18]
+  wire  _GEN_485 = ~bgTransparent ? 1'h0 : 1'h1; // @[PPUSimplified.scala 334:32 55:20 339:33]
+  wire [5:0] _GEN_486 = spriteFound & (~spriteBehindBg | bgTransparent) ? spriteColor : _GEN_482; // @[PPUSimplified.scala 331:67 333:18]
+  wire  _GEN_489 = spriteFound & (~spriteBehindBg | bgTransparent) ? 1'h0 : _GEN_485; // @[PPUSimplified.scala 331:67 55:20]
+  wire [5:0] _GEN_490 = _T ? _pixelColor_T_5 : _GEN_486; // @[PPUSimplified.scala 326:28 328:18]
+  wire  _GEN_493 = _T ? 1'h0 : _GEN_489; // @[PPUSimplified.scala 326:28 55:20]
+  assign vram_io_cpuDataOut_MPORT_2_en = io_cpuRead & _GEN_105;
   assign vram_io_cpuDataOut_MPORT_2_addr = ppuAddrReg[10:0];
-  assign vram_io_cpuDataOut_MPORT_2_data = vram[vram_io_cpuDataOut_MPORT_2_addr]; // @[PPU.scala 61:17]
+  assign vram_io_cpuDataOut_MPORT_2_data = vram[vram_io_cpuDataOut_MPORT_2_addr]; // @[PPUSimplified.scala 53:17]
   assign vram_tileIndex_en = _T_30 & _T_31;
-  assign vram_tileIndex_addr = _nametableAddr_T + _GEN_348;
-  assign vram_tileIndex_data = vram[vram_tileIndex_addr]; // @[PPU.scala 61:17]
+  assign vram_tileIndex_addr = _nametableAddr_T + _GEN_595;
+  assign vram_tileIndex_data = vram[vram_tileIndex_addr]; // @[PPUSimplified.scala 53:17]
   assign vram_attrByte_en = _T_30 & _T_31;
   assign vram_attrByte_addr = {{1'd0}, attrAddr};
-  assign vram_attrByte_data = vram[vram_attrByte_addr]; // @[PPU.scala 61:17]
-  assign vram_MPORT_3_data = io_cpuDataIn;
-  assign vram_MPORT_3_addr = ppuAddrReg[10:0];
-  assign vram_MPORT_3_mask = 1'h1;
-  assign vram_MPORT_3_en = io_cpuWrite & _GEN_299;
-  assign oam_io_cpuDataOut_MPORT_en = io_cpuRead & _GEN_96;
+  assign vram_attrByte_data = vram[vram_attrByte_addr]; // @[PPUSimplified.scala 53:17]
+  assign vram_MPORT_4_data = io_cpuDataIn;
+  assign vram_MPORT_4_addr = ppuAddrReg[10:0];
+  assign vram_MPORT_4_mask = 1'h1;
+  assign vram_MPORT_4_en = io_cpuWrite & _GEN_306;
+  assign oam_io_cpuDataOut_MPORT_en = io_cpuRead & _GEN_99;
   assign oam_io_cpuDataOut_MPORT_addr = oamAddr;
-  assign oam_io_cpuDataOut_MPORT_data = oam[oam_io_cpuDataOut_MPORT_addr]; // @[PPU.scala 62:16]
-  assign oam_MPORT_1_data = io_cpuDataIn;
-  assign oam_MPORT_1_addr = oamAddr;
+  assign oam_io_cpuDataOut_MPORT_data = oam[oam_io_cpuDataOut_MPORT_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprY_en = _T_30 & _T_31;
+  assign oam_sprY_addr = 8'h0;
+  assign oam_sprY_data = oam[oam_sprY_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprTile_en = _T_30 & _T_31;
+  assign oam_sprTile_addr = 8'h1;
+  assign oam_sprTile_data = oam[oam_sprTile_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprAttr_en = _T_30 & _T_31;
+  assign oam_sprAttr_addr = 8'h2;
+  assign oam_sprAttr_data = oam[oam_sprAttr_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprX_en = _T_30 & _T_31;
+  assign oam_sprX_addr = 8'h3;
+  assign oam_sprX_data = oam[oam_sprX_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprY_1_en = _T_30 & _T_31;
+  assign oam_sprY_1_addr = 8'h4;
+  assign oam_sprY_1_data = oam[oam_sprY_1_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprTile_1_en = _T_30 & _T_31;
+  assign oam_sprTile_1_addr = 8'h5;
+  assign oam_sprTile_1_data = oam[oam_sprTile_1_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprAttr_1_en = _T_30 & _T_31;
+  assign oam_sprAttr_1_addr = 8'h6;
+  assign oam_sprAttr_1_data = oam[oam_sprAttr_1_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprX_1_en = _T_30 & _T_31;
+  assign oam_sprX_1_addr = 8'h7;
+  assign oam_sprX_1_data = oam[oam_sprX_1_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprY_2_en = _T_30 & _T_31;
+  assign oam_sprY_2_addr = 8'h8;
+  assign oam_sprY_2_data = oam[oam_sprY_2_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprTile_2_en = _T_30 & _T_31;
+  assign oam_sprTile_2_addr = 8'h9;
+  assign oam_sprTile_2_data = oam[oam_sprTile_2_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprAttr_2_en = _T_30 & _T_31;
+  assign oam_sprAttr_2_addr = 8'ha;
+  assign oam_sprAttr_2_data = oam[oam_sprAttr_2_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprX_2_en = _T_30 & _T_31;
+  assign oam_sprX_2_addr = 8'hb;
+  assign oam_sprX_2_data = oam[oam_sprX_2_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprY_3_en = _T_30 & _T_31;
+  assign oam_sprY_3_addr = 8'hc;
+  assign oam_sprY_3_data = oam[oam_sprY_3_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprTile_3_en = _T_30 & _T_31;
+  assign oam_sprTile_3_addr = 8'hd;
+  assign oam_sprTile_3_data = oam[oam_sprTile_3_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprAttr_3_en = _T_30 & _T_31;
+  assign oam_sprAttr_3_addr = 8'he;
+  assign oam_sprAttr_3_data = oam[oam_sprAttr_3_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprX_3_en = _T_30 & _T_31;
+  assign oam_sprX_3_addr = 8'hf;
+  assign oam_sprX_3_data = oam[oam_sprX_3_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprY_4_en = _T_30 & _T_31;
+  assign oam_sprY_4_addr = 8'h10;
+  assign oam_sprY_4_data = oam[oam_sprY_4_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprTile_4_en = _T_30 & _T_31;
+  assign oam_sprTile_4_addr = 8'h11;
+  assign oam_sprTile_4_data = oam[oam_sprTile_4_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprAttr_4_en = _T_30 & _T_31;
+  assign oam_sprAttr_4_addr = 8'h12;
+  assign oam_sprAttr_4_data = oam[oam_sprAttr_4_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprX_4_en = _T_30 & _T_31;
+  assign oam_sprX_4_addr = 8'h13;
+  assign oam_sprX_4_data = oam[oam_sprX_4_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprY_5_en = _T_30 & _T_31;
+  assign oam_sprY_5_addr = 8'h14;
+  assign oam_sprY_5_data = oam[oam_sprY_5_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprTile_5_en = _T_30 & _T_31;
+  assign oam_sprTile_5_addr = 8'h15;
+  assign oam_sprTile_5_data = oam[oam_sprTile_5_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprAttr_5_en = _T_30 & _T_31;
+  assign oam_sprAttr_5_addr = 8'h16;
+  assign oam_sprAttr_5_data = oam[oam_sprAttr_5_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprX_5_en = _T_30 & _T_31;
+  assign oam_sprX_5_addr = 8'h17;
+  assign oam_sprX_5_data = oam[oam_sprX_5_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprY_6_en = _T_30 & _T_31;
+  assign oam_sprY_6_addr = 8'h18;
+  assign oam_sprY_6_data = oam[oam_sprY_6_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprTile_6_en = _T_30 & _T_31;
+  assign oam_sprTile_6_addr = 8'h19;
+  assign oam_sprTile_6_data = oam[oam_sprTile_6_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprAttr_6_en = _T_30 & _T_31;
+  assign oam_sprAttr_6_addr = 8'h1a;
+  assign oam_sprAttr_6_data = oam[oam_sprAttr_6_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprX_6_en = _T_30 & _T_31;
+  assign oam_sprX_6_addr = 8'h1b;
+  assign oam_sprX_6_data = oam[oam_sprX_6_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprY_7_en = _T_30 & _T_31;
+  assign oam_sprY_7_addr = 8'h1c;
+  assign oam_sprY_7_data = oam[oam_sprY_7_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprTile_7_en = _T_30 & _T_31;
+  assign oam_sprTile_7_addr = 8'h1d;
+  assign oam_sprTile_7_data = oam[oam_sprTile_7_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprAttr_7_en = _T_30 & _T_31;
+  assign oam_sprAttr_7_addr = 8'h1e;
+  assign oam_sprAttr_7_data = oam[oam_sprAttr_7_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_sprX_7_en = _T_30 & _T_31;
+  assign oam_sprX_7_addr = 8'h1f;
+  assign oam_sprX_7_data = oam[oam_sprX_7_addr]; // @[PPUSimplified.scala 54:16]
+  assign oam_MPORT_1_data = io_oamDmaData;
+  assign oam_MPORT_1_addr = io_oamDmaAddr;
   assign oam_MPORT_1_mask = 1'h1;
-  assign oam_MPORT_1_en = io_cpuWrite & _GEN_285;
-  assign palette_io_cpuDataOut_MPORT_3_en = io_cpuRead & _GEN_105;
+  assign oam_MPORT_1_en = io_oamDmaWrite;
+  assign oam_MPORT_2_data = io_cpuDataIn;
+  assign oam_MPORT_2_addr = oamAddr;
+  assign oam_MPORT_2_mask = 1'h1;
+  assign oam_MPORT_2_en = io_cpuWrite & _GEN_292;
+  assign palette_io_cpuDataOut_MPORT_3_en = io_cpuRead & _GEN_108;
   assign palette_io_cpuDataOut_MPORT_3_addr = ppuAddrReg[4:0];
-  assign palette_io_cpuDataOut_MPORT_3_data = palette[palette_io_cpuDataOut_MPORT_3_addr]; // @[PPU.scala 63:20]
+  assign palette_io_cpuDataOut_MPORT_3_data = palette[palette_io_cpuDataOut_MPORT_3_addr]; // @[PPUSimplified.scala 55:20]
   assign palette_paletteColor_en = _T_30 & _T_31;
   assign palette_paletteColor_addr = paletteAddr[4:0];
-  assign palette_paletteColor_data = palette[palette_paletteColor_addr]; // @[PPU.scala 63:20]
+  assign palette_paletteColor_data = palette[palette_paletteColor_addr]; // @[PPUSimplified.scala 55:20]
+  assign palette_sprPaletteColor_en = _T_32 & spriteHits_0;
+  assign palette_sprPaletteColor_addr = sprFullPaletteIndex[4:0];
+  assign palette_sprPaletteColor_data = palette[palette_sprPaletteColor_addr]; // @[PPUSimplified.scala 55:20]
+  assign palette_sprPaletteColor_1_en = _T_32 & spriteHits_1;
+  assign palette_sprPaletteColor_1_addr = sprFullPaletteIndex_1[4:0];
+  assign palette_sprPaletteColor_1_data = palette[palette_sprPaletteColor_1_addr]; // @[PPUSimplified.scala 55:20]
+  assign palette_sprPaletteColor_2_en = _T_32 & spriteHits_2;
+  assign palette_sprPaletteColor_2_addr = sprFullPaletteIndex_2[4:0];
+  assign palette_sprPaletteColor_2_data = palette[palette_sprPaletteColor_2_addr]; // @[PPUSimplified.scala 55:20]
+  assign palette_sprPaletteColor_3_en = _T_32 & spriteHits_3;
+  assign palette_sprPaletteColor_3_addr = sprFullPaletteIndex_3[4:0];
+  assign palette_sprPaletteColor_3_data = palette[palette_sprPaletteColor_3_addr]; // @[PPUSimplified.scala 55:20]
+  assign palette_sprPaletteColor_4_en = _T_32 & spriteHits_4;
+  assign palette_sprPaletteColor_4_addr = sprFullPaletteIndex_4[4:0];
+  assign palette_sprPaletteColor_4_data = palette[palette_sprPaletteColor_4_addr]; // @[PPUSimplified.scala 55:20]
+  assign palette_sprPaletteColor_5_en = _T_32 & spriteHits_5;
+  assign palette_sprPaletteColor_5_addr = sprFullPaletteIndex_5[4:0];
+  assign palette_sprPaletteColor_5_data = palette[palette_sprPaletteColor_5_addr]; // @[PPUSimplified.scala 55:20]
+  assign palette_sprPaletteColor_6_en = _T_32 & spriteHits_6;
+  assign palette_sprPaletteColor_6_addr = sprFullPaletteIndex_6[4:0];
+  assign palette_sprPaletteColor_6_data = palette[palette_sprPaletteColor_6_addr]; // @[PPUSimplified.scala 55:20]
+  assign palette_sprPaletteColor_7_en = _T_32 & spriteHits_7;
+  assign palette_sprPaletteColor_7_addr = sprFullPaletteIndex_7[4:0];
+  assign palette_sprPaletteColor_7_data = palette[palette_sprPaletteColor_7_addr]; // @[PPUSimplified.scala 55:20]
+  assign palette_pixelColor_MPORT_en = _T_32 & _GEN_493;
+  assign palette_pixelColor_MPORT_addr = 5'h0;
+  assign palette_pixelColor_MPORT_data = palette[palette_pixelColor_MPORT_addr]; // @[PPUSimplified.scala 55:20]
   assign palette_MPORT_data = {{2'd0}, _GEN_31};
   assign palette_MPORT_addr = paletteInitAddr;
   assign palette_MPORT_mask = 1'h1;
   assign palette_MPORT_en = ~paletteInitDone;
-  assign palette_MPORT_4_data = io_cpuDataIn;
-  assign palette_MPORT_4_addr = ppuAddrReg[4:0];
-  assign palette_MPORT_4_mask = 1'h1;
-  assign palette_MPORT_4_en = io_cpuWrite & _GEN_304;
-  assign chrROM_io_cpuDataOut_MPORT_1_en = io_cpuRead & _GEN_99;
+  assign palette_MPORT_5_data = io_cpuDataIn;
+  assign palette_MPORT_5_addr = ppuAddrReg[4:0];
+  assign palette_MPORT_5_mask = 1'h1;
+  assign palette_MPORT_5_en = io_cpuWrite & _GEN_311;
+  assign chrROM_io_cpuDataOut_MPORT_1_en = io_cpuRead & _GEN_102;
   assign chrROM_io_cpuDataOut_MPORT_1_addr = ppuAddrReg[12:0];
-  assign chrROM_io_cpuDataOut_MPORT_1_data = chrROM[chrROM_io_cpuDataOut_MPORT_1_addr]; // @[PPU.scala 64:19]
+  assign chrROM_io_cpuDataOut_MPORT_1_data = chrROM[chrROM_io_cpuDataOut_MPORT_1_addr]; // @[PPUSimplified.scala 56:19]
   assign chrROM_patternLow_en = _T_30 & _T_31;
-  assign chrROM_patternLow_addr = _patternAddr_T_2 + _GEN_353;
-  assign chrROM_patternLow_data = chrROM[chrROM_patternLow_addr]; // @[PPU.scala 64:19]
+  assign chrROM_patternLow_addr = _patternAddr_T_2 + _GEN_600;
+  assign chrROM_patternLow_data = chrROM[chrROM_patternLow_addr]; // @[PPUSimplified.scala 56:19]
   assign chrROM_patternHigh_en = _T_30 & _T_31;
   assign chrROM_patternHigh_addr = patternAddr + 13'h8;
-  assign chrROM_patternHigh_data = chrROM[chrROM_patternHigh_addr]; // @[PPU.scala 64:19]
-  assign chrROM_MPORT_2_data = io_cpuDataIn;
-  assign chrROM_MPORT_2_addr = ppuAddrReg[12:0];
-  assign chrROM_MPORT_2_mask = 1'h1;
-  assign chrROM_MPORT_2_en = io_cpuWrite & _GEN_294;
-  assign chrROM_MPORT_5_data = io_chrLoadData;
-  assign chrROM_MPORT_5_addr = io_chrLoadAddr;
-  assign chrROM_MPORT_5_mask = 1'h1;
-  assign chrROM_MPORT_5_en = io_chrLoadEn;
-  assign io_cpuDataOut = io_cpuRead ? _GEN_90 : 8'h0; // @[PPU.scala 124:17 126:20]
-  assign io_pixelX = renderX; // @[PPU.scala 266:13]
-  assign io_pixelY = renderY; // @[PPU.scala 267:13]
-  assign io_pixelColor = renderX < 9'h100 & renderY < 9'hf0 ? _GEN_339 : 6'hf; // @[PPU.scala 210:31 213:44]
-  assign io_vblank = vblankFlag; // @[PPU.scala 269:13]
-  assign io_debug_ppuCtrl = ppuCtrl; // @[PPU.scala 273:20]
-  assign io_debug_ppuMask = ppuMask; // @[PPU.scala 274:20]
-  assign io_debug_ppuStatus = {vblankFlag,7'h0}; // @[Cat.scala 33:92]
-  assign io_debug_ppuAddrReg = ppuAddrReg; // @[PPU.scala 276:23]
-  assign io_debug_paletteInitDone = paletteInitDone; // @[PPU.scala 277:28]
+  assign chrROM_patternHigh_data = chrROM[chrROM_patternHigh_addr]; // @[PPUSimplified.scala 56:19]
+  assign chrROM_sprPatternLow_en = _T_32 & _T_33;
+  assign chrROM_sprPatternLow_addr = _sprPatternAddr_T_2 + _GEN_610;
+  assign chrROM_sprPatternLow_data = chrROM[chrROM_sprPatternLow_addr]; // @[PPUSimplified.scala 56:19]
+  assign chrROM_sprPatternHigh_en = _T_32 & _T_33;
+  assign chrROM_sprPatternHigh_addr = sprPatternAddr + 13'h8;
+  assign chrROM_sprPatternHigh_data = chrROM[chrROM_sprPatternHigh_addr]; // @[PPUSimplified.scala 56:19]
+  assign chrROM_sprPatternLow_1_en = _T_32 & _T_35;
+  assign chrROM_sprPatternLow_1_addr = _sprPatternAddr_T_6 + _GEN_621;
+  assign chrROM_sprPatternLow_1_data = chrROM[chrROM_sprPatternLow_1_addr]; // @[PPUSimplified.scala 56:19]
+  assign chrROM_sprPatternHigh_1_en = _T_32 & _T_35;
+  assign chrROM_sprPatternHigh_1_addr = sprPatternAddr_1 + 13'h8;
+  assign chrROM_sprPatternHigh_1_data = chrROM[chrROM_sprPatternHigh_1_addr]; // @[PPUSimplified.scala 56:19]
+  assign chrROM_sprPatternLow_2_en = _T_32 & _T_37;
+  assign chrROM_sprPatternLow_2_addr = _sprPatternAddr_T_10 + _GEN_632;
+  assign chrROM_sprPatternLow_2_data = chrROM[chrROM_sprPatternLow_2_addr]; // @[PPUSimplified.scala 56:19]
+  assign chrROM_sprPatternHigh_2_en = _T_32 & _T_37;
+  assign chrROM_sprPatternHigh_2_addr = sprPatternAddr_2 + 13'h8;
+  assign chrROM_sprPatternHigh_2_data = chrROM[chrROM_sprPatternHigh_2_addr]; // @[PPUSimplified.scala 56:19]
+  assign chrROM_sprPatternLow_3_en = _T_32 & _T_39;
+  assign chrROM_sprPatternLow_3_addr = _sprPatternAddr_T_14 + _GEN_643;
+  assign chrROM_sprPatternLow_3_data = chrROM[chrROM_sprPatternLow_3_addr]; // @[PPUSimplified.scala 56:19]
+  assign chrROM_sprPatternHigh_3_en = _T_32 & _T_39;
+  assign chrROM_sprPatternHigh_3_addr = sprPatternAddr_3 + 13'h8;
+  assign chrROM_sprPatternHigh_3_data = chrROM[chrROM_sprPatternHigh_3_addr]; // @[PPUSimplified.scala 56:19]
+  assign chrROM_sprPatternLow_4_en = _T_32 & _T_41;
+  assign chrROM_sprPatternLow_4_addr = _sprPatternAddr_T_18 + _GEN_654;
+  assign chrROM_sprPatternLow_4_data = chrROM[chrROM_sprPatternLow_4_addr]; // @[PPUSimplified.scala 56:19]
+  assign chrROM_sprPatternHigh_4_en = _T_32 & _T_41;
+  assign chrROM_sprPatternHigh_4_addr = sprPatternAddr_4 + 13'h8;
+  assign chrROM_sprPatternHigh_4_data = chrROM[chrROM_sprPatternHigh_4_addr]; // @[PPUSimplified.scala 56:19]
+  assign chrROM_sprPatternLow_5_en = _T_32 & _T_43;
+  assign chrROM_sprPatternLow_5_addr = _sprPatternAddr_T_22 + _GEN_665;
+  assign chrROM_sprPatternLow_5_data = chrROM[chrROM_sprPatternLow_5_addr]; // @[PPUSimplified.scala 56:19]
+  assign chrROM_sprPatternHigh_5_en = _T_32 & _T_43;
+  assign chrROM_sprPatternHigh_5_addr = sprPatternAddr_5 + 13'h8;
+  assign chrROM_sprPatternHigh_5_data = chrROM[chrROM_sprPatternHigh_5_addr]; // @[PPUSimplified.scala 56:19]
+  assign chrROM_sprPatternLow_6_en = _T_32 & _T_45;
+  assign chrROM_sprPatternLow_6_addr = _sprPatternAddr_T_26 + _GEN_676;
+  assign chrROM_sprPatternLow_6_data = chrROM[chrROM_sprPatternLow_6_addr]; // @[PPUSimplified.scala 56:19]
+  assign chrROM_sprPatternHigh_6_en = _T_32 & _T_45;
+  assign chrROM_sprPatternHigh_6_addr = sprPatternAddr_6 + 13'h8;
+  assign chrROM_sprPatternHigh_6_data = chrROM[chrROM_sprPatternHigh_6_addr]; // @[PPUSimplified.scala 56:19]
+  assign chrROM_sprPatternLow_7_en = _T_32 & _T_47;
+  assign chrROM_sprPatternLow_7_addr = _sprPatternAddr_T_30 + _GEN_687;
+  assign chrROM_sprPatternLow_7_data = chrROM[chrROM_sprPatternLow_7_addr]; // @[PPUSimplified.scala 56:19]
+  assign chrROM_sprPatternHigh_7_en = _T_32 & _T_47;
+  assign chrROM_sprPatternHigh_7_addr = sprPatternAddr_7 + 13'h8;
+  assign chrROM_sprPatternHigh_7_data = chrROM[chrROM_sprPatternHigh_7_addr]; // @[PPUSimplified.scala 56:19]
+  assign chrROM_MPORT_3_data = io_cpuDataIn;
+  assign chrROM_MPORT_3_addr = ppuAddrReg[12:0];
+  assign chrROM_MPORT_3_mask = 1'h1;
+  assign chrROM_MPORT_3_en = io_cpuWrite & _GEN_301;
+  assign chrROM_MPORT_6_data = io_chrLoadData;
+  assign chrROM_MPORT_6_addr = io_chrLoadAddr;
+  assign chrROM_MPORT_6_mask = 1'h1;
+  assign chrROM_MPORT_6_en = io_chrLoadEn;
+  assign io_cpuDataOut = io_cpuRead ? _GEN_94 : 8'h0; // @[PPUSimplified.scala 114:17 123:20]
+  assign io_pixelX = scanlineX; // @[PPUSimplified.scala 344:13]
+  assign io_pixelY = scanlineY; // @[PPUSimplified.scala 345:13]
+  assign io_pixelColor = scanlineX < 9'h100 & scanlineY < 9'hf0 ? _GEN_490 : 6'hf; // @[PPUSimplified.scala 195:31 201:48]
+  assign io_vblank = vblankFlag; // @[PPUSimplified.scala 347:13]
+  assign io_nmiOut = nmiOccurred; // @[PPUSimplified.scala 348:13]
+  assign io_debug_ppuCtrl = ppuCtrl; // @[PPUSimplified.scala 351:20]
+  assign io_debug_ppuMask = ppuMask; // @[PPUSimplified.scala 352:20]
+  assign io_debug_ppuStatus = {io_cpuDataOut_hi,6'h0}; // @[Cat.scala 33:92]
+  assign io_debug_ppuAddrReg = ppuAddrReg; // @[PPUSimplified.scala 354:23]
+  assign io_debug_paletteInitDone = paletteInitDone; // @[PPUSimplified.scala 355:28]
   always @(posedge clock) begin
-    if (vram_MPORT_3_en & vram_MPORT_3_mask) begin
-      vram[vram_MPORT_3_addr] <= vram_MPORT_3_data; // @[PPU.scala 61:17]
+    if (vram_MPORT_4_en & vram_MPORT_4_mask) begin
+      vram[vram_MPORT_4_addr] <= vram_MPORT_4_data; // @[PPUSimplified.scala 53:17]
     end
     if (oam_MPORT_1_en & oam_MPORT_1_mask) begin
-      oam[oam_MPORT_1_addr] <= oam_MPORT_1_data; // @[PPU.scala 62:16]
+      oam[oam_MPORT_1_addr] <= oam_MPORT_1_data; // @[PPUSimplified.scala 54:16]
+    end
+    if (oam_MPORT_2_en & oam_MPORT_2_mask) begin
+      oam[oam_MPORT_2_addr] <= oam_MPORT_2_data; // @[PPUSimplified.scala 54:16]
     end
     if (palette_MPORT_en & palette_MPORT_mask) begin
-      palette[palette_MPORT_addr] <= palette_MPORT_data; // @[PPU.scala 63:20]
+      palette[palette_MPORT_addr] <= palette_MPORT_data; // @[PPUSimplified.scala 55:20]
     end
-    if (palette_MPORT_4_en & palette_MPORT_4_mask) begin
-      palette[palette_MPORT_4_addr] <= palette_MPORT_4_data; // @[PPU.scala 63:20]
+    if (palette_MPORT_5_en & palette_MPORT_5_mask) begin
+      palette[palette_MPORT_5_addr] <= palette_MPORT_5_data; // @[PPUSimplified.scala 55:20]
     end
-    if (chrROM_MPORT_2_en & chrROM_MPORT_2_mask) begin
-      chrROM[chrROM_MPORT_2_addr] <= chrROM_MPORT_2_data; // @[PPU.scala 64:19]
+    if (chrROM_MPORT_3_en & chrROM_MPORT_3_mask) begin
+      chrROM[chrROM_MPORT_3_addr] <= chrROM_MPORT_3_data; // @[PPUSimplified.scala 56:19]
     end
-    if (chrROM_MPORT_5_en & chrROM_MPORT_5_mask) begin
-      chrROM[chrROM_MPORT_5_addr] <= chrROM_MPORT_5_data; // @[PPU.scala 64:19]
+    if (chrROM_MPORT_6_en & chrROM_MPORT_6_mask) begin
+      chrROM[chrROM_MPORT_6_addr] <= chrROM_MPORT_6_data; // @[PPUSimplified.scala 56:19]
     end
-    if (reset) begin // @[PPU.scala 51:24]
-      ppuCtrl <= 8'h0; // @[PPU.scala 51:24]
-    end else if (io_cpuWrite) begin // @[PPU.scala 154:21]
-      if (3'h0 == io_cpuAddr) begin // @[PPU.scala 155:24]
-        ppuCtrl <= io_cpuDataIn; // @[PPU.scala 157:17]
+    if (reset) begin // @[PPUSimplified.scala 44:24]
+      ppuCtrl <= 8'h0; // @[PPUSimplified.scala 44:24]
+    end else if (io_cpuWrite) begin // @[PPUSimplified.scala 151:21]
+      if (3'h0 == io_cpuAddr) begin // @[PPUSimplified.scala 152:24]
+        ppuCtrl <= io_cpuDataIn; // @[PPUSimplified.scala 153:27]
       end
     end
-    if (reset) begin // @[PPU.scala 52:24]
-      ppuMask <= 8'h0; // @[PPU.scala 52:24]
-    end else if (io_cpuWrite) begin // @[PPU.scala 154:21]
-      if (!(3'h0 == io_cpuAddr)) begin // @[PPU.scala 155:24]
-        if (3'h1 == io_cpuAddr) begin // @[PPU.scala 155:24]
-          ppuMask <= io_cpuDataIn; // @[PPU.scala 160:17]
+    if (reset) begin // @[PPUSimplified.scala 45:24]
+      ppuMask <= 8'h0; // @[PPUSimplified.scala 45:24]
+    end else if (io_cpuWrite) begin // @[PPUSimplified.scala 151:21]
+      if (!(3'h0 == io_cpuAddr)) begin // @[PPUSimplified.scala 152:24]
+        if (3'h1 == io_cpuAddr) begin // @[PPUSimplified.scala 152:24]
+          ppuMask <= io_cpuDataIn; // @[PPUSimplified.scala 154:27]
         end
       end
     end
-    if (reset) begin // @[PPU.scala 54:24]
-      oamAddr <= 8'h0; // @[PPU.scala 54:24]
-    end else if (io_cpuWrite) begin // @[PPU.scala 154:21]
-      if (!(3'h0 == io_cpuAddr)) begin // @[PPU.scala 155:24]
-        if (!(3'h1 == io_cpuAddr)) begin // @[PPU.scala 155:24]
-          oamAddr <= _GEN_229;
+    if (reset) begin // @[PPUSimplified.scala 46:24]
+      oamAddr <= 8'h0; // @[PPUSimplified.scala 46:24]
+    end else if (io_cpuWrite) begin // @[PPUSimplified.scala 151:21]
+      if (!(3'h0 == io_cpuAddr)) begin // @[PPUSimplified.scala 152:24]
+        if (!(3'h1 == io_cpuAddr)) begin // @[PPUSimplified.scala 152:24]
+          oamAddr <= _GEN_236;
         end
       end
     end
-    if (reset) begin // @[PPU.scala 57:29]
-      ppuAddrLatch <= 1'h0; // @[PPU.scala 57:29]
-    end else if (io_cpuWrite) begin // @[PPU.scala 154:21]
-      if (3'h0 == io_cpuAddr) begin // @[PPU.scala 155:24]
-        ppuAddrLatch <= _GEN_110;
-      end else if (3'h1 == io_cpuAddr) begin // @[PPU.scala 155:24]
-        ppuAddrLatch <= _GEN_110;
+    if (reset) begin // @[PPUSimplified.scala 49:29]
+      ppuAddrLatch <= 1'h0; // @[PPUSimplified.scala 49:29]
+    end else if (io_cpuWrite) begin // @[PPUSimplified.scala 151:21]
+      if (3'h0 == io_cpuAddr) begin // @[PPUSimplified.scala 152:24]
+        ppuAddrLatch <= _GEN_112;
+      end else if (3'h1 == io_cpuAddr) begin // @[PPUSimplified.scala 152:24]
+        ppuAddrLatch <= _GEN_112;
       end else begin
-        ppuAddrLatch <= _GEN_237;
+        ppuAddrLatch <= _GEN_244;
       end
     end else begin
-      ppuAddrLatch <= _GEN_110;
+      ppuAddrLatch <= _GEN_112;
     end
-    if (reset) begin // @[PPU.scala 58:27]
-      ppuAddrReg <= 16'h0; // @[PPU.scala 58:27]
-    end else if (io_cpuWrite) begin // @[PPU.scala 154:21]
-      if (3'h0 == io_cpuAddr) begin // @[PPU.scala 155:24]
-        ppuAddrReg <= _GEN_123;
-      end else if (3'h1 == io_cpuAddr) begin // @[PPU.scala 155:24]
-        ppuAddrReg <= _GEN_123;
+    if (reset) begin // @[PPUSimplified.scala 50:27]
+      ppuAddrReg <= 16'h0; // @[PPUSimplified.scala 50:27]
+    end else if (io_cpuWrite) begin // @[PPUSimplified.scala 151:21]
+      if (3'h0 == io_cpuAddr) begin // @[PPUSimplified.scala 152:24]
+        ppuAddrReg <= _GEN_125;
+      end else if (3'h1 == io_cpuAddr) begin // @[PPUSimplified.scala 152:24]
+        ppuAddrReg <= _GEN_125;
       end else begin
-        ppuAddrReg <= _GEN_238;
+        ppuAddrReg <= _GEN_245;
       end
     end else begin
-      ppuAddrReg <= _GEN_123;
+      ppuAddrReg <= _GEN_125;
     end
-    if (reset) begin // @[PPU.scala 67:32]
-      paletteInitDone <= 1'h0; // @[PPU.scala 67:32]
-    end else if (~paletteInitDone) begin // @[PPU.scala 70:26]
+    if (reset) begin // @[PPUSimplified.scala 59:32]
+      paletteInitDone <= 1'h0; // @[PPUSimplified.scala 59:32]
+    end else if (~paletteInitDone) begin // @[PPUSimplified.scala 62:26]
       paletteInitDone <= _GEN_32;
     end
-    if (reset) begin // @[PPU.scala 68:32]
-      paletteInitAddr <= 5'h0; // @[PPU.scala 68:32]
-    end else if (~paletteInitDone) begin // @[PPU.scala 70:26]
-      paletteInitAddr <= _paletteInitAddr_T_1; // @[PPU.scala 84:21]
+    if (reset) begin // @[PPUSimplified.scala 60:32]
+      paletteInitAddr <= 5'h0; // @[PPUSimplified.scala 60:32]
+    end else if (~paletteInitDone) begin // @[PPUSimplified.scala 62:26]
+      paletteInitAddr <= _paletteInitAddr_T_1; // @[PPUSimplified.scala 75:21]
     end
-    if (reset) begin // @[PPU.scala 92:26]
-      renderX <= 9'h0; // @[PPU.scala 92:26]
-    end else if (renderX == 9'h154) begin // @[PPU.scala 101:29]
-      renderX <= 9'h0; // @[PPU.scala 102:15]
+    if (reset) begin // @[PPUSimplified.scala 83:26]
+      scanlineX <= 9'h0; // @[PPUSimplified.scala 83:26]
+    end else if (scanlineX == 9'h154) begin // @[PPUSimplified.scala 87:29]
+      scanlineX <= 9'h0; // @[PPUSimplified.scala 88:15]
     end else begin
-      renderX <= _scanlineX_T_1; // @[PPU.scala 100:13]
+      scanlineX <= _scanlineX_T_1; // @[PPUSimplified.scala 86:13]
     end
-    if (reset) begin // @[PPU.scala 93:26]
-      renderY <= 9'h0; // @[PPU.scala 93:26]
-    end else if (renderX == 9'h154) begin // @[PPU.scala 101:29]
-      if (renderY == 9'h105) begin // @[PPU.scala 105:31]
-        renderY <= 9'h0; // @[PPU.scala 106:17]
+    if (reset) begin // @[PPUSimplified.scala 84:26]
+      scanlineY <= 9'h0; // @[PPUSimplified.scala 84:26]
+    end else if (scanlineX == 9'h154) begin // @[PPUSimplified.scala 87:29]
+      if (scanlineY == 9'h105) begin // @[PPUSimplified.scala 90:31]
+        scanlineY <= 9'h0; // @[PPUSimplified.scala 91:17]
       end else begin
-        renderY <= _scanlineY_T_1; // @[PPU.scala 103:15]
+        scanlineY <= _scanlineY_T_1; // @[PPUSimplified.scala 89:15]
       end
     end
-    if (reset) begin // @[PPU.scala 96:27]
-      vblankFlag <= 1'h0; // @[PPU.scala 96:27]
-    end else if (io_cpuRead) begin // @[PPU.scala 126:20]
-      if (3'h2 == io_cpuAddr) begin // @[PPU.scala 127:24]
-        vblankFlag <= 1'h0; // @[PPU.scala 130:20]
-      end else begin
-        vblankFlag <= _GEN_46;
-      end
+    if (reset) begin // @[PPUSimplified.scala 96:27]
+      vblankFlag <= 1'h0; // @[PPUSimplified.scala 96:27]
+    end else if (vblankClearNext) begin // @[PPUSimplified.scala 117:25]
+      vblankFlag <= 1'h0; // @[PPUSimplified.scala 118:16]
+    end else if (_T_3 & _T_5) begin // @[PPUSimplified.scala 107:50]
+      vblankFlag <= 1'h0; // @[PPUSimplified.scala 108:16]
     end else begin
-      vblankFlag <= _GEN_46;
+      vblankFlag <= _GEN_44;
+    end
+    if (reset) begin // @[PPUSimplified.scala 97:28]
+      nmiOccurred <= 1'h0; // @[PPUSimplified.scala 97:28]
+    end else if (vblankClearNext) begin // @[PPUSimplified.scala 117:25]
+      nmiOccurred <= 1'h0; // @[PPUSimplified.scala 119:17]
+    end else if (_T_3 & _T_5) begin // @[PPUSimplified.scala 107:50]
+      nmiOccurred <= 1'h0; // @[PPUSimplified.scala 109:17]
+    end else if (scanlineY == 9'hf1 & scanlineX == 9'h1) begin // @[PPUSimplified.scala 100:50]
+      nmiOccurred <= _GEN_43;
+    end
+    if (reset) begin // @[PPUSimplified.scala 116:32]
+      vblankClearNext <= 1'h0; // @[PPUSimplified.scala 116:32]
+    end else if (io_cpuRead) begin // @[PPUSimplified.scala 123:20]
+      vblankClearNext <= _GEN_95;
+    end else if (vblankClearNext) begin // @[PPUSimplified.scala 117:25]
+      vblankClearNext <= 1'h0; // @[PPUSimplified.scala 120:21]
     end
   end
 endmodule
 module MemoryController(
   input         clock,
+  input         reset,
   input  [15:0] io_cpuAddr,
   input  [7:0]  io_cpuDataIn,
   output [7:0]  io_cpuDataOut,
@@ -3059,6 +3835,9 @@ module MemoryController(
   input  [7:0]  io_ppuDataOut,
   output        io_ppuWrite,
   output        io_ppuRead,
+  output [7:0]  io_oamDmaAddr,
+  output [7:0]  io_oamDmaData,
+  output        io_oamDmaWrite,
   input  [7:0]  io_controller1,
   input  [7:0]  io_controller2,
   input         io_romLoadEn,
@@ -3066,90 +3845,166 @@ module MemoryController(
   input  [7:0]  io_romLoadData,
   input         io_romLoadPRG
 );
-  reg [7:0] internalRAM [0:2047]; // @[MemoryController.scala 35:32]
-  wire  internalRAM_io_cpuDataOut_MPORT_en; // @[MemoryController.scala 35:32]
-  wire [10:0] internalRAM_io_cpuDataOut_MPORT_addr; // @[MemoryController.scala 35:32]
-  wire [7:0] internalRAM_io_cpuDataOut_MPORT_data; // @[MemoryController.scala 35:32]
-  wire [7:0] internalRAM_MPORT_data; // @[MemoryController.scala 35:32]
-  wire [10:0] internalRAM_MPORT_addr; // @[MemoryController.scala 35:32]
-  wire  internalRAM_MPORT_mask; // @[MemoryController.scala 35:32]
-  wire  internalRAM_MPORT_en; // @[MemoryController.scala 35:32]
+  reg [7:0] internalRAM [0:2047]; // @[MemoryController.scala 41:32]
+  wire  internalRAM_io_cpuDataOut_MPORT_en; // @[MemoryController.scala 41:32]
+  wire [10:0] internalRAM_io_cpuDataOut_MPORT_addr; // @[MemoryController.scala 41:32]
+  wire [7:0] internalRAM_io_cpuDataOut_MPORT_data; // @[MemoryController.scala 41:32]
+  wire  internalRAM_dmaData_MPORT_en; // @[MemoryController.scala 41:32]
+  wire [10:0] internalRAM_dmaData_MPORT_addr; // @[MemoryController.scala 41:32]
+  wire [7:0] internalRAM_dmaData_MPORT_data; // @[MemoryController.scala 41:32]
+  wire [7:0] internalRAM_MPORT_data; // @[MemoryController.scala 41:32]
+  wire [10:0] internalRAM_MPORT_addr; // @[MemoryController.scala 41:32]
+  wire  internalRAM_MPORT_mask; // @[MemoryController.scala 41:32]
+  wire  internalRAM_MPORT_en; // @[MemoryController.scala 41:32]
   reg  internalRAM_io_cpuDataOut_MPORT_en_pipe_0;
   reg [10:0] internalRAM_io_cpuDataOut_MPORT_addr_pipe_0;
-  reg [7:0] prgROM [0:32767]; // @[MemoryController.scala 39:19]
-  wire  prgROM_io_cpuDataOut_MPORT_1_en; // @[MemoryController.scala 39:19]
-  wire [14:0] prgROM_io_cpuDataOut_MPORT_1_addr; // @[MemoryController.scala 39:19]
-  wire [7:0] prgROM_io_cpuDataOut_MPORT_1_data; // @[MemoryController.scala 39:19]
-  wire [7:0] prgROM_MPORT_1_data; // @[MemoryController.scala 39:19]
-  wire [14:0] prgROM_MPORT_1_addr; // @[MemoryController.scala 39:19]
-  wire  prgROM_MPORT_1_mask; // @[MemoryController.scala 39:19]
-  wire  prgROM_MPORT_1_en; // @[MemoryController.scala 39:19]
-  wire [7:0] prgROM_MPORT_2_data; // @[MemoryController.scala 39:19]
-  wire [14:0] prgROM_MPORT_2_addr; // @[MemoryController.scala 39:19]
-  wire  prgROM_MPORT_2_mask; // @[MemoryController.scala 39:19]
-  wire  prgROM_MPORT_2_en; // @[MemoryController.scala 39:19]
-  wire  _T = io_cpuAddr < 16'h2000; // @[MemoryController.scala 58:21]
-  wire  _T_3 = io_cpuAddr >= 16'h2000 & io_cpuAddr < 16'h4000; // @[MemoryController.scala 62:39]
-  wire  _T_6 = io_cpuAddr >= 16'h8000; // @[MemoryController.scala 73:27]
-  wire [15:0] _romAddr_T_1 = io_cpuAddr - 16'h8000; // @[MemoryController.scala 78:33]
-  wire [13:0] romAddr = _romAddr_T_1[13:0]; // @[MemoryController.scala 78:44]
-  wire [7:0] _GEN_7 = io_cpuAddr >= 16'h8000 ? prgROM_io_cpuDataOut_MPORT_1_data : 8'h0; // @[MemoryController.scala 42:17 73:40 79:21]
-  wire [7:0] _GEN_8 = io_cpuAddr == 16'h4017 ? io_controller2 : _GEN_7; // @[MemoryController.scala 70:41 72:21]
-  wire  _GEN_11 = io_cpuAddr == 16'h4017 ? 1'h0 : _T_6; // @[MemoryController.scala 39:19 70:41]
-  wire [7:0] _GEN_12 = io_cpuAddr == 16'h4016 ? io_controller1 : _GEN_8; // @[MemoryController.scala 67:41 69:21]
-  wire  _GEN_15 = io_cpuAddr == 16'h4016 ? 1'h0 : _GEN_11; // @[MemoryController.scala 39:19 67:41]
-  wire [2:0] _GEN_16 = io_cpuAddr >= 16'h2000 & io_cpuAddr < 16'h4000 ? io_cpuAddr[2:0] : 3'h0; // @[MemoryController.scala 43:14 62:65 64:18]
-  wire [7:0] _GEN_18 = io_cpuAddr >= 16'h2000 & io_cpuAddr < 16'h4000 ? io_ppuDataOut : _GEN_12; // @[MemoryController.scala 62:65 66:21]
-  wire  _GEN_21 = io_cpuAddr >= 16'h2000 & io_cpuAddr < 16'h4000 ? 1'h0 : _GEN_15; // @[MemoryController.scala 39:19 62:65]
-  wire [7:0] _GEN_25 = io_cpuAddr < 16'h2000 ? internalRAM_io_cpuDataOut_MPORT_data : _GEN_18; // @[MemoryController.scala 58:33 61:21]
-  wire [2:0] _GEN_26 = io_cpuAddr < 16'h2000 ? 3'h0 : _GEN_16; // @[MemoryController.scala 43:14 58:33]
-  wire  _GEN_27 = io_cpuAddr < 16'h2000 ? 1'h0 : _T_3; // @[MemoryController.scala 46:14 58:33]
-  wire  _GEN_30 = io_cpuAddr < 16'h2000 ? 1'h0 : _GEN_21; // @[MemoryController.scala 39:19 58:33]
-  wire [2:0] _GEN_35 = io_cpuRead ? _GEN_26 : 3'h0; // @[MemoryController.scala 43:14 57:20]
-  wire [2:0] _GEN_45 = _T_3 ? io_cpuAddr[2:0] : _GEN_35; // @[MemoryController.scala 89:65 91:18]
-  wire [7:0] _GEN_46 = _T_3 ? io_cpuDataIn : 8'h0; // @[MemoryController.scala 44:16 89:65 92:20]
-  wire  _GEN_50 = _T_3 ? 1'h0 : _T_6; // @[MemoryController.scala 39:19 89:65]
-  wire [2:0] _GEN_58 = _T ? _GEN_35 : _GEN_45; // @[MemoryController.scala 85:33]
-  wire [7:0] _GEN_59 = _T ? 8'h0 : _GEN_46; // @[MemoryController.scala 44:16 85:33]
-  wire  _GEN_63 = _T ? 1'h0 : _GEN_50; // @[MemoryController.scala 39:19 85:33]
-  wire  _T_13 = io_romLoadEn & io_romLoadPRG; // @[MemoryController.scala 102:21]
-  wire  _T_14 = io_romLoadAddr < 16'h8000; // @[MemoryController.scala 104:25]
+  reg  internalRAM_dmaData_MPORT_en_pipe_0;
+  reg [10:0] internalRAM_dmaData_MPORT_addr_pipe_0;
+  reg [7:0] prgROM [0:32767]; // @[MemoryController.scala 45:19]
+  wire  prgROM_io_cpuDataOut_MPORT_1_en; // @[MemoryController.scala 45:19]
+  wire [14:0] prgROM_io_cpuDataOut_MPORT_1_addr; // @[MemoryController.scala 45:19]
+  wire [7:0] prgROM_io_cpuDataOut_MPORT_1_data; // @[MemoryController.scala 45:19]
+  wire  prgROM_dmaData_MPORT_1_en; // @[MemoryController.scala 45:19]
+  wire [14:0] prgROM_dmaData_MPORT_1_addr; // @[MemoryController.scala 45:19]
+  wire [7:0] prgROM_dmaData_MPORT_1_data; // @[MemoryController.scala 45:19]
+  wire [7:0] prgROM_MPORT_1_data; // @[MemoryController.scala 45:19]
+  wire [14:0] prgROM_MPORT_1_addr; // @[MemoryController.scala 45:19]
+  wire  prgROM_MPORT_1_mask; // @[MemoryController.scala 45:19]
+  wire  prgROM_MPORT_1_en; // @[MemoryController.scala 45:19]
+  wire [7:0] prgROM_MPORT_2_data; // @[MemoryController.scala 45:19]
+  wire [14:0] prgROM_MPORT_2_addr; // @[MemoryController.scala 45:19]
+  wire  prgROM_MPORT_2_mask; // @[MemoryController.scala 45:19]
+  wire  prgROM_MPORT_2_en; // @[MemoryController.scala 45:19]
+  reg  dmaActive; // @[MemoryController.scala 48:26]
+  reg [7:0] dmaPage; // @[MemoryController.scala 49:24]
+  reg [7:0] dmaOffset; // @[MemoryController.scala 50:26]
+  wire  _T = io_cpuAddr < 16'h2000; // @[MemoryController.scala 73:21]
+  wire  _T_3 = io_cpuAddr >= 16'h2000 & io_cpuAddr < 16'h4000; // @[MemoryController.scala 77:39]
+  wire  _T_6 = io_cpuAddr >= 16'h8000; // @[MemoryController.scala 88:27]
+  wire [15:0] _romAddr_T_1 = io_cpuAddr - 16'h8000; // @[MemoryController.scala 93:33]
+  wire [13:0] romAddr = _romAddr_T_1[13:0]; // @[MemoryController.scala 93:44]
+  wire [7:0] _GEN_7 = io_cpuAddr >= 16'h8000 ? prgROM_io_cpuDataOut_MPORT_1_data : 8'h0; // @[MemoryController.scala 53:17 88:40 94:21]
+  wire [7:0] _GEN_8 = io_cpuAddr == 16'h4017 ? io_controller2 : _GEN_7; // @[MemoryController.scala 85:41 87:21]
+  wire  _GEN_11 = io_cpuAddr == 16'h4017 ? 1'h0 : _T_6; // @[MemoryController.scala 45:19 85:41]
+  wire [7:0] _GEN_12 = io_cpuAddr == 16'h4016 ? io_controller1 : _GEN_8; // @[MemoryController.scala 82:41 84:21]
+  wire  _GEN_15 = io_cpuAddr == 16'h4016 ? 1'h0 : _GEN_11; // @[MemoryController.scala 45:19 82:41]
+  wire [2:0] _GEN_16 = io_cpuAddr >= 16'h2000 & io_cpuAddr < 16'h4000 ? io_cpuAddr[2:0] : 3'h0; // @[MemoryController.scala 54:14 77:65 79:18]
+  wire [7:0] _GEN_18 = io_cpuAddr >= 16'h2000 & io_cpuAddr < 16'h4000 ? io_ppuDataOut : _GEN_12; // @[MemoryController.scala 77:65 81:21]
+  wire  _GEN_21 = io_cpuAddr >= 16'h2000 & io_cpuAddr < 16'h4000 ? 1'h0 : _GEN_15; // @[MemoryController.scala 45:19 77:65]
+  wire [7:0] _GEN_25 = io_cpuAddr < 16'h2000 ? internalRAM_io_cpuDataOut_MPORT_data : _GEN_18; // @[MemoryController.scala 73:33 76:21]
+  wire [2:0] _GEN_26 = io_cpuAddr < 16'h2000 ? 3'h0 : _GEN_16; // @[MemoryController.scala 54:14 73:33]
+  wire  _GEN_27 = io_cpuAddr < 16'h2000 ? 1'h0 : _T_3; // @[MemoryController.scala 57:14 73:33]
+  wire  _GEN_30 = io_cpuAddr < 16'h2000 ? 1'h0 : _GEN_21; // @[MemoryController.scala 45:19 73:33]
+  wire [2:0] _GEN_35 = io_cpuRead ? _GEN_26 : 3'h0; // @[MemoryController.scala 54:14 72:20]
+  wire [15:0] dmaAddr = {dmaPage,dmaOffset}; // @[Cat.scala 33:92]
+  wire  _T_7 = dmaAddr < 16'h2000; // @[MemoryController.scala 106:18]
+  wire  _T_8 = dmaAddr >= 16'h8000; // @[MemoryController.scala 108:24]
+  wire [15:0] _romAddr_T_3 = dmaAddr - 16'h8000; // @[MemoryController.scala 109:30]
+  wire [13:0] romAddr_1 = _romAddr_T_3[13:0]; // @[MemoryController.scala 109:41]
+  wire [7:0] _GEN_45 = dmaAddr >= 16'h8000 ? prgROM_dmaData_MPORT_1_data : 8'h0; // @[MemoryController.scala 108:37 110:15 103:30]
+  wire [7:0] dmaData = dmaAddr < 16'h2000 ? internalRAM_dmaData_MPORT_data : _GEN_45; // @[MemoryController.scala 106:30 107:15]
+  wire  _GEN_52 = dmaAddr < 16'h2000 ? 1'h0 : _T_8; // @[MemoryController.scala 106:30 45:19]
+  wire [7:0] _dmaOffset_T_1 = dmaOffset + 8'h1; // @[MemoryController.scala 119:28]
+  wire  _GEN_53 = dmaOffset == 8'hff ? 1'h0 : dmaActive; // @[MemoryController.scala 122:31 123:17 48:26]
+  wire [7:0] _GEN_63 = dmaActive ? _dmaOffset_T_1 : dmaOffset; // @[MemoryController.scala 100:19 119:15 50:26]
+  wire  _GEN_64 = dmaActive ? _GEN_53 : dmaActive; // @[MemoryController.scala 100:19 48:26]
+  wire  _T_11 = io_cpuWrite & ~dmaActive; // @[MemoryController.scala 127:20]
+  wire  _GEN_70 = io_cpuAddr == 16'h4014 | _GEN_64; // @[MemoryController.scala 137:41 139:17]
+  wire [7:0] _GEN_71 = io_cpuAddr == 16'h4014 ? io_cpuDataIn : dmaPage; // @[MemoryController.scala 137:41 140:15 49:24]
+  wire [7:0] _GEN_72 = io_cpuAddr == 16'h4014 ? 8'h0 : _GEN_63; // @[MemoryController.scala 137:41 141:17]
+  wire  _GEN_75 = io_cpuAddr == 16'h4014 ? 1'h0 : _T_6; // @[MemoryController.scala 137:41 45:19]
+  wire [2:0] _GEN_78 = _T_3 ? io_cpuAddr[2:0] : _GEN_35; // @[MemoryController.scala 132:65 134:18]
+  wire [7:0] _GEN_79 = _T_3 ? io_cpuDataIn : 8'h0; // @[MemoryController.scala 132:65 135:20 55:16]
+  wire  _GEN_86 = _T_3 ? 1'h0 : _GEN_75; // @[MemoryController.scala 132:65 45:19]
+  wire [2:0] _GEN_94 = _T ? _GEN_35 : _GEN_78; // @[MemoryController.scala 128:33]
+  wire [7:0] _GEN_95 = _T ? 8'h0 : _GEN_79; // @[MemoryController.scala 128:33 55:16]
+  wire  _GEN_102 = _T ? 1'h0 : _GEN_86; // @[MemoryController.scala 128:33 45:19]
+  wire  _T_19 = io_romLoadEn & io_romLoadPRG; // @[MemoryController.scala 150:21]
+  wire  _T_20 = io_romLoadAddr < 16'h8000; // @[MemoryController.scala 152:25]
   assign internalRAM_io_cpuDataOut_MPORT_en = internalRAM_io_cpuDataOut_MPORT_en_pipe_0;
   assign internalRAM_io_cpuDataOut_MPORT_addr = internalRAM_io_cpuDataOut_MPORT_addr_pipe_0;
-  assign internalRAM_io_cpuDataOut_MPORT_data = internalRAM[internalRAM_io_cpuDataOut_MPORT_addr]; // @[MemoryController.scala 35:32]
+  assign internalRAM_io_cpuDataOut_MPORT_data = internalRAM[internalRAM_io_cpuDataOut_MPORT_addr]; // @[MemoryController.scala 41:32]
+  assign internalRAM_dmaData_MPORT_en = internalRAM_dmaData_MPORT_en_pipe_0;
+  assign internalRAM_dmaData_MPORT_addr = internalRAM_dmaData_MPORT_addr_pipe_0;
+  assign internalRAM_dmaData_MPORT_data = internalRAM[internalRAM_dmaData_MPORT_addr]; // @[MemoryController.scala 41:32]
   assign internalRAM_MPORT_data = io_cpuDataIn;
   assign internalRAM_MPORT_addr = io_cpuAddr[10:0];
   assign internalRAM_MPORT_mask = 1'h1;
-  assign internalRAM_MPORT_en = io_cpuWrite & _T;
+  assign internalRAM_MPORT_en = _T_11 & _T;
   assign prgROM_io_cpuDataOut_MPORT_1_en = io_cpuRead & _GEN_30;
   assign prgROM_io_cpuDataOut_MPORT_1_addr = {{1'd0}, romAddr};
-  assign prgROM_io_cpuDataOut_MPORT_1_data = prgROM[prgROM_io_cpuDataOut_MPORT_1_addr]; // @[MemoryController.scala 39:19]
+  assign prgROM_io_cpuDataOut_MPORT_1_data = prgROM[prgROM_io_cpuDataOut_MPORT_1_addr]; // @[MemoryController.scala 45:19]
+  assign prgROM_dmaData_MPORT_1_en = dmaActive & _GEN_52;
+  assign prgROM_dmaData_MPORT_1_addr = {{1'd0}, romAddr_1};
+  assign prgROM_dmaData_MPORT_1_data = prgROM[prgROM_dmaData_MPORT_1_addr]; // @[MemoryController.scala 45:19]
   assign prgROM_MPORT_1_data = io_cpuDataIn;
   assign prgROM_MPORT_1_addr = _romAddr_T_1[14:0];
   assign prgROM_MPORT_1_mask = 1'h1;
-  assign prgROM_MPORT_1_en = io_cpuWrite & _GEN_63;
+  assign prgROM_MPORT_1_en = _T_11 & _GEN_102;
   assign prgROM_MPORT_2_data = io_romLoadData;
   assign prgROM_MPORT_2_addr = io_romLoadAddr[14:0];
   assign prgROM_MPORT_2_mask = 1'h1;
-  assign prgROM_MPORT_2_en = _T_13 & _T_14;
-  assign io_cpuDataOut = io_cpuRead ? _GEN_25 : 8'h0; // @[MemoryController.scala 42:17 57:20]
-  assign io_ppuAddr = io_cpuWrite ? _GEN_58 : _GEN_35; // @[MemoryController.scala 84:21]
-  assign io_ppuDataIn = io_cpuWrite ? _GEN_59 : 8'h0; // @[MemoryController.scala 44:16 84:21]
-  assign io_ppuWrite = io_cpuWrite & _GEN_27; // @[MemoryController.scala 45:15 84:21]
-  assign io_ppuRead = io_cpuRead & _GEN_27; // @[MemoryController.scala 46:14 57:20]
+  assign prgROM_MPORT_2_en = _T_19 & _T_20;
+  assign io_cpuDataOut = io_cpuRead ? _GEN_25 : 8'h0; // @[MemoryController.scala 53:17 72:20]
+  assign io_ppuAddr = io_cpuWrite & ~dmaActive ? _GEN_94 : _GEN_35; // @[MemoryController.scala 127:35]
+  assign io_ppuDataIn = io_cpuWrite & ~dmaActive ? _GEN_95 : 8'h0; // @[MemoryController.scala 127:35 55:16]
+  assign io_ppuWrite = io_cpuWrite & ~dmaActive & _GEN_27; // @[MemoryController.scala 127:35 56:15]
+  assign io_ppuRead = io_cpuRead & _GEN_27; // @[MemoryController.scala 57:14 72:20]
+  assign io_oamDmaAddr = dmaActive ? dmaOffset : 8'h0; // @[MemoryController.scala 100:19 114:19 58:17]
+  assign io_oamDmaData = dmaActive ? dmaData : 8'h0; // @[MemoryController.scala 100:19 115:19 59:17]
+  assign io_oamDmaWrite = dmaActive; // @[MemoryController.scala 100:19 116:20 60:18]
   always @(posedge clock) begin
     if (internalRAM_MPORT_en & internalRAM_MPORT_mask) begin
-      internalRAM[internalRAM_MPORT_addr] <= internalRAM_MPORT_data; // @[MemoryController.scala 35:32]
+      internalRAM[internalRAM_MPORT_addr] <= internalRAM_MPORT_data; // @[MemoryController.scala 41:32]
     end
     internalRAM_io_cpuDataOut_MPORT_en_pipe_0 <= io_cpuRead & _T;
     if (io_cpuRead & _T) begin
       internalRAM_io_cpuDataOut_MPORT_addr_pipe_0 <= io_cpuAddr[10:0];
     end
+    internalRAM_dmaData_MPORT_en_pipe_0 <= dmaActive & _T_7;
+    if (dmaActive & _T_7) begin
+      internalRAM_dmaData_MPORT_addr_pipe_0 <= dmaAddr[10:0];
+    end
     if (prgROM_MPORT_1_en & prgROM_MPORT_1_mask) begin
-      prgROM[prgROM_MPORT_1_addr] <= prgROM_MPORT_1_data; // @[MemoryController.scala 39:19]
+      prgROM[prgROM_MPORT_1_addr] <= prgROM_MPORT_1_data; // @[MemoryController.scala 45:19]
     end
     if (prgROM_MPORT_2_en & prgROM_MPORT_2_mask) begin
-      prgROM[prgROM_MPORT_2_addr] <= prgROM_MPORT_2_data; // @[MemoryController.scala 39:19]
+      prgROM[prgROM_MPORT_2_addr] <= prgROM_MPORT_2_data; // @[MemoryController.scala 45:19]
+    end
+    if (reset) begin // @[MemoryController.scala 48:26]
+      dmaActive <= 1'h0; // @[MemoryController.scala 48:26]
+    end else if (io_cpuWrite & ~dmaActive) begin // @[MemoryController.scala 127:35]
+      if (_T) begin // @[MemoryController.scala 128:33]
+        dmaActive <= _GEN_64;
+      end else if (_T_3) begin // @[MemoryController.scala 132:65]
+        dmaActive <= _GEN_64;
+      end else begin
+        dmaActive <= _GEN_70;
+      end
+    end else begin
+      dmaActive <= _GEN_64;
+    end
+    if (reset) begin // @[MemoryController.scala 49:24]
+      dmaPage <= 8'h0; // @[MemoryController.scala 49:24]
+    end else if (io_cpuWrite & ~dmaActive) begin // @[MemoryController.scala 127:35]
+      if (!(_T)) begin // @[MemoryController.scala 128:33]
+        if (!(_T_3)) begin // @[MemoryController.scala 132:65]
+          dmaPage <= _GEN_71;
+        end
+      end
+    end
+    if (reset) begin // @[MemoryController.scala 50:26]
+      dmaOffset <= 8'h0; // @[MemoryController.scala 50:26]
+    end else if (io_cpuWrite & ~dmaActive) begin // @[MemoryController.scala 127:35]
+      if (_T) begin // @[MemoryController.scala 128:33]
+        dmaOffset <= _GEN_63;
+      end else if (_T_3) begin // @[MemoryController.scala 132:65]
+        dmaOffset <= _GEN_63;
+      end else begin
+        dmaOffset <= _GEN_72;
+      end
+    end else begin
+      dmaOffset <= _GEN_63;
     end
   end
 endmodule
@@ -3204,6 +4059,7 @@ module NESSystem(
   wire [1:0] cpu_io_debug_state; // @[NESSystem.scala 41:19]
   wire [2:0] cpu_io_debug_cycle; // @[NESSystem.scala 41:19]
   wire  cpu_io_reset; // @[NESSystem.scala 41:19]
+  wire  cpu_io_nmi; // @[NESSystem.scala 41:19]
   wire  ppu_clock; // @[NESSystem.scala 42:19]
   wire  ppu_reset; // @[NESSystem.scala 42:19]
   wire [2:0] ppu_io_cpuAddr; // @[NESSystem.scala 42:19]
@@ -3211,10 +4067,14 @@ module NESSystem(
   wire [7:0] ppu_io_cpuDataOut; // @[NESSystem.scala 42:19]
   wire  ppu_io_cpuWrite; // @[NESSystem.scala 42:19]
   wire  ppu_io_cpuRead; // @[NESSystem.scala 42:19]
+  wire [7:0] ppu_io_oamDmaAddr; // @[NESSystem.scala 42:19]
+  wire [7:0] ppu_io_oamDmaData; // @[NESSystem.scala 42:19]
+  wire  ppu_io_oamDmaWrite; // @[NESSystem.scala 42:19]
   wire [8:0] ppu_io_pixelX; // @[NESSystem.scala 42:19]
   wire [8:0] ppu_io_pixelY; // @[NESSystem.scala 42:19]
   wire [5:0] ppu_io_pixelColor; // @[NESSystem.scala 42:19]
   wire  ppu_io_vblank; // @[NESSystem.scala 42:19]
+  wire  ppu_io_nmiOut; // @[NESSystem.scala 42:19]
   wire  ppu_io_chrLoadEn; // @[NESSystem.scala 42:19]
   wire [12:0] ppu_io_chrLoadAddr; // @[NESSystem.scala 42:19]
   wire [7:0] ppu_io_chrLoadData; // @[NESSystem.scala 42:19]
@@ -3224,6 +4084,7 @@ module NESSystem(
   wire [15:0] ppu_io_debug_ppuAddrReg; // @[NESSystem.scala 42:19]
   wire  ppu_io_debug_paletteInitDone; // @[NESSystem.scala 42:19]
   wire  memory_clock; // @[NESSystem.scala 43:22]
+  wire  memory_reset; // @[NESSystem.scala 43:22]
   wire [15:0] memory_io_cpuAddr; // @[NESSystem.scala 43:22]
   wire [7:0] memory_io_cpuDataIn; // @[NESSystem.scala 43:22]
   wire [7:0] memory_io_cpuDataOut; // @[NESSystem.scala 43:22]
@@ -3234,6 +4095,9 @@ module NESSystem(
   wire [7:0] memory_io_ppuDataOut; // @[NESSystem.scala 43:22]
   wire  memory_io_ppuWrite; // @[NESSystem.scala 43:22]
   wire  memory_io_ppuRead; // @[NESSystem.scala 43:22]
+  wire [7:0] memory_io_oamDmaAddr; // @[NESSystem.scala 43:22]
+  wire [7:0] memory_io_oamDmaData; // @[NESSystem.scala 43:22]
+  wire  memory_io_oamDmaWrite; // @[NESSystem.scala 43:22]
   wire [7:0] memory_io_controller1; // @[NESSystem.scala 43:22]
   wire [7:0] memory_io_controller2; // @[NESSystem.scala 43:22]
   wire  memory_io_romLoadEn; // @[NESSystem.scala 43:22]
@@ -3260,9 +4124,10 @@ module NESSystem(
     .io_debug_opcode(cpu_io_debug_opcode),
     .io_debug_state(cpu_io_debug_state),
     .io_debug_cycle(cpu_io_debug_cycle),
-    .io_reset(cpu_io_reset)
+    .io_reset(cpu_io_reset),
+    .io_nmi(cpu_io_nmi)
   );
-  PPU ppu ( // @[NESSystem.scala 42:19]
+  PPUSimplified ppu ( // @[NESSystem.scala 42:19]
     .clock(ppu_clock),
     .reset(ppu_reset),
     .io_cpuAddr(ppu_io_cpuAddr),
@@ -3270,10 +4135,14 @@ module NESSystem(
     .io_cpuDataOut(ppu_io_cpuDataOut),
     .io_cpuWrite(ppu_io_cpuWrite),
     .io_cpuRead(ppu_io_cpuRead),
+    .io_oamDmaAddr(ppu_io_oamDmaAddr),
+    .io_oamDmaData(ppu_io_oamDmaData),
+    .io_oamDmaWrite(ppu_io_oamDmaWrite),
     .io_pixelX(ppu_io_pixelX),
     .io_pixelY(ppu_io_pixelY),
     .io_pixelColor(ppu_io_pixelColor),
     .io_vblank(ppu_io_vblank),
+    .io_nmiOut(ppu_io_nmiOut),
     .io_chrLoadEn(ppu_io_chrLoadEn),
     .io_chrLoadAddr(ppu_io_chrLoadAddr),
     .io_chrLoadData(ppu_io_chrLoadData),
@@ -3285,6 +4154,7 @@ module NESSystem(
   );
   MemoryController memory ( // @[NESSystem.scala 43:22]
     .clock(memory_clock),
+    .reset(memory_reset),
     .io_cpuAddr(memory_io_cpuAddr),
     .io_cpuDataIn(memory_io_cpuDataIn),
     .io_cpuDataOut(memory_io_cpuDataOut),
@@ -3295,6 +4165,9 @@ module NESSystem(
     .io_ppuDataOut(memory_io_ppuDataOut),
     .io_ppuWrite(memory_io_ppuWrite),
     .io_ppuRead(memory_io_ppuRead),
+    .io_oamDmaAddr(memory_io_oamDmaAddr),
+    .io_oamDmaData(memory_io_oamDmaData),
+    .io_oamDmaWrite(memory_io_oamDmaWrite),
     .io_controller1(memory_io_controller1),
     .io_controller2(memory_io_controller2),
     .io_romLoadEn(memory_io_romLoadEn),
@@ -3302,50 +4175,55 @@ module NESSystem(
     .io_romLoadData(memory_io_romLoadData),
     .io_romLoadPRG(memory_io_romLoadPRG)
   );
-  assign io_pixelX = ppu_io_pixelX; // @[NESSystem.scala 68:13]
-  assign io_pixelY = ppu_io_pixelY; // @[NESSystem.scala 69:13]
-  assign io_pixelColor = ppu_io_pixelColor; // @[NESSystem.scala 70:17]
-  assign io_vblank = ppu_io_vblank; // @[NESSystem.scala 71:13]
-  assign io_debug_regA = cpu_io_debug_regA; // @[NESSystem.scala 74:12]
-  assign io_debug_regX = cpu_io_debug_regX; // @[NESSystem.scala 74:12]
-  assign io_debug_regY = cpu_io_debug_regY; // @[NESSystem.scala 74:12]
-  assign io_debug_regPC = cpu_io_debug_regPC; // @[NESSystem.scala 74:12]
-  assign io_debug_regSP = cpu_io_debug_regSP; // @[NESSystem.scala 74:12]
-  assign io_debug_flagC = cpu_io_debug_flagC; // @[NESSystem.scala 74:12]
-  assign io_debug_flagZ = cpu_io_debug_flagZ; // @[NESSystem.scala 74:12]
-  assign io_debug_flagN = cpu_io_debug_flagN; // @[NESSystem.scala 74:12]
-  assign io_debug_flagV = cpu_io_debug_flagV; // @[NESSystem.scala 74:12]
-  assign io_debug_opcode = cpu_io_debug_opcode; // @[NESSystem.scala 74:12]
-  assign io_debug_state = cpu_io_debug_state; // @[NESSystem.scala 74:12]
-  assign io_debug_cycle = cpu_io_debug_cycle; // @[NESSystem.scala 74:12]
-  assign io_ppuDebug_ppuCtrl = ppu_io_debug_ppuCtrl; // @[NESSystem.scala 75:15]
-  assign io_ppuDebug_ppuMask = ppu_io_debug_ppuMask; // @[NESSystem.scala 75:15]
-  assign io_ppuDebug_ppuStatus = ppu_io_debug_ppuStatus; // @[NESSystem.scala 75:15]
-  assign io_ppuDebug_ppuAddrReg = ppu_io_debug_ppuAddrReg; // @[NESSystem.scala 75:15]
-  assign io_ppuDebug_paletteInitDone = ppu_io_debug_paletteInitDone; // @[NESSystem.scala 75:15]
+  assign io_pixelX = ppu_io_pixelX; // @[NESSystem.scala 73:13]
+  assign io_pixelY = ppu_io_pixelY; // @[NESSystem.scala 74:13]
+  assign io_pixelColor = ppu_io_pixelColor; // @[NESSystem.scala 75:17]
+  assign io_vblank = ppu_io_vblank; // @[NESSystem.scala 76:13]
+  assign io_debug_regA = cpu_io_debug_regA; // @[NESSystem.scala 79:12]
+  assign io_debug_regX = cpu_io_debug_regX; // @[NESSystem.scala 79:12]
+  assign io_debug_regY = cpu_io_debug_regY; // @[NESSystem.scala 79:12]
+  assign io_debug_regPC = cpu_io_debug_regPC; // @[NESSystem.scala 79:12]
+  assign io_debug_regSP = cpu_io_debug_regSP; // @[NESSystem.scala 79:12]
+  assign io_debug_flagC = cpu_io_debug_flagC; // @[NESSystem.scala 79:12]
+  assign io_debug_flagZ = cpu_io_debug_flagZ; // @[NESSystem.scala 79:12]
+  assign io_debug_flagN = cpu_io_debug_flagN; // @[NESSystem.scala 79:12]
+  assign io_debug_flagV = cpu_io_debug_flagV; // @[NESSystem.scala 79:12]
+  assign io_debug_opcode = cpu_io_debug_opcode; // @[NESSystem.scala 79:12]
+  assign io_debug_state = cpu_io_debug_state; // @[NESSystem.scala 79:12]
+  assign io_debug_cycle = cpu_io_debug_cycle; // @[NESSystem.scala 79:12]
+  assign io_ppuDebug_ppuCtrl = ppu_io_debug_ppuCtrl; // @[NESSystem.scala 80:15]
+  assign io_ppuDebug_ppuMask = ppu_io_debug_ppuMask; // @[NESSystem.scala 80:15]
+  assign io_ppuDebug_ppuStatus = ppu_io_debug_ppuStatus; // @[NESSystem.scala 80:15]
+  assign io_ppuDebug_ppuAddrReg = ppu_io_debug_ppuAddrReg; // @[NESSystem.scala 80:15]
+  assign io_ppuDebug_paletteInitDone = ppu_io_debug_paletteInitDone; // @[NESSystem.scala 80:15]
   assign cpu_clock = clock;
   assign cpu_reset = reset;
   assign cpu_io_memDataIn = memory_io_cpuDataOut; // @[NESSystem.scala 52:20]
   assign cpu_io_reset = reset; // @[NESSystem.scala 46:25]
+  assign cpu_io_nmi = ppu_io_nmiOut; // @[NESSystem.scala 47:14]
   assign ppu_clock = clock;
   assign ppu_reset = reset;
   assign ppu_io_cpuAddr = memory_io_ppuAddr; // @[NESSystem.scala 57:18]
   assign ppu_io_cpuDataIn = memory_io_ppuDataIn; // @[NESSystem.scala 58:20]
   assign ppu_io_cpuWrite = memory_io_ppuWrite; // @[NESSystem.scala 60:19]
   assign ppu_io_cpuRead = memory_io_ppuRead; // @[NESSystem.scala 61:18]
-  assign ppu_io_chrLoadEn = io_romLoadEn & ~io_romLoadPRG; // @[NESSystem.scala 84:36]
-  assign ppu_io_chrLoadAddr = io_romLoadAddr[12:0]; // @[NESSystem.scala 85:39]
-  assign ppu_io_chrLoadData = io_romLoadData; // @[NESSystem.scala 86:22]
+  assign ppu_io_oamDmaAddr = memory_io_oamDmaAddr; // @[NESSystem.scala 64:21]
+  assign ppu_io_oamDmaData = memory_io_oamDmaData; // @[NESSystem.scala 65:21]
+  assign ppu_io_oamDmaWrite = memory_io_oamDmaWrite; // @[NESSystem.scala 66:22]
+  assign ppu_io_chrLoadEn = io_romLoadEn & ~io_romLoadPRG; // @[NESSystem.scala 89:36]
+  assign ppu_io_chrLoadAddr = io_romLoadAddr[12:0]; // @[NESSystem.scala 90:39]
+  assign ppu_io_chrLoadData = io_romLoadData; // @[NESSystem.scala 91:22]
   assign memory_clock = clock;
+  assign memory_reset = reset;
   assign memory_io_cpuAddr = cpu_io_memAddr; // @[NESSystem.scala 50:21]
   assign memory_io_cpuDataIn = cpu_io_memDataOut; // @[NESSystem.scala 51:23]
   assign memory_io_cpuWrite = cpu_io_memWrite; // @[NESSystem.scala 53:22]
   assign memory_io_cpuRead = cpu_io_memRead; // @[NESSystem.scala 54:21]
   assign memory_io_ppuDataOut = ppu_io_cpuDataOut; // @[NESSystem.scala 59:24]
-  assign memory_io_controller1 = io_controller1; // @[NESSystem.scala 64:25]
-  assign memory_io_controller2 = io_controller2; // @[NESSystem.scala 65:25]
-  assign memory_io_romLoadEn = io_romLoadEn; // @[NESSystem.scala 78:23]
-  assign memory_io_romLoadAddr = io_romLoadAddr; // @[NESSystem.scala 79:25]
-  assign memory_io_romLoadData = io_romLoadData; // @[NESSystem.scala 80:25]
-  assign memory_io_romLoadPRG = io_romLoadPRG; // @[NESSystem.scala 81:24]
+  assign memory_io_controller1 = io_controller1; // @[NESSystem.scala 69:25]
+  assign memory_io_controller2 = io_controller2; // @[NESSystem.scala 70:25]
+  assign memory_io_romLoadEn = io_romLoadEn; // @[NESSystem.scala 83:23]
+  assign memory_io_romLoadAddr = io_romLoadAddr; // @[NESSystem.scala 84:25]
+  assign memory_io_romLoadData = io_romLoadData; // @[NESSystem.scala 85:25]
+  assign memory_io_romLoadPRG = io_romLoadPRG; // @[NESSystem.scala 86:24]
 endmodule
