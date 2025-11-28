@@ -4,13 +4,14 @@ import chisel3._
 import chisel3.stage.ChiselStage
 
 object GenerateNESVerilog extends App {
-  println("Generating Verilog for NES System...")
+  println("Generating Verilog for NES System v2...")
   
   (new ChiselStage).emitVerilog(
-    new NESSystem,
+    new NESSystemv2,
     Array(
       "--target-dir", "generated/nes",
-      "--emission-options", "disableMemRandomization,disableRegisterRandomization"
+      "--emission-options", "disableMemRandomization,disableRegisterRandomization",
+      "-o", "NESSystem"  // 输出文件名为 NESSystem.v
     )
   )
   

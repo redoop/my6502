@@ -3,7 +3,7 @@
 
 #include <verilated.h>
 #include <verilated_vcd_c.h>
-#include "VNESSystem.h"
+#include "VNESSystemv2.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -27,7 +27,7 @@ const uint32_t NES_PALETTE[64] = {
 
 class NESEmulator {
 private:
-    VNESSystem* dut;
+    VNESSystemv2* dut;
     uint64_t cycle_count;
     
     // ROM 数据
@@ -45,7 +45,7 @@ private:
     uint8_t controller2;
     
 public:
-    NESEmulator(VNESSystem* dut_ptr) : dut(dut_ptr), cycle_count(0) {
+    NESEmulator(VNESSystemv2* dut_ptr) : dut(dut_ptr), cycle_count(0) {
         controller1 = 0;
         controller2 = 0;
         
@@ -314,8 +314,8 @@ public:
             
             // 检测渲染启用
             static bool rendering_enabled_logged = false;
-            if (!rendering_enabled_logged && (dut->io_ppuDebug_ppuMask & 0x18)) {
-                std::cout << "\n✅ 渲染已启用！PPUMASK = 0x" << std::hex << (int)dut->io_ppuDebug_ppuMask << std::dec << std::endl;
+            if (!rendering_enabled_logged && dut->io_rendering) {
+                std::cout << "\n✅ 渲染已启用！" << std::endl;
                 rendering_enabled_logged = true;
             }
             
@@ -354,9 +354,7 @@ public:
                         std::cout << "  总帧数: " << total_frames << std::endl;
                         std::cout << "  CPU: PC=0x" << std::hex << pc << " A=0x" << (int)a 
                                   << " X=0x" << (int)x << " Y=0x" << (int)y << std::dec << std::endl;
-                        std::cout << "  PPUMASK: 0x" << std::hex << (int)dut->io_ppuDebug_ppuMask << std::dec;
-                        std::cout << " (BG: " << (dut->io_ppuDebug_ppuMask & 0x08 ? "ON" : "OFF");
-                        std::cout << ", SPR: " << (dut->io_ppuDebug_ppuMask & 0x10 ? "ON" : "OFF") << ")" << std::endl;
+                        std::cout << "  Rendering: " << (dut->io_rendering ? "ON" : "OFF") << std::endl;
                         
                         // 简化的 Framebuffer 统计
                         int non_zero_pixels = 0;
@@ -403,7 +401,7 @@ int main(int argc, char** argv) {
     
     Verilated::commandArgs(argc, argv);
     
-    VNESSystem* dut = new VNESSystem;
+    VNESSystemv2* dut = new VNESSystemv2;
     
     // 启用波形追踪
     VerilatedVcdC* tfp = nullptr;

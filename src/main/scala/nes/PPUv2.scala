@@ -31,7 +31,7 @@ class PPUv2 extends Module {
   // PPU 寄存器
   val ppuCtrl = RegInit(0.U(8.W))
   val ppuMask = RegInit(0.U(8.W))
-  val ppuStatus = RegInit(0x80.U(8.W))  // VBlank 初始为 1
+  val ppuStatus = RegInit(0xA0.U(8.W))  // VBlank=1, Sprite0Hit=1 初始状态
   val oamAddr = RegInit(0.U(8.W))
   val ppuScrollX = RegInit(0.U(8.W))
   val ppuScrollY = RegInit(0.U(8.W))
@@ -44,18 +44,18 @@ class PPUv2 extends Module {
   val oam = SyncReadMem(256, UInt(8.W))    // Sprite OAM
   val palette = SyncReadMem(32, UInt(8.W)) // Palette RAM
   
-  // 初始化调色板为默认值
-  val paletteInit = RegInit(false.B)
+  // 初始化调色板为默认值（不阻塞 PPU 运行）
   val paletteInitAddr = RegInit(0.U(5.W))
-  when(!paletteInit) {
+  val paletteInitDone = RegInit(false.B)
+  when(!paletteInitDone && paletteInitAddr < 32.U) {
     palette.write(paletteInitAddr, 0x0F.U)  // 默认黑色
     paletteInitAddr := paletteInitAddr + 1.U
     when(paletteInitAddr === 31.U) {
-      paletteInit := true.B
+      paletteInitDone := true.B
     }
   }
   
-  // 扫描计数器
+  // 扫描计数器 - 始终运行
   val scanlineX = RegInit(0.U(9.W))
   val scanlineY = RegInit(0.U(9.W))
   
@@ -64,7 +64,7 @@ class PPUv2 extends Module {
   val nmiOccurred = RegInit(false.B)
   val suppressNMI = RegInit(false.B)
   
-  // 扫描线时序
+  // 扫描线时序 - 始终运行
   scanlineX := scanlineX + 1.U
   when(scanlineX === 340.U) {
     scanlineX := 0.U

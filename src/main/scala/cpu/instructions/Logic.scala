@@ -209,10 +209,19 @@ object LogicInstructions {
       is(2.U) {
         result.memAddr := operand
         result.memRead := true.B
-        val res = doLogicOp(opcode, regs.a, memDataIn)
-        newRegs.a := res
-        newRegs.flagN := res(7)
-        newRegs.flagZ := res === 0.U
+        
+        // BIT 指令特殊处理
+        when(opcode === 0x2C.U) {
+          newRegs.flagZ := (regs.a & memDataIn) === 0.U
+          newRegs.flagN := memDataIn(7)
+          newRegs.flagV := memDataIn(6)
+        }.otherwise {
+          val res = doLogicOp(opcode, regs.a, memDataIn)
+          newRegs.a := res
+          newRegs.flagN := res(7)
+          newRegs.flagZ := res === 0.U
+        }
+        
         result.regs := newRegs
         result.done := true.B
       }

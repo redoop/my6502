@@ -116,7 +116,8 @@ class PPUSimplified extends Module {
   val vblankClearNext = RegInit(false.B)
   when(vblankClearNext) {
     vblankFlag := false.B
-    nmiOccurred := false.B
+    // 注意: 不清除 nmiOccurred，让它在下一帧开始时自然清除
+    // 这确保 CPU 有足够时间响应 NMI 中断
     vblankClearNext := false.B
   }
   
