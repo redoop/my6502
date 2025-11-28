@@ -1,131 +1,122 @@
 # 📚 文档导航
 
-**最后更新**: 2025-11-27
+**最后更新**: 2025-11-28  
+**文档版本**: v1.0
 
-## 🎯 核心文档 (推荐阅读)
+## 🎯 文档已重新整理！
 
-### 1. [PROJECT_STATUS.md](PROJECT_STATUS.md) ⭐
-**项目状态总览**
-- 当前进度和完成度
-- 测试统计
-- 下一步计划
-- 资源使用情况
+文档已从 70+ 个文件整理为 **10 个核心文档**，更易阅读和维护。
 
-### 2. [ARCHITECTURE.md](ARCHITECTURE.md)
-**系统架构设计**
-- CPU 6502 架构
-- PPU 架构
-- NES 系统架构
-- 模块化设计
+### 📖 快速导航
 
-### 3. [DEVELOPMENT.md](DEVELOPMENT.md)
-**开发指南**
-- 快速开始
-- 测试指南
-- 使用指南
-- 重构总结
-
-### 4. [GAME_SUPPORT.md](GAME_SUPPORT.md)
-**游戏支持**
-- 魂斗罗支持
-- ROM 加载
-- 简单程序示例
-- 调试指南
-
-### 5. [TECHNICAL_DETAILS.md](TECHNICAL_DETAILS.md)
-**技术细节**
-- 晶体管分析
-- 性能指标
-- PPU 渲染细节
-- 优化技巧
-
-## 📖 专题文档
-
-### PPU 相关
-- [PPU_V3_INTEGRATION.md](PPU_V3_INTEGRATION.md) - PPUv3 集成报告
-- [PPU_RENDERING_PIPELINE.md](PPU_RENDERING_PIPELINE.md) - 渲染管线技术文档
-
-### 系统改进
-- [NES_V2_IMPROVEMENTS.md](NES_V2_IMPROVEMENTS.md) - v2/v3 功能改进
-
-### 其他
-- [CHANGELOG.md](CHANGELOG.md) - 变更日志
-- [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - 快速参考
-
-## 🗺️ 文档地图
-
-```
-docs/
-├── 📊 PROJECT_STATUS.md          ⭐ 从这里开始
-├── 🏗️ ARCHITECTURE.md            系统架构
-├── 🛠️ DEVELOPMENT.md             开发指南
-├── 🎮 GAME_SUPPORT.md            游戏支持
-├── 🔬 TECHNICAL_DETAILS.md       技术细节
-│
-├── 🎨 PPU_V3_INTEGRATION.md      PPUv3 集成
-├── 🎨 PPU_RENDERING_PIPELINE.md  渲染管线
-├── 🎮 NES_V2_IMPROVEMENTS.md     系统改进
-│
-├── 📝 CHANGELOG.md               变更日志
-├── 📖 QUICK_REFERENCE.md         快速参考
-└── � README.md                  本文件
-```
-
-## 🎯 按需求查找
-
-### 我想了解项目进度
-→ [PROJECT_STATUS.md](PROJECT_STATUS.md)
-
-### 我想了解系统架构
-→ [ARCHITECTURE.md](ARCHITECTURE.md)
-
-### 我想开始开发
-→ [DEVELOPMENT.md](DEVELOPMENT.md)
-
-### 我想运行游戏
-→ [GAME_SUPPORT.md](GAME_SUPPORT.md)
-
-### 我想了解技术细节
-→ [TECHNICAL_DETAILS.md](TECHNICAL_DETAILS.md)
-
-### 我想了解 PPU 渲染
-→ [PPU_RENDERING_PIPELINE.md](PPU_RENDERING_PIPELINE.md)
-→ [PPU_V3_INTEGRATION.md](PPU_V3_INTEGRATION.md)
-
-### 我想了解最新改进
-→ [NES_V2_IMPROVEMENTS.md](NES_V2_IMPROVEMENTS.md)
-→ [CHANGELOG.md](CHANGELOG.md)
-
-## 📈 文档完整度
-
-```
-核心文档:     5/5  ✅ 100%
-专题文档:     3/3  ✅ 100%
-其他文档:     3/3  ✅ 100%
-总计:        11/11 ✅ 100%
-```
-
-## 🔄 文档更新
-
-所有文档都会随着项目进展持续更新。
-
-**更新频率**:
-- PROJECT_STATUS.md: 每周
-- 其他核心文档: 按需
-- 专题文档: 重大更新时
-
-## 💡 贡献文档
-
-欢迎改进文档！
-
-**指南**:
-1. 保持简洁明了
-2. 使用示例代码
-3. 添加图表说明
-4. 更新目录
+**请查看**: [INDEX.md](INDEX.md) - 完整的文档索引和导航
 
 ---
 
-**文档版本**: v3.0
-**最后更新**: 2025-11-27
+## 📑 10 个核心文档
+
+1. **[项目概述](01_PROJECT_OVERVIEW.md)** ⭐ 从这里开始
+   - 项目简介、架构、快速开始
+
+2. **[开发指南](02_DEVELOPMENT_GUIDE.md)**
+   - 环境设置、工作流、代码规范
+
+3. **[测试指南](03_TESTING_GUIDE.md)**
+   - 测试类型、工具、场景
+
+4. **[Verilator 指南](04_VERILATOR_GUIDE.md)**
+   - 仿真环境、编译、调试
+
+5. **[PPU 系统](05_PPU_SYSTEM.md)**
+   - PPU 架构、渲染、时序
+
+6. **[CPU 实现](06_CPU_IMPLEMENTATION.md)**
+   - CPU 架构、指令集、实现
+
+7. **[游戏兼容性](07_GAME_COMPATIBILITY.md)**
+   - 游戏测试、兼容性、Mapper
+
+8. **[调试指南](08_DEBUG_GUIDE.md)**
+   - 调试工具、方法、问题诊断
+
+9. **[发布说明](09_RELEASE_NOTES.md)**
+   - 版本历史、更新、路线图
+
+10. **[快速参考](10_QUICK_REFERENCE.md)** ⭐ 速查手册
+    - 命令、寄存器、常见问题速查
+
+---
+
+## 🗺️ 按需求查找
+
+| 我想... | 查看文档 |
+|---------|---------|
+| 了解项目 | [01_PROJECT_OVERVIEW.md](01_PROJECT_OVERVIEW.md) |
+| 开始开发 | [02_DEVELOPMENT_GUIDE.md](02_DEVELOPMENT_GUIDE.md) |
+| 运行测试 | [03_TESTING_GUIDE.md](03_TESTING_GUIDE.md) |
+| 使用 Verilator | [04_VERILATOR_GUIDE.md](04_VERILATOR_GUIDE.md) |
+| 了解 PPU | [05_PPU_SYSTEM.md](05_PPU_SYSTEM.md) |
+| 了解 CPU | [06_CPU_IMPLEMENTATION.md](06_CPU_IMPLEMENTATION.md) |
+| 测试游戏 | [07_GAME_COMPATIBILITY.md](07_GAME_COMPATIBILITY.md) |
+| 调试问题 | [08_DEBUG_GUIDE.md](08_DEBUG_GUIDE.md) |
+| 查看版本 | [09_RELEASE_NOTES.md](09_RELEASE_NOTES.md) |
+| 快速查询 | [10_QUICK_REFERENCE.md](10_QUICK_REFERENCE.md) |
+
+---
+
+## 📊 文档统计
+
+```
+核心文档: 10 个
+总页数: ~475 页
+代码示例: 200+
+图表: 50+
+完整度: 100%
+```
+
+---
+
+## 🎯 推荐阅读路径
+
+### 新手
+1. [项目概述](01_PROJECT_OVERVIEW.md)
+2. [快速参考](10_QUICK_REFERENCE.md)
+3. [开发指南](02_DEVELOPMENT_GUIDE.md)
+
+### 开发者
+1. [开发指南](02_DEVELOPMENT_GUIDE.md)
+2. [CPU 实现](06_CPU_IMPLEMENTATION.md)
+3. [PPU 系统](05_PPU_SYSTEM.md)
+4. [调试指南](08_DEBUG_GUIDE.md)
+
+---
+
+## 📚 参考文档
+
+以下专题文档保留供深入研究：
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) - 完整架构文档
+
+---
+
+## 📦 历史文档归档
+
+64 个历史文档已移至 [archive/](archive/) 目录：
+- 包括: TECHNICAL_DETAILS.md, PPU_V3_INTEGRATION.md, PPU_RENDERING_PIPELINE.md, NES_V2_IMPROVEMENTS.md 等
+- 查看 [archive/README.md](archive/README.md) 了解归档文档列表
+- 查看 [ARCHIVE_SUMMARY.md](ARCHIVE_SUMMARY.md) 了解归档详情
+
+---
+
+## 📝 文档整理说明
+
+- [DOCUMENTATION_SUMMARY.md](DOCUMENTATION_SUMMARY.md) - 文档整理详细信息
+- [ARCHIVE_SUMMARY.md](ARCHIVE_SUMMARY.md) - 文档归档总结
+
+---
+
+**文档版本**: v1.0  
+**最后更新**: 2025-11-28  
 **维护者**: NES 开发团队
+
+🎮 Happy Coding! 🎵

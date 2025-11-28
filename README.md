@@ -109,18 +109,27 @@ The 6502 processor was widely used in numerous classic computers and game consol
 
 ### 📚 Documentation
 
-**Core Documentation** (5 essential docs):
-- 📚 **[Documentation Index](docs/README.md)** - Complete documentation guide
-- 📊 **[Project Status](docs/PROJECT_STATUS.md)** - Progress & roadmap ⭐ Start here
-- 🏗️ **[Architecture](docs/ARCHITECTURE.md)** - System design (CPU + PPU + NES)
-- 🛠️ **[Development](docs/DEVELOPMENT.md)** - Development & testing guide
-- 🎮 **[Game Support](docs/GAME_SUPPORT.md)** - Running games (Contra, etc.)
-- 🔬 **[Technical Details](docs/TECHNICAL_DETAILS.md)** - Performance & optimization
+**Documentation has been reorganized!** Streamlined from 70+ documents to 10 core documents for easier reading and maintenance.
 
-**Specialized Documentation**:
-- 🎨 **[PPU v3 Integration](docs/PPU_V3_INTEGRATION.md)** - Rendering pipeline integration
-- 🎨 **[PPU Rendering](docs/PPU_RENDERING_PIPELINE.md)** - Technical rendering details
-- 🎮 **[NES Improvements](docs/NES_V2_IMPROVEMENTS.md)** - v2/v3 features
+**Quick Start**: 📖 [docs/INDEX.md](docs/INDEX.md) or [docs/README.md](docs/README.md)
+
+**10 Core Documents**:
+1. 📋 [Project Overview](docs/01_PROJECT_OVERVIEW.md) ⭐ Start here
+2. 🛠️ [Development Guide](docs/02_DEVELOPMENT_GUIDE.md) - Setup, workflow
+3. 🧪 [Testing Guide](docs/03_TESTING_GUIDE.md) - Test types, tools
+4. ⚡ [Verilator Guide](docs/04_VERILATOR_GUIDE.md) - Simulation environment
+5. 🎨 [PPU System](docs/05_PPU_SYSTEM.md) - PPU architecture, rendering
+6. 🔧 [CPU Implementation](docs/06_CPU_IMPLEMENTATION.md) - CPU architecture, instructions
+7. 🎮 [Game Compatibility](docs/07_GAME_COMPATIBILITY.md) - Game testing
+8. 🐛 [Debug Guide](docs/08_DEBUG_GUIDE.md) - Debug tools, methods
+9. 📝 [Release Notes](docs/09_RELEASE_NOTES.md) - Version history
+10. ⚡ [Quick Reference](docs/10_QUICK_REFERENCE.md) ⭐ Cheat sheet
+
+**Reference Documents** (for deep dive):
+- 🏗️ [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Complete architecture
+
+**Historical Documents**: 64 historical documents archived in [docs/archive/](docs/archive/)
+- Including: TECHNICAL_DETAILS.md, PPU_V3_INTEGRATION.md, PPU_RENDERING_PIPELINE.md, NES_V2_IMPROVEMENTS.md, etc.
 
 ### 🎮 NES System v2 (Latest Update!)
 
