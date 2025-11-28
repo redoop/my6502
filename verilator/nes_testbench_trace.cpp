@@ -165,9 +165,18 @@ int main(int argc, char** argv) {
     dut->trace(tfp, 99);  // 追踪深度 99
     tfp->open("nes_trace.vcd");
     
-    // 复位
-    std::cout << "🔄 复位系统..." << std::endl;
+    NESEmulatorTrace emulator(dut, tfp);
+    
+    // 在 reset 期间加载 ROM
+    std::cout << "🔄 保持 Reset 状态..." << std::endl;
     dut->reset = 1;
+    
+    if (!emulator.loadROM(argv[1])) {
+        return 1;
+    }
+    
+    // 额外的 reset 周期
+    std::cout << "🔄 复位 CPU..." << std::endl;
     for (int i = 0; i < 10; i++) {
         dut->clock = 0;
         dut->eval();
@@ -178,10 +187,15 @@ int main(int argc, char** argv) {
     }
     dut->reset = 0;
     
-    NESEmulatorTrace emulator(dut, tfp);
-    
-    if (!emulator.loadROM(argv[1])) {
-        return 1;
+    // 等待 CPU 完成 Reset 序列
+    std::cout << "⏳ 等待 CPU Reset 序列..." << std::endl;
+    for (int i = 0; i < 20; i++) {
+        dut->clock = 0;
+        dut->eval();
+        tfp->dump((i + 10) * 2);
+        dut->clock = 1;
+        dut->eval();
+        tfp->dump((i + 10) * 2 + 1);
     }
     
     emulator.run(max_cycles);
