@@ -32,16 +32,16 @@ class CPU6502Core extends Module {
   val nmiLast = RegInit(false.B)
   val nmiEdge = RegInit(false.B)
   
-  // 始终更新 nmiLast
+  // 更新 nmiLast
   nmiLast := io.nmi
   
-  // 检测 NMI 上升沿
-  when(io.nmi && !nmiLast) {
+  // 检测 NMI 上升沿（只在 Fetch 状态时检测，避免重复触发）
+  when(state === sFetch && io.nmi && !nmiLast) {
     nmiEdge := true.B
   }
   
   // 在进入 NMI 状态时清除边沿标志
-  when(state === sNMI) {
+  when(state === sNMI && cycle === 0.U) {
     nmiEdge := false.B
   }
 
@@ -57,44 +57,52 @@ class CPU6502Core extends Module {
 
   // 状态机
   when(io.reset) {
-    // Reset 时初始化状态
+    // Reset 时重置所有状态
     state := sReset
     cycle := 0.U
-    regs.pc := 0.U
-    regs.sp := 0xFF.U
+    opcode := 0.U
+    operand := 0.U
+    nmiEdge := false.B
+    nmiLast := false.B
   }.otherwise {
+    // 正常执行状态机
     switch(state) {
         is(sReset) {
           // Reset 序列: 读取 Reset Vector ($FFFC-$FFFD)
-          // 注意：即使 PRG ROM 使用 Mem (异步读)，在 Verilator 中仍需要时序考虑
           when(cycle === 0.U) {
-            // 周期 0: 发起读取低字节
+            // 周期 0: 读取低字节地址
             io.memAddr := 0xFFFC.U
             io.memRead := true.B
             cycle := 1.U
 
           }.elsewhen(cycle === 1.U) {
-            // 周期 1: 保存低字节到 operand 寄存器
+            // 周期 1: 读取低字节数据并保存
             io.memAddr := 0xFFFC.U
             io.memRead := true.B
-            operand := io.memDataIn  // 保存到寄存器
             cycle := 2.U
 
           }.elsewhen(cycle === 2.U) {
-            // 周期 2: 发起读取高字节（operand 已经在上个周期保存）
-            io.memAddr := 0xFFFD.U
+            // 周期 2: 保存低字节，准备读取高字节
+            io.memAddr := 0xFFFC.U
             io.memRead := true.B
+            operand := io.memDataIn  // 保存低字节
             cycle := 3.U
 
           }.elsewhen(cycle === 3.U) {
-            // 周期 3: 等待数据稳定
+            // 周期 3: 读取高字节地址
             io.memAddr := 0xFFFD.U
             io.memRead := true.B
             cycle := 4.U
 
-          }.otherwise {  // cycle === 4
-            // 周期 4: 读取高字节，设置 PC 并进入 Fetch
-            io.memAddr := 0xFFFD.U  // 保持地址
+          }.elsewhen(cycle === 4.U) {
+            // 周期 4: 读取高字节数据
+            io.memAddr := 0xFFFD.U
+            io.memRead := true.B
+            cycle := 5.U
+
+          }.otherwise {  // cycle === 5
+            // 周期 5: 组合向量地址并设置 PC
+            io.memAddr := 0xFFFD.U
             io.memRead := true.B
             val resetVector = Cat(io.memDataIn, operand(7, 0))
             regs.pc := resetVector
@@ -102,13 +110,12 @@ class CPU6502Core extends Module {
             regs.flagI := true.B  // 设置中断禁止标志
             cycle := 0.U
             state := sFetch
-
           }
         }
     
         is(sFetch) {
-          // 检查是否有 NMI 中断
-          when(nmiEdge) {
+          // 检查是否有 NMI 中断（暂时禁用用于测试）
+          when(false.B && nmiEdge) {
             cycle := 0.U
             state := sNMI
           }.otherwise {

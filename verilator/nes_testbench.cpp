@@ -382,21 +382,24 @@ int main(int argc, char** argv) {
     
     NESEmulator emulator(dut);
     
-    // 初始 reset
+    // 在 reset 期间加载 ROM
+    std::cout << "🔄 保持 Reset 状态加载 ROM..." << std::endl;
     dut->reset = 1;
     dut->io_romLoadEn = 0;
     dut->io_controller1 = 0;
     dut->io_controller2 = 0;
+    
+    // 加载 ROM（在 reset 期间）
+    if (!emulator.loadROM(argv[1])) {
+        return 1;
+    }
+    
+    // 额外的 reset 周期
     for (int i = 0; i < 10; i++) {
         dut->clock = 0;
         dut->eval();
         dut->clock = 1;
         dut->eval();
-    }
-    
-    // 加载 ROM
-    if (!emulator.loadROM(argv[1])) {
-        return 1;
     }
     
     // 释放 reset，让 CPU 从 reset vector 启动
