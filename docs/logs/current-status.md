@@ -119,3 +119,82 @@ when(opcode === 0xD0.U) {  // BNE
 - 2025-11-28: 创建分阶段调试系统
 - 2025-11-28: 定位到 DEX 循环问题
 - 2025-11-28: 分析可能的根本原因
+
+
+## 性能优化 (2025-11-28) ✅
+
+### 优化成果
+- **优化前**: 0.7 FPS
+- **优化后**: 27.6 FPS  
+- **提升倍数**: ~40x
+
+### 优化措施
+1. **减少 I/O 操作**
+   - 状态报告从每秒改为每 3 秒
+   - 详细调试从每 5 秒改为每 30 秒
+   - 简化 framebuffer 统计
+
+2. **批量处理**
+   - 每 1000 周期处理一次输入事件
+   - 减少函数调用开销
+
+3. **编译器优化**
+   - `-O3 -march=native -mtune=native`
+   - `-flto` 链接时优化
+   - `-ffast-math` 快速数学运算
+
+### 使用方法
+```bash
+# 优化编译
+bash scripts/verilator_build_optimized.sh
+
+# 快速测试（30秒）
+bash scripts/quick_performance_test.sh
+
+# 扩展测试（2分钟）
+bash scripts/extended_performance_test.sh
+```
+
+### 预期进展
+以 27.6 FPS 的速度，预计约 2 分钟可以完成初始化循环，游戏将启用渲染。
+
+详细信息见：`docs/stage3-optimization.md`
+
+
+## 长时间测试结果 (2025-11-28)
+
+### 测试数据
+- **运行时间**: ~4 分钟
+- **总帧数**: ~7156 帧
+- **平均 FPS**: 28-29.5
+- **CPU 状态**: 仍在 0xf1a0-0xf1a7 循环
+- **PPUMASK**: 保持在 0x6
+- **渲染状态**: 未启用
+
+### 问题
+Donkey Kong 的初始化循环比预期长得多，7000+ 帧后仍未退出。
+
+### 可能的原因
+1. 游戏等待特定条件（帧数、PPU 状态、输入等）
+2. CPU 实现问题（指令、标志位、中断）
+3. PPU 实现问题（VBlank、NMI、状态寄存器）
+
+### 下一步调试
+1. **测试 Super Mario Bros** - 确定是游戏特定还是通用问题
+2. **检查 NMI 中断** - 验证中断是否正确触发
+3. **分析循环代码** - 理解退出条件
+4. **强制测试渲染** - 验证 PPU 功能
+
+详细计划见：`docs/next-steps.md`
+
+### 可用的调试脚本
+```bash
+# 测试 Super Mario Bros
+bash scripts/test_mario.sh
+
+# 监控 NMI 中断
+bash scripts/monitor_nmi.sh
+
+# 分析循环代码
+bash scripts/analyze_loop_code.sh
+```
