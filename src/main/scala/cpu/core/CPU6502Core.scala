@@ -70,44 +70,38 @@ class CPU6502Core extends Module {
         is(sReset) {
           // Reset 序列: 读取 Reset Vector ($FFFC-$FFFD)
           when(cycle === 0.U) {
-            // 周期 0: 读取低字节地址
             io.memAddr := 0xFFFC.U
             io.memRead := true.B
             cycle := 1.U
-
           }.elsewhen(cycle === 1.U) {
-            // 周期 1: 读取低字节数据并保存
+            // 等待一个周期让数据准备好
             io.memAddr := 0xFFFC.U
             io.memRead := true.B
             cycle := 2.U
-
           }.elsewhen(cycle === 2.U) {
-            // 周期 2: 保存低字节，准备读取高字节
+            // 读取低字节
             io.memAddr := 0xFFFC.U
             io.memRead := true.B
-            operand := io.memDataIn  // 保存低字节
+            operand := io.memDataIn
             cycle := 3.U
-
           }.elsewhen(cycle === 3.U) {
-            // 周期 3: 读取高字节地址
+            // 读取高字节地址
             io.memAddr := 0xFFFD.U
             io.memRead := true.B
             cycle := 4.U
-
           }.elsewhen(cycle === 4.U) {
-            // 周期 4: 读取高字节数据
+            // 等待一个周期让数据准备好
             io.memAddr := 0xFFFD.U
             io.memRead := true.B
             cycle := 5.U
-
-          }.otherwise {  // cycle === 5
-            // 周期 5: 组合向量地址并设置 PC
+          }.otherwise {
+            // cycle=5: 完成 reset 并进入 Fetch
             io.memAddr := 0xFFFD.U
             io.memRead := true.B
             val resetVector = Cat(io.memDataIn, operand(7, 0))
             regs.pc := resetVector
-            regs.sp := 0xFD.U  // 初始化 SP
-            regs.flagI := true.B  // 设置中断禁止标志
+            regs.sp := 0xFD.U
+            regs.flagI := true.B
             cycle := 0.U
             state := sFetch
           }
@@ -149,7 +143,7 @@ class CPU6502Core extends Module {
         }
 
         is(sNMI) {
-          // NMI 中断处理 (7 个周期)
+          // NMI 中断处理 (9 个周期)
           when(cycle === 0.U) {
             // 周期 1: 空操作
             cycle := 1.U
@@ -180,17 +174,25 @@ class CPU6502Core extends Module {
             // 周期 5: 读取 NMI 向量低字节 (0xFFFA)
             io.memAddr := 0xFFFA.U
             io.memRead := true.B
-            operand := io.memDataIn
             cycle := 5.U
           }.elsewhen(cycle === 5.U) {
-            // 周期 6: 读取高字节 (0xFFFB)
-            io.memAddr := 0xFFFB.U
+            // 周期 6: 等待数据准备好
+            io.memAddr := 0xFFFA.U
             io.memRead := true.B
             cycle := 6.U
-          }.otherwise {  // cycle === 6
-            // 周期 7: 设置 PC
+          }.elsewhen(cycle === 6.U) {
+            // 周期 7: 保存低字节，读取高字节
+            operand := io.memDataIn
             io.memAddr := 0xFFFB.U
             io.memRead := true.B
+            cycle := 7.U
+          }.elsewhen(cycle === 7.U) {
+            // 周期 8: 等待高字节数据准备好
+            io.memAddr := 0xFFFB.U
+            io.memRead := true.B
+            cycle := 8.U
+          }.otherwise {  // cycle === 8
+            // 周期 9: 保存向量并设置 PC
             val nmiVector = Cat(io.memDataIn, operand(7, 0))
             regs.pc := nmiVector
             regs.flagI := true.B  // 设置中断禁止标志

@@ -70,7 +70,7 @@ verilator \
     -Wno-UNUSED \
     -Wno-UNDRIVEN \
     -Wno-CASEINCOMPLETE \
-    --top-module NESSystem \
+    --top-module NESSystemv2 \
     -CFLAGS "$(pkg-config --cflags sdl2)" \
     -LDFLAGS "$(pkg-config --libs sdl2)" \
     -Mdir "$PROJECT_DIR/build/verilator" \

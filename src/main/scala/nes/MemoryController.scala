@@ -40,9 +40,13 @@ class MemoryController extends Module {
   // 内部 RAM (2KB) - 同步读取
   val internalRAM = SyncReadMem(2048, UInt(8.W))
   
-  // 程序 ROM (32KB) - 异步读取（组合逻辑）
+  // 程序 ROM (32KB) - 使用 Vec 实现组合逻辑读取
   // 这样可以在同一个周期内读取数据，避免时序问题
   val prgROM = Mem(32768, UInt(8.W))
+  
+  // ROM 读取缓存（用于组合逻辑读取）
+  val romReadData = Wire(UInt(8.W))
+  romReadData := 0.U
   
   // OAM DMA 状态机
   val dmaActive = RegInit(false.B)
@@ -87,11 +91,11 @@ class MemoryController extends Module {
       io.cpuDataOut := io.controller2
     }.elsewhen(io.cpuAddr >= 0x8000.U) {
       // PRG ROM (支持 16KB 和 32KB)
-      // 对于 16KB ROM: 0x8000-0xBFFF 和 0xC000-0xFFFF 都映射到 ROM 0x0000-0x3FFF
-      // 对于 32KB ROM: 0x8000-0xFFFF 直接映射到 ROM 0x0000-0x7FFF
-      // 使用低 14 位 (0-13)，自动支持 16KB 镜像
+      // 对于 16KB ROM: 0x8000-0xBFFF 和 0xC000-0xFFFF 都映射到 ROM 0x0000-0x3FFF (使用低 14 位)
+      // 对于 32KB ROM: 0x8000-0xFFFF 直接映射到 ROM 0x0000-0x7FFF (使用低 15 位)
+      // 使用低 14 位 (0-13) 来支持 16KB ROM 的镜像
       val romAddr = (io.cpuAddr - 0x8000.U)(13, 0)
-      io.cpuDataOut := prgROM.read(romAddr)
+      io.cpuDataOut := prgROM(romAddr)  // 使用括号语法进行组合逻辑读取
 
     }
   }
@@ -149,9 +153,10 @@ class MemoryController extends Module {
   // ROM 加载逻辑 (用于 Verilator 仿真)
   when(io.romLoadEn && io.romLoadPRG) {
     // 加载 PRG ROM
-    when(io.romLoadAddr < 32768.U) {
-      prgROM.write(io.romLoadAddr, io.romLoadData)
-
+    // testbench 传入的是 ROM 内部地址 (0-32767)，直接使用
+    val romAddr = io.romLoadAddr(14, 0)  // 取低 15 位
+    when(romAddr < 32768.U) {
+      prgROM.write(romAddr, io.romLoadData)
     }
   }
 }
