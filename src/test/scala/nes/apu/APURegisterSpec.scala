@@ -6,8 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import nes.APURefactored
 
 /**
- * APU 寄存器测试 - 使用重构版本
- * 参考 CPU 指令测试方式，测试 APU 的 20 个寄存器
+ * APU 寄存器测试 - 完整覆盖
  */
 class APURegisterSpec extends AnyFlatSpec with ChiselScalatestTester {
   
@@ -15,19 +14,38 @@ class APURegisterSpec extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "write to Pulse 1 register 0" in {
     test(new APURefactored) { dut =>
-      dut.io.cpuAddr.poke(0x00.U)  // $4000
-      dut.io.cpuDataIn.poke(0xBF.U)  // 占空比=3, 循环, 音量=15
+      dut.io.cpuAddr.poke(0x00.U)
+      dut.io.cpuDataIn.poke(0xBF.U)
       dut.io.cpuWrite.poke(true.B)
       dut.clock.step()
-      
-      // 验证写入成功（通过后续操作验证）
     }
   }
   
-  it should "write to Pulse 1 register 1 (sweep)" in {
+  it should "set Pulse 1 duty cycle" in {
     test(new APURefactored) { dut =>
-      dut.io.cpuAddr.poke(0x01.U)  // $4001
-      dut.io.cpuDataIn.poke(0x88.U)  // 使能, 周期=0, 负向, 移位=0
+      val duties = Seq(0x00, 0x40, 0x80, 0xC0)
+      for (duty <- duties) {
+        dut.io.cpuAddr.poke(0x00.U)
+        dut.io.cpuDataIn.poke(duty.U)
+        dut.io.cpuWrite.poke(true.B)
+        dut.clock.step()
+      }
+    }
+  }
+  
+  it should "set Pulse 1 volume" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x00.U)
+      dut.io.cpuDataIn.poke(0x0F.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+    }
+  }
+  
+  it should "write to Pulse 1 sweep" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x01.U)
+      dut.io.cpuDataIn.poke(0x88.U)
       dut.io.cpuWrite.poke(true.B)
       dut.clock.step()
     }
@@ -35,7 +53,7 @@ class APURegisterSpec extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "write to Pulse 1 timer low" in {
     test(new APURefactored) { dut =>
-      dut.io.cpuAddr.poke(0x02.U)  // $4002
+      dut.io.cpuAddr.poke(0x02.U)
       dut.io.cpuDataIn.poke(0x54.U)
       dut.io.cpuWrite.poke(true.B)
       dut.clock.step()
@@ -44,8 +62,8 @@ class APURegisterSpec extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "write to Pulse 1 timer high and length" in {
     test(new APURefactored) { dut =>
-      dut.io.cpuAddr.poke(0x03.U)  // $4003
-      dut.io.cpuDataIn.poke(0xF8.U)  // 长度=31, 定时器高3位=0
+      dut.io.cpuAddr.poke(0x03.U)
+      dut.io.cpuDataIn.poke(0xF8.U)
       dut.io.cpuWrite.poke(true.B)
       dut.clock.step()
     }
@@ -77,12 +95,30 @@ class APURegisterSpec extends AnyFlatSpec with ChiselScalatestTester {
     }
   }
   
+  it should "set Pulse 2 duty cycle" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x04.U)
+      dut.io.cpuDataIn.poke(0x80.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+    }
+  }
+  
   behavior of "APU Registers - Triangle ($4008-$400B)"
   
   it should "write to Triangle linear counter" in {
     test(new APURefactored) { dut =>
-      dut.io.cpuAddr.poke(0x08.U)  // $4008
-      dut.io.cpuDataIn.poke(0x7F.U)  // 控制=0, 重载值=127
+      dut.io.cpuAddr.poke(0x08.U)
+      dut.io.cpuDataIn.poke(0x7F.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+    }
+  }
+  
+  it should "set Triangle control flag" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x08.U)
+      dut.io.cpuDataIn.poke(0x80.U)
       dut.io.cpuWrite.poke(true.B)
       dut.clock.step()
     }
@@ -90,7 +126,7 @@ class APURegisterSpec extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "write to Triangle timer low" in {
     test(new APURefactored) { dut =>
-      dut.io.cpuAddr.poke(0x0A.U)  // $400A
+      dut.io.cpuAddr.poke(0x0A.U)
       dut.io.cpuDataIn.poke(0xFE.U)
       dut.io.cpuWrite.poke(true.B)
       dut.clock.step()
@@ -99,7 +135,7 @@ class APURegisterSpec extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "write to Triangle timer high and length" in {
     test(new APURefactored) { dut =>
-      dut.io.cpuAddr.poke(0x0B.U)  // $400B
+      dut.io.cpuAddr.poke(0x0B.U)
       dut.io.cpuDataIn.poke(0xF8.U)
       dut.io.cpuWrite.poke(true.B)
       dut.clock.step()
@@ -127,24 +163,110 @@ class APURegisterSpec extends AnyFlatSpec with ChiselScalatestTester {
     }
   }
   
-  behavior of "APU Registers - Control ($4015)"
-  
-  it should "enable channels" in {
+  it should "set Noise mode" in {
     test(new APURefactored) { dut =>
-      dut.io.cpuAddr.poke(0x15.U)  // $4015
-      dut.io.cpuDataIn.poke(0x0F.U)  // 使能所有通道
+      dut.io.cpuAddr.poke(0x0E.U)
+      dut.io.cpuDataIn.poke(0x80.U)
       dut.io.cpuWrite.poke(true.B)
       dut.clock.step()
     }
   }
   
+  it should "set Noise period" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x0E.U)
+      for (i <- 0 until 16) {
+        dut.io.cpuDataIn.poke(i.U)
+        dut.io.cpuWrite.poke(true.B)
+        dut.clock.step()
+      }
+    }
+  }
+  
+  behavior of "APU Registers - DMC ($4010-$4013)"
+  
+  it should "write to DMC frequency" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x10.U)
+      dut.io.cpuDataIn.poke(0x0F.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+    }
+  }
+  
+  it should "set DMC IRQ enable" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x10.U)
+      dut.io.cpuDataIn.poke(0x80.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+    }
+  }
+  
+  it should "set DMC loop flag" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x10.U)
+      dut.io.cpuDataIn.poke(0x40.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+    }
+  }
+  
+  it should "write to DMC direct load" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x11.U)
+      dut.io.cpuDataIn.poke(0x7F.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+    }
+  }
+  
+  it should "write to DMC sample address" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x12.U)
+      dut.io.cpuDataIn.poke(0xC0.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+    }
+  }
+  
+  it should "write to DMC sample length" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x13.U)
+      dut.io.cpuDataIn.poke(0xFF.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+    }
+  }
+  
+  behavior of "APU Registers - Control ($4015)"
+  
+  it should "enable channels" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x15.U)
+      dut.io.cpuDataIn.poke(0x0F.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+    }
+  }
+  
+  it should "enable individual channels" in {
+    test(new APURefactored) { dut =>
+      val enables = Seq(0x01, 0x02, 0x04, 0x08, 0x10)
+      for (en <- enables) {
+        dut.io.cpuAddr.poke(0x15.U)
+        dut.io.cpuDataIn.poke(en.U)
+        dut.io.cpuWrite.poke(true.B)
+        dut.clock.step()
+      }
+    }
+  }
+  
   it should "read channel status" in {
     test(new APURefactored) { dut =>
-      dut.io.cpuAddr.poke(0x15.U)  // $4015
+      dut.io.cpuAddr.poke(0x15.U)
       dut.io.cpuRead.poke(true.B)
       dut.clock.step()
-      
-      // 初始状态应该是 0
       dut.io.cpuDataOut.expect(0.U)
     }
   }
@@ -153,8 +275,8 @@ class APURegisterSpec extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "set 4-step mode" in {
     test(new APURefactored) { dut =>
-      dut.io.cpuAddr.poke(0x17.U)  // $4017
-      dut.io.cpuDataIn.poke(0x00.U)  // 4步模式
+      dut.io.cpuAddr.poke(0x17.U)
+      dut.io.cpuDataIn.poke(0x00.U)
       dut.io.cpuWrite.poke(true.B)
       dut.clock.step()
     }
@@ -162,8 +284,17 @@ class APURegisterSpec extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "set 5-step mode" in {
     test(new APURefactored) { dut =>
-      dut.io.cpuAddr.poke(0x17.U)  // $4017
-      dut.io.cpuDataIn.poke(0x80.U)  // 5步模式
+      dut.io.cpuAddr.poke(0x17.U)
+      dut.io.cpuDataIn.poke(0x80.U)
+      dut.io.cpuWrite.poke(true.B)
+      dut.clock.step()
+    }
+  }
+  
+  it should "set IRQ inhibit flag" in {
+    test(new APURefactored) { dut =>
+      dut.io.cpuAddr.poke(0x17.U)
+      dut.io.cpuDataIn.poke(0x40.U)
       dut.io.cpuWrite.poke(true.B)
       dut.clock.step()
     }
