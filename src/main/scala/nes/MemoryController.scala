@@ -20,6 +20,12 @@ class MemoryController extends Module {
     val ppuWrite = Output(Bool())
     val ppuRead = Output(Bool())
     
+    // OAM DMA 接口
+    val oamDmaAddr = Output(UInt(8.W))
+    val oamDmaData = Output(UInt(8.W))
+    val oamDmaWrite = Output(Bool())
+    val oamDmaActive = Output(Bool())  // DMA 正在进行，CPU 暂停
+    
     // 控制器接口 (简化)
     val controller1 = Input(UInt(8.W))
     val controller2 = Input(UInt(8.W))
@@ -38,12 +44,21 @@ class MemoryController extends Module {
   // 这样可以在同一个周期内读取数据，避免时序问题
   val prgROM = Mem(32768, UInt(8.W))
   
+  // OAM DMA 状态机
+  val dmaActive = RegInit(false.B)
+  val dmaPage = RegInit(0.U(8.W))
+  val dmaOffset = RegInit(0.U(8.W))
+  
   // 默认输出
   io.cpuDataOut := 0.U
   io.ppuAddr := 0.U
   io.ppuDataIn := 0.U
   io.ppuWrite := false.B
   io.ppuRead := false.B
+  io.oamDmaAddr := 0.U
+  io.oamDmaData := 0.U
+  io.oamDmaWrite := false.B
+  io.oamDmaActive := dmaActive
   
   // NES 内存映射
   // $0000-$07FF: 2KB 内部 RAM
@@ -81,7 +96,35 @@ class MemoryController extends Module {
     }
   }
   
-  when(io.cpuWrite) {
+  // OAM DMA 处理
+  when(dmaActive) {
+    // DMA 正在进行，从内存读取并写入 OAM
+    val dmaAddr = Cat(dmaPage, dmaOffset)
+    val dmaData = WireDefault(0.U(8.W))
+    
+    // 从内存读取数据
+    when(dmaAddr < 0x2000.U) {
+      dmaData := internalRAM.read(dmaAddr(10, 0))
+    }.elsewhen(dmaAddr >= 0x8000.U) {
+      val romAddr = (dmaAddr - 0x8000.U)(13, 0)
+      dmaData := prgROM.read(romAddr)
+    }
+    
+    // 写入 OAM
+    io.oamDmaAddr := dmaOffset
+    io.oamDmaData := dmaData
+    io.oamDmaWrite := true.B
+    
+    // 更新偏移
+    dmaOffset := dmaOffset + 1.U
+    
+    // 完成 256 字节传输后结束
+    when(dmaOffset === 255.U) {
+      dmaActive := false.B
+    }
+  }
+  
+  when(io.cpuWrite && !dmaActive) {
     when(io.cpuAddr < 0x2000.U) {
       // 内部 RAM (带镜像)
       val ramAddr = io.cpuAddr(10, 0)
@@ -91,6 +134,11 @@ class MemoryController extends Module {
       io.ppuAddr := io.cpuAddr(2, 0)
       io.ppuDataIn := io.cpuDataIn
       io.ppuWrite := true.B
+    }.elsewhen(io.cpuAddr === 0x4014.U) {
+      // OAM DMA 寄存器
+      dmaActive := true.B
+      dmaPage := io.cpuDataIn
+      dmaOffset := 0.U
     }.elsewhen(io.cpuAddr >= 0x8000.U) {
       // PRG ROM (测试时可写)
       val romAddr = io.cpuAddr - 0x8000.U
