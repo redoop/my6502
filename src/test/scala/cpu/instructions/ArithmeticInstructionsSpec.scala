@@ -67,6 +67,105 @@ class ArithmeticInstructionsSpec extends AnyFlatSpec with ChiselScalatestTester 
     }
   }
 
+  behavior of "ArithmeticInstructions - Zero Page"
+
+  it should "ADC zero page adds with carry" in {
+    test(new ArithmeticZeroPageTestModule) { dut =>
+      dut.io.opcode.poke(0x65.U)
+      dut.io.aIn.poke(0x50.U)
+      dut.io.flagCIn.poke(false.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      
+      // Cycle 0: 读取地址
+      dut.io.memDataIn.poke(0x10.U)
+      dut.clock.step()
+      
+      // Cycle 1: 读取数据并执行
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x10.U)
+      dut.io.memDataIn.poke(0x30.U)
+      dut.clock.step()
+      dut.io.aOut.expect(0x80.U)
+      dut.io.flagN.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "SBC zero page subtracts with borrow" in {
+    test(new ArithmeticZeroPageTestModule) { dut =>
+      dut.io.opcode.poke(0xE5.U)
+      dut.io.aIn.poke(0x50.U)
+      dut.io.flagCIn.poke(true.B)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      
+      // Cycle 0: 读取地址
+      dut.io.memDataIn.poke(0x20.U)
+      dut.clock.step()
+      
+      // Cycle 1: 读取数据并执行
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x20.U)
+      dut.io.memDataIn.poke(0x30.U)
+      dut.clock.step()
+      dut.io.aOut.expect(0x20.U)
+      dut.io.flagC.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "INC zero page increments memory" in {
+    test(new ArithmeticZeroPageTestModule) { dut =>
+      dut.io.opcode.poke(0xE6.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      
+      // Cycle 0: 读取地址
+      dut.io.memDataIn.poke(0x30.U)
+      dut.clock.step()
+      
+      // Cycle 1: 读取数据
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x30.U)
+      dut.io.memDataIn.poke(0x42.U)
+      dut.clock.step()
+      
+      // Cycle 2: 写回结果
+      dut.io.cycle.poke(2.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0x43.U)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "DEC zero page decrements memory" in {
+    test(new ArithmeticZeroPageTestModule) { dut =>
+      dut.io.opcode.poke(0xC6.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      
+      // Cycle 0: 读取地址
+      dut.io.memDataIn.poke(0x40.U)
+      dut.clock.step()
+      
+      // Cycle 1: 读取数据
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x40.U)
+      dut.io.memDataIn.poke(0x01.U)
+      dut.clock.step()
+      
+      // Cycle 2: 写回结果
+      dut.io.cycle.poke(2.U)
+      dut.clock.step()
+      dut.io.memWrite.expect(true.B)
+      dut.io.memDataOut.expect(0x00.U)
+      dut.io.flagZ.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
   it should "INC A (65C02) increments accumulator" in {
     test(new ArithmeticTestModule) { dut =>
       dut.io.opcode.poke(0x1A.U)
@@ -114,4 +213,43 @@ class ArithmeticTestModule extends Module {
   io.yOut     := result.regs.y
   io.flagNOut := result.regs.flagN
   io.flagZOut := result.regs.flagZ
+}
+
+class ArithmeticZeroPageTestModule extends Module {
+  val io = IO(new Bundle {
+    val opcode     = Input(UInt(8.W))
+    val cycle      = Input(UInt(8.W))
+    val operand    = Input(UInt(8.W))
+    val memDataIn  = Input(UInt(8.W))
+    val aIn        = Input(UInt(8.W))
+    val flagCIn    = Input(Bool())
+    val memAddr    = Output(UInt(16.W))
+    val memWrite   = Output(Bool())
+    val memDataOut = Output(UInt(8.W))
+    val aOut       = Output(UInt(8.W))
+    val flagN      = Output(Bool())
+    val flagZ      = Output(Bool())
+    val flagC      = Output(Bool())
+    val done       = Output(Bool())
+  })
+
+  val regs = Wire(new Registers)
+  regs := Registers.default()
+  regs.a := io.aIn
+  regs.flagC := io.flagCIn
+
+  val isADCSBC = (io.opcode === 0x65.U) || (io.opcode === 0xE5.U)
+  val result = Mux(isADCSBC,
+    ArithmeticInstructions.executeADCSBCZeroPage(io.opcode, io.cycle, regs, io.operand, io.memDataIn),
+    ArithmeticInstructions.executeZeroPage(io.opcode, io.cycle, regs, io.operand, io.memDataIn)
+  )
+
+  io.memAddr    := result.memAddr
+  io.memWrite   := result.memWrite
+  io.memDataOut := result.memData
+  io.aOut       := result.regs.a
+  io.flagN      := result.regs.flagN
+  io.flagZ      := result.regs.flagZ
+  io.flagC      := result.regs.flagC
+  io.done       := result.done
 }
