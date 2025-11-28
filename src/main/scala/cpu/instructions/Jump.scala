@@ -35,6 +35,7 @@ object JumpInstructions {
       is(1.U) {
         result.memAddr := regs.pc
         result.memRead := true.B
+        result.operand := Cat(memDataIn, operand(7, 0))
         newRegs.pc := Cat(memDataIn, operand(7, 0))
         result.regs := newRegs
         result.done := true.B
@@ -126,19 +127,25 @@ object JumpInstructions {
         result.memAddr := regs.pc
         result.memRead := true.B
         result.operand := Cat(memDataIn, operand(7, 0))
+        newRegs.pc := regs.pc + 1.U
+        result.regs := newRegs
         result.nextCycle := 2.U
       }
       is(2.U) {
+        // 压栈 PC-1 的高字节（返回地址指向 JSR 的最后一个字节）
+        val returnAddr = regs.pc - 1.U
         result.memAddr := Cat(0x01.U(8.W), regs.sp)
-        result.memData := regs.pc(15, 8)
+        result.memData := returnAddr(15, 8)
         result.memWrite := true.B
         newRegs.sp := regs.sp - 1.U
         result.regs := newRegs
         result.nextCycle := 3.U
       }
       is(3.U) {
+        // 压栈 PC-1 的低字节
+        val returnAddr = regs.pc - 1.U
         result.memAddr := Cat(0x01.U(8.W), regs.sp)
-        result.memData := regs.pc(7, 0)
+        result.memData := returnAddr(7, 0)
         result.memWrite := true.B
         newRegs.sp := regs.sp - 1.U
         newRegs.pc := operand
@@ -182,6 +189,7 @@ object JumpInstructions {
       is(2.U) {
         result.memAddr := Cat(0x01.U(8.W), regs.sp)
         result.memRead := true.B
+        result.operand := Cat(memDataIn, operand(7, 0))
         newRegs.pc := Cat(memDataIn, operand(7, 0)) + 1.U
         result.regs := newRegs
         result.done := true.B

@@ -196,3 +196,144 @@ class CompareZeroPageTestModule extends Module {
   io.flagN := result.regs.flagN
   io.done  := result.done
 }
+
+class CompareAbsoluteSpec extends AnyFlatSpec with ChiselScalatestTester {
+  behavior of "CompareInstructions - Absolute"
+
+  it should "CMP absolute equal" in {
+    test(new CompareAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0xCD.U)
+      dut.io.aIn.poke(0x42.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x34.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x34.U)
+      dut.io.memDataIn.poke(0x12.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x1234.U)
+      dut.io.memDataIn.poke(0x42.U)
+      dut.clock.step()
+      dut.io.flagZ.expect(true.B)
+      dut.io.flagC.expect(true.B)
+      dut.io.flagN.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "CMP absolute greater" in {
+    test(new CompareAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0xCD.U)
+      dut.io.aIn.poke(0x50.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x20.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x2000.U)
+      dut.io.memDataIn.poke(0x30.U)
+      dut.clock.step()
+      dut.io.flagZ.expect(false.B)
+      dut.io.flagC.expect(true.B)
+      dut.io.flagN.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "CMP absolute less" in {
+    test(new CompareAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0xCD.U)
+      dut.io.aIn.poke(0x30.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x30.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x3000.U)
+      dut.io.memDataIn.poke(0x50.U)
+      dut.clock.step()
+      dut.io.flagZ.expect(false.B)
+      dut.io.flagC.expect(false.B)
+      dut.io.flagN.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "CPX absolute equal" in {
+    test(new CompareAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0xEC.U)
+      dut.io.xIn.poke(0x55.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x40.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x4000.U)
+      dut.io.memDataIn.poke(0x55.U)
+      dut.clock.step()
+      dut.io.flagZ.expect(true.B)
+      dut.io.flagC.expect(true.B)
+      dut.io.flagN.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "CPX absolute greater" in {
+    test(new CompareAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0xEC.U)
+      dut.io.xIn.poke(0x80.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x50.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x5000.U)
+      dut.io.memDataIn.poke(0x40.U)
+      dut.clock.step()
+      dut.io.flagZ.expect(false.B)
+      dut.io.flagC.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "CPY absolute equal" in {
+    test(new CompareAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0xCC.U)
+      dut.io.yIn.poke(0xAA.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x60.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x6000.U)
+      dut.io.memDataIn.poke(0xAA.U)
+      dut.clock.step()
+      dut.io.flagZ.expect(true.B)
+      dut.io.flagC.expect(true.B)
+      dut.io.flagN.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+}

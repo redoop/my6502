@@ -209,3 +209,193 @@ class LogicZeroPageTestModule extends Module {
   io.flagV := result.regs.flagV
   io.done  := result.done
 }
+
+class LogicAbsoluteSpec extends AnyFlatSpec with ChiselScalatestTester {
+  behavior of "LogicInstructions - Absolute"
+
+  it should "AND absolute" in {
+    test(new LogicAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x2D.U)
+      dut.io.aIn.poke(0xFF.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x34.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x34.U)
+      dut.io.memDataIn.poke(0x12.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x1234.U)
+      dut.io.memDataIn.poke(0x0F.U)
+      dut.clock.step()
+      dut.io.aOut.expect(0x0F.U)
+      dut.io.flagZ.expect(false.B)
+      dut.io.flagN.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "ORA absolute" in {
+    test(new LogicAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x0D.U)
+      dut.io.aIn.poke(0x0F.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x20.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x2000.U)
+      dut.io.memDataIn.poke(0xF0.U)
+      dut.clock.step()
+      dut.io.aOut.expect(0xFF.U)
+      dut.io.flagZ.expect(false.B)
+      dut.io.flagN.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "EOR absolute" in {
+    test(new LogicAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x4D.U)
+      dut.io.aIn.poke(0xFF.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x30.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x3000.U)
+      dut.io.memDataIn.poke(0xFF.U)
+      dut.clock.step()
+      dut.io.aOut.expect(0x00.U)
+      dut.io.flagZ.expect(true.B)
+      dut.io.flagN.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "BIT absolute" in {
+    test(new LogicAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x2C.U)
+      dut.io.aIn.poke(0xFF.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x40.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x4000.U)
+      dut.io.memDataIn.poke(0xC0.U)
+      dut.clock.step()
+      dut.io.aOut.expect(0xFF.U)
+      dut.io.flagZ.expect(false.B)
+      dut.io.flagN.expect(true.B)
+      dut.io.flagV.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "BIT absolute with zero result" in {
+    test(new LogicAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x2C.U)
+      dut.io.aIn.poke(0x0F.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x50.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x5000.U)
+      dut.io.memDataIn.poke(0xF0.U)
+      dut.clock.step()
+      dut.io.aOut.expect(0x0F.U)
+      dut.io.flagZ.expect(true.B)
+      dut.io.flagN.expect(true.B)
+      dut.io.flagV.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "AND absolute with zero result" in {
+    test(new LogicAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x2D.U)
+      dut.io.aIn.poke(0x0F.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x60.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x6000.U)
+      dut.io.memDataIn.poke(0xF0.U)
+      dut.clock.step()
+      dut.io.aOut.expect(0x00.U)
+      dut.io.flagZ.expect(true.B)
+      dut.io.flagN.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "ORA absolute with zero input" in {
+    test(new LogicAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x0D.U)
+      dut.io.aIn.poke(0x00.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x70.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x7000.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.aOut.expect(0x00.U)
+      dut.io.flagZ.expect(true.B)
+      dut.io.flagN.expect(false.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+
+  it should "EOR absolute with negative result" in {
+    test(new LogicAbsoluteTestModule) { dut =>
+      dut.io.opcode.poke(0x4D.U)
+      dut.io.aIn.poke(0x0F.U)
+      dut.io.cycle.poke(0.U)
+      dut.io.operand.poke(0.U)
+      dut.io.memDataIn.poke(0x00.U)
+      dut.clock.step()
+      dut.io.cycle.poke(1.U)
+      dut.io.operand.poke(0x00.U)
+      dut.io.memDataIn.poke(0x80.U)
+      dut.clock.step()
+      dut.io.cycle.poke(2.U)
+      dut.io.operand.poke(0x8000.U)
+      dut.io.memDataIn.poke(0xFF.U)
+      dut.clock.step()
+      dut.io.aOut.expect(0xF0.U)
+      dut.io.flagZ.expect(false.B)
+      dut.io.flagN.expect(true.B)
+      dut.io.done.expect(true.B)
+    }
+  }
+}
