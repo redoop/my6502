@@ -99,8 +99,6 @@ class CPU6502Test extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step(1)
       dut.io.memDataIn.poke(0x05.U)
       dut.clock.step(1)
-      dut.io.memDataIn.poke(0xEA.U)  // NOP
-      dut.clock.step(1)
       
       val pcAfter = dut.io.debug.regPC.peek().litValue
       assert(pcAfter == pcBefore + 7) // PC + 2 (指令) + 5 (偏移)
