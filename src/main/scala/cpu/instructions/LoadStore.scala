@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// /Instruction: LDA, LDX, LDY, STA, STX, STY
+// /Instructions: LDA, LDX, LDY, STA, STX, STY
 object LoadStoreInstructions {
   val immediateOpcodes = Seq(0xA9, 0xA2, 0xA0)
   val zeroPageOpcodes = Seq(0xA5, 0x85, 0x86, 0x84, 0xA6, 0xA4)  // LDA/STA/STX/STY/LDX/LDY

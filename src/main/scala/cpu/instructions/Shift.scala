@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// Instruction: ASL, LSR, ROL, ROR
+// Instructions: ASL, LSR, ROL, ROR
 object ShiftInstructions {
   val accumulatorOpcodes = Seq(0x0A, 0x4A, 0x2A, 0x6A)
   val zeroPageOpcodes = Seq(0x06, 0x46, 0x26, 0x66)

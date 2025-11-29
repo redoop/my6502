@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// Instruction: CMP, CPX, CPY
+// Instructions: CMP, CPX, CPY
 object CompareInstructions {
   val immediateOpcodes = Seq(0xC9, 0xE0, 0xC0)
   val zeroPageOpcodes = Seq(0xC5, 0xE4, 0xC4)  // CMP, CPX, CPY

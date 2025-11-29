@@ -35,10 +35,10 @@ object TestHelpers {
   }
   
   /**
-// * WaitInstructionExecuteComplete
+// * WaitInstructionsExecuteComplete
 // *  CPU State
    */
-  def waitInstructionComplete(dut: CPU6502Core, maxCycles: Int = 20): Int = {
+  def waitInstructionsComplete(dut: CPU6502Core, maxCycles: Int = 20): Int = {
     var cycles = 0
     var lastPC = dut.io.debug.regPC.peek().litValue
     
@@ -49,7 +49,7 @@ object TestHelpers {
       val currentPC = dut.io.debug.regPC.peek().litValue
       val state = dut.io.debug.state.peek().litValue
       
-      // PC State Fetch，InstructionExecuteComplete
+      // PC State Fetch，InstructionsExecuteComplete
       if (currentPC != lastPC && state == 1) {
         return cycles
       }
@@ -213,118 +213,118 @@ class SimpleMemory {
 }
 
 /**
-// * Instruction
-// * InstructionSequence
+// * Instructions
+// * InstructionsSequence
  */
-object InstructionBuilder {
+object InstructionsBuilder {
   
   /**
-// *  ASL zp,X Instruction
+// *  ASL zp,X Instructions
    */
   def aslZpX(zpAddr: Int): Seq[Int] = {
     Seq(0x16, zpAddr & 0xFF)
   }
   
   /**
-// *  INC abs,X Instruction
+// *  INC abs,X Instructions
    */
   def incAbsX(absAddr: Int): Seq[Int] = {
     Seq(0xFE, absAddr & 0xFF, (absAddr >> 8) & 0xFF)
   }
   
   /**
-// *  ASL abs Instruction
+// *  ASL abs Instructions
    */
   def aslAbs(absAddr: Int): Seq[Int] = {
     Seq(0x0E, absAddr & 0xFF, (absAddr >> 8) & 0xFF)
   }
   
   /**
-// *  ROL zp,X Instruction
+// *  ROL zp,X Instructions
    */
   def rolZpX(zpAddr: Int): Seq[Int] = {
     Seq(0x36, zpAddr & 0xFF)
   }
   
   /**
-// *  LSR abs,X Instruction
+// *  LSR abs,X Instructions
    */
   def lsrAbsX(absAddr: Int): Seq[Int] = {
     Seq(0x5E, absAddr & 0xFF, (absAddr >> 8) & 0xFF)
   }
   
   /**
-// *  SBC (ind,X) Instruction
+// *  SBC (ind,X) Instructions
    */
   def sbcIndX(zpAddr: Int): Seq[Int] = {
     Seq(0xE1, zpAddr & 0xFF)
   }
   
   /**
-// *  SBC zp Instruction
+// *  SBC zp Instructions
    */
   def sbcZp(zpAddr: Int): Seq[Int] = {
     Seq(0xE5, zpAddr & 0xFF)
   }
   
   /**
-// *  LSR zp,X Instruction
+// *  LSR zp,X Instructions
    */
   def lsrZpX(zpAddr: Int): Seq[Int] = {
     Seq(0x56, zpAddr & 0xFF)
   }
   
   /**
-// *  ROL abs,X Instruction
+// *  ROL abs,X Instructions
    */
   def rolAbsX(absAddr: Int): Seq[Int] = {
     Seq(0x3E, absAddr & 0xFF, (absAddr >> 8) & 0xFF)
   }
   
   /**
-// *  SBC (ind),Y Instruction
+// *  SBC (ind),Y Instructions
    */
   def sbcIndY(zpAddr: Int): Seq[Int] = {
     Seq(0xF1, zpAddr & 0xFF)
   }
   
   /**
-// *  LDA #imm Instruction（Set A）
+// *  LDA #imm Instructions（Set A）
    */
   def ldaImm(value: Int): Seq[Int] = {
     Seq(0xA9, value & 0xFF)
   }
   
   /**
-// *  LDX #imm Instruction（Set X）
+// *  LDX #imm Instructions（Set X）
    */
   def ldxImm(value: Int): Seq[Int] = {
     Seq(0xA2, value & 0xFF)
   }
   
   /**
-// *  LDY #imm Instruction（Set Y）
+// *  LDY #imm Instructions（Set Y）
    */
   def ldyImm(value: Int): Seq[Int] = {
     Seq(0xA0, value & 0xFF)
   }
   
   /**
-// *  SEC Instruction（Set）
+// *  SEC Instructions（Set）
    */
   def sec(): Seq[Int] = {
     Seq(0x38)
   }
   
   /**
-// *  CLC Instruction（Clear）
+// *  CLC Instructions（Clear）
    */
   def clc(): Seq[Int] = {
     Seq(0x18)
   }
   
   /**
-// *  NOP Instruction
+// *  NOP Instructions
    */
   def nop(): Seq[Int] = {
     Seq(0xEA)

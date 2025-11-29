@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// FlagInstruction: CLC, SEC, CLD, SED, CLI, SEI, CLV, NOP
+// FlagInstructions: CLC, SEC, CLD, SED, CLI, SEI, CLV, NOP
 object FlagInstructions {
   val opcodes = Seq(0x18, 0x38, 0xD8, 0xF8, 0x58, 0x78, 0xB8, 0xEA)
   

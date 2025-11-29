@@ -5,7 +5,7 @@ import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
 import cpu6502.core._
 
-class BEQInstructionSpec extends AnyFlatSpec with ChiselScalatestTester {
+class BEQInstructionsSpec extends AnyFlatSpec with ChiselScalatestTester {
   
   "BEQ" should "branch when Z=1" in {
     test(new BranchInstructionsModule) { dut =>

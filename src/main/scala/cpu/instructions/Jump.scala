@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// Instruction: JMP, JSR, RTS, BRK, RTI
+// Instructions: JMP, JSR, RTS, BRK, RTI
 object JumpInstructions {
   val opcodes = Seq(0x4C, 0x6C, 0x20, 0x60, 0x00, 0x40)
   

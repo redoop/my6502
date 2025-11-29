@@ -26,7 +26,7 @@ class PPUStatusClearTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.vblank.expect(true.B)
       println("✓ VBlank set at scanline 241")
       
-      // Cycle，VBlank
+      // cycles, VBlank
       for (i <- 1 to 10) {
         dut.clock.step(100)
         val vb = dut.io.vblank.peek().litValue
@@ -38,8 +38,8 @@ class PPUStatusClearTest extends AnyFlatSpec with ChiselScalatestTester {
       
       println("\n✓ VBlank persists without PPUSTATUS read")
       
-      // inRead PPUSTATUS
-      println("\n读取 PPUSTATUS...")
+      // now read PPUSTATUS
+      println("\nread PPUSTATUS...")
       dut.io.cpuAddr.poke(2.U)
       dut.io.cpuRead.poke(true.B)
       dut.clock.step(1)

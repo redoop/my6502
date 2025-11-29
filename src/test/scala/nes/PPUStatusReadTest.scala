@@ -20,7 +20,7 @@ class PPUStatusReadTest extends AnyFlatSpec with ChiselScalatestTester {
       
       // to VBlank
       val cyclesTo241 = 241 * 341 + 10
-      println(s"运行 $cyclesTo241 个周期到 VBlank...")
+      println(s"Running $cyclesTo241 cycles to VBlank...")
       dut.clock.step(cyclesTo241)
       
       // VBlank Flag
@@ -37,8 +37,8 @@ class PPUStatusReadTest extends AnyFlatSpec with ChiselScalatestTester {
       
       println(f"✓ CPU: PC=0x$pc%04x PPUCTRL=0x$ppuCtrl%02x PPUMASK=0x$ppuMask%02x")
       
-      // Cycle， CPU for
-      println("\n观察 CPU 在 VBlank 期间的行为...")
+      // Run cycles, observe CPU behavior
+      println("\nObserving CPU behavior during VBlank...")
       for (i <- 0 until 10) {
         dut.clock.step(1000)
         val pc2 = dut.io.debug.cpuPC.peek().litValue

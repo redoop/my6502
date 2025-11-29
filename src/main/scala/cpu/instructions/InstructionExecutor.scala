@@ -4,16 +4,16 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// InstructionExecuteResult
+// InstructionsExecuteResult
 class ExecutionResult extends Bundle {
-  val done     = Bool()           // InstructionExecuteComplete
+  val done     = Bool()           // InstructionsExecuteComplete
   val nextCycle = UInt(3.W)       // Cycle
   val regs     = new Registers    // UpdateRegisters
   val memAddr  = UInt(16.W)       // Address
   val memData  = UInt(8.W)        // WriteData
   val memWrite = Bool()
   val memRead  = Bool()
-  val operand  = UInt(16.W)       // Operand (CycleInstruction)
+  val operand  = UInt(16.W)       // Operand (CycleInstructions)
 }
 
 object ExecutionResult {

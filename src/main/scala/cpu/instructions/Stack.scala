@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// Instruction: PHA, PHP, PLA, PLP
+// Instructions: PHA, PHP, PLA, PLP
 object StackInstructions {
   val pushOpcodes = Seq(0x48, 0x08)
   val pullOpcodes = Seq(0x68, 0x28)

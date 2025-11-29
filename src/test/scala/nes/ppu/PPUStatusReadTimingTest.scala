@@ -40,7 +40,7 @@ class PPUStatusReadTimingTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.cpuRead.poke(false.B)
       println(s"✓ cpuRead cleared")
       
-      // Cycle，VBlank Clear
+      // cycles, VBlank Clear
       dut.clock.step(1)
       val vb2 = dut.io.vblank.peek().litValue
       val status2 = dut.io.cpuDataOut.peek().litValue

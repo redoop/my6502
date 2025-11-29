@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// Instruction: AND, ORA, EOR, BIT
+// Instructions: AND, ORA, EOR, BIT
 object LogicInstructions {
   val immediateOpcodes = Seq(0x29, 0x09, 0x49)
   val zeroPageOpcodes = Seq(0x24, 0x25, 0x05, 0x45)  // BIT, AND, ORA, EOR
@@ -210,7 +210,7 @@ object LogicInstructions {
         result.memAddr := operand
         result.memRead := true.B
         
-        // BIT InstructionProcess
+        // BIT InstructionsProcess
         when(opcode === 0x2C.U) {
           newRegs.flagZ := (regs.a & memDataIn) === 0.U
           newRegs.flagN := memDataIn(7)

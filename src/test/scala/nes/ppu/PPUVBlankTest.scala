@@ -26,7 +26,7 @@ class PPUVBlankTest extends AnyFlatSpec with ChiselScalatestTester {
       // scanline  341
       val cyclesTo241 = 241 * 341 + 1
       
-      println(s"运行 $cyclesTo241 个周期到 scanline 241...")
+      println(s"Running $cyclesTo241 cycles to scanline 241...")
       dut.clock.step(cyclesTo241)
       
 

@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// RegistersInstruction: TAX, TAY, TXA, TYA, TSX, TXS
+// RegistersInstructions: TAX, TAY, TXA, TYA, TSX, TXS
 object TransferInstructions {
   val opcodes = Seq(0xAA, 0xA8, 0x8A, 0x98, 0xBA, 0x9A)
   

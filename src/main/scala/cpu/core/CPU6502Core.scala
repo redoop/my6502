@@ -51,7 +51,7 @@ class CPU6502Core extends Module {
   io.memWrite   := false.B
   io.memRead    := false.B
 
-  // InstructionExecuteResult
+  // InstructionsExecuteResult
   val execResult = Wire(new ExecutionResult)
   execResult := ExecutionResult.hold(regs, operand)
 
@@ -135,8 +135,8 @@ class CPU6502Core extends Module {
         }
 
         is(sExecute) {
-          // opcode toInstructionModule
-          execResult := dispatchInstruction(opcode, cycle, regs, operand, io.memDataIn)
+          // opcode toInstructionsModule
+          execResult := dispatchInstructions(opcode, cycle, regs, operand, io.memDataIn)
           
           // ApplyExecuteResult
           io.memAddr    := execResult.memAddr
@@ -226,8 +226,8 @@ class CPU6502Core extends Module {
   debugBundle := DebugBundle.fromRegisters(regs, opcode, state, cycle)
   io.debug := debugBundle
 
-  // Instruction
-  def dispatchInstruction(
+  // Instructions
+  def dispatchInstructions(
     opcode: UInt, 
     cycle: UInt, 
     regs: Registers, 
@@ -238,12 +238,12 @@ class CPU6502Core extends Module {
     result := ExecutionResult.hold(regs, operand)
     
     switch(opcode) {
-      // ========== Flag Instruction ==========
+      // ========== Flag Instructions ==========
       is(0x18.U, 0x38.U, 0xD8.U, 0xF8.U, 0x58.U, 0x78.U, 0xB8.U, 0xEA.U) {
         result := FlagInstructions.execute(opcode, regs)
       }
       
-      // ========== Transfer Instruction ==========
+      // ========== Transfer Instructions ==========
       is(0xAA.U, 0xA8.U, 0x8A.U, 0x98.U, 0xBA.U, 0x9A.U) {
         result := TransferInstructions.execute(opcode, regs)
       }
@@ -410,7 +410,7 @@ class CPU6502Core extends Module {
         result := CompareInstructions.executeIndirect(opcode, cycle, regs, operand, memDataIn)
       }
       
-      // ========== Branch Instruction ==========
+      // ========== Branch Instructions ==========
       is(0xF0.U, 0xD0.U, 0xB0.U, 0x90.U, 0x30.U, 0x10.U, 0x50.U, 0x70.U) {
         result := BranchInstructions.execute(opcode, regs, memDataIn)
       }
@@ -465,7 +465,7 @@ class CPU6502Core extends Module {
         result := StackInstructions.executePull(opcode, cycle, regs, memDataIn)
       }
       
-      // ========== Jump Instruction ==========
+      // ========== Jump Instructions ==========
       is(0x4C.U) { result := JumpInstructions.executeJMP(cycle, regs, operand, memDataIn) }
       is(0x6C.U) { result := JumpInstructions.executeJMPIndirect(cycle, regs, operand, memDataIn) }
       is(0x20.U) { result := JumpInstructions.executeJSR(cycle, regs, operand, memDataIn) }

@@ -6,8 +6,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import cpu6502.core._
 
 /**
-// * P1 Instruction
-// *  Donkey Kong  10 Instruction（10-25）
+// * P1 Instructions
+// *  Donkey Kong top 10 instructions (ranks 10-25)
  */
 class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   
@@ -20,23 +20,23 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "pass basic smoke test" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 ADC zp - 基础冒烟测试 ===")
+      println("\n=== test ADC zp - basic smoke test ===")
       
       initCPU(dut)
-      printCPUState(dut, "初始化后")
+      printCPUState(dut, "after initialization")
       
-      println("✅ CPU 初始化成功")
+      println("✅ CPU initialization successful")
     }
   }
   
   it should "be recognized as valid opcode" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 ADC zp - 指令识别 ===")
+      println("\n=== test ADC zp - instruction recognition ===")
       
       initCPU(dut)
       
       // 0x65 ValidOpcode
-      println("✅ 指令 0x65 被正确识别")
+      println("✅ Instruction 0x65 correctly recognized")
     }
   }
   
@@ -47,21 +47,21 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "pass basic smoke test" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 INC zp,X - 基础冒烟测试 ===")
+      println("\n=== test INC zp,X - basic smoke test ===")
       
       initCPU(dut)
-      printCPUState(dut, "初始化后")
+      printCPUState(dut, "after initialization")
       
-      println("✅ CPU 初始化成功")
+      println("✅ CPU initialization successful")
     }
   }
   
   it should "be recognized as valid opcode" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 INC zp,X - 指令识别 ===")
+      println("\n=== test INC zp,X - instruction recognition ===")
       
       initCPU(dut)
-      println("✅ 指令 0xF6 被正确识别")
+      println("✅ Instruction 0xF6 correctly recognized")
     }
   }
   
@@ -72,21 +72,21 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "pass basic smoke test" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 LSR abs - 基础冒烟测试 ===")
+      println("\n=== test LSR abs - basic smoke test ===")
       
       initCPU(dut)
-      printCPUState(dut, "初始化后")
+      printCPUState(dut, "after initialization")
       
-      println("✅ CPU 初始化成功")
+      println("✅ CPU initialization successful")
     }
   }
   
   it should "be recognized as valid opcode" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 LSR abs - 指令识别 ===")
+      println("\n=== test LSR abs - instruction recognition ===")
       
       initCPU(dut)
-      println("✅ 指令 0x4E 被正确识别")
+      println("✅ Instruction 0x4E correctly recognized")
     }
   }
   
@@ -97,21 +97,21 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "pass basic smoke test" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 ASL abs,X - 基础冒烟测试 ===")
+      println("\n=== test ASL abs,X - basic smoke test ===")
       
       initCPU(dut)
-      printCPUState(dut, "初始化后")
+      printCPUState(dut, "after initialization")
       
-      println("✅ CPU 初始化成功")
+      println("✅ CPU initialization successful")
     }
   }
   
   it should "be recognized as valid opcode" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 ASL abs,X - 指令识别 ===")
+      println("\n=== test ASL abs,X - instruction recognition ===")
       
       initCPU(dut)
-      println("✅ 指令 0x1E 被正确识别")
+      println("✅ Instruction 0x1E correctly recognized")
     }
   }
   
@@ -122,21 +122,21 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "pass basic smoke test" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 DEC abs,X - 基础冒烟测试 ===")
+      println("\n=== test DEC abs,X - basic smoke test ===")
       
       initCPU(dut)
-      printCPUState(dut, "初始化后")
+      printCPUState(dut, "after initialization")
       
-      println("✅ CPU 初始化成功")
+      println("✅ CPU initialization successful")
     }
   }
   
   it should "be recognized as valid opcode" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 DEC abs,X - 指令识别 ===")
+      println("\n=== test DEC abs,X - instruction recognition ===")
       
       initCPU(dut)
-      println("✅ 指令 0xDE 被正确识别")
+      println("✅ Instruction 0xDE correctly recognized")
     }
   }
   
@@ -147,21 +147,21 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "pass basic smoke test" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 DEC zp,X - 基础冒烟测试 ===")
+      println("\n=== test DEC zp,X - basic smoke test ===")
       
       initCPU(dut)
-      printCPUState(dut, "初始化后")
+      printCPUState(dut, "after initialization")
       
-      println("✅ CPU 初始化成功")
+      println("✅ CPU initialization successful")
     }
   }
   
   it should "be recognized as valid opcode" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 DEC zp,X - 指令识别 ===")
+      println("\n=== test DEC zp,X - instruction recognition ===")
       
       initCPU(dut)
-      println("✅ 指令 0xD6 被正确识别")
+      println("✅ Instruction 0xD6 correctly recognized")
     }
   }
   
@@ -172,21 +172,21 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "pass basic smoke test" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 ROL abs - 基础冒烟测试 ===")
+      println("\n=== test ROL abs - basic smoke test ===")
       
       initCPU(dut)
-      printCPUState(dut, "初始化后")
+      printCPUState(dut, "after initialization")
       
-      println("✅ CPU 初始化成功")
+      println("✅ CPU initialization successful")
     }
   }
   
   it should "be recognized as valid opcode" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 ROL abs - 指令识别 ===")
+      println("\n=== test ROL abs - instruction recognition ===")
       
       initCPU(dut)
-      println("✅ 指令 0x2E 被正确识别")
+      println("✅ Instruction 0x2E correctly recognized")
     }
   }
   
@@ -197,21 +197,21 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "pass basic smoke test" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 SBC zp,X - 基础冒烟测试 ===")
+      println("\n=== test SBC zp,X - basic smoke test ===")
       
       initCPU(dut)
-      printCPUState(dut, "初始化后")
+      printCPUState(dut, "after initialization")
       
-      println("✅ CPU 初始化成功")
+      println("✅ CPU initialization successful")
     }
   }
   
   it should "be recognized as valid opcode" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 SBC zp,X - 指令识别 ===")
+      println("\n=== test SBC zp,X - instruction recognition ===")
       
       initCPU(dut)
-      println("✅ 指令 0xF5 被正确识别")
+      println("✅ Instruction 0xF5 correctly recognized")
     }
   }
   
@@ -222,21 +222,21 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "pass basic smoke test" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 SBC abs - 基础冒烟测试 ===")
+      println("\n=== test SBC abs - basic smoke test ===")
       
       initCPU(dut)
-      printCPUState(dut, "初始化后")
+      printCPUState(dut, "after initialization")
       
-      println("✅ CPU 初始化成功")
+      println("✅ CPU initialization successful")
     }
   }
   
   it should "be recognized as valid opcode" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 SBC abs - 指令识别 ===")
+      println("\n=== test SBC abs - instruction recognition ===")
       
       initCPU(dut)
-      println("✅ 指令 0xED 被正确识别")
+      println("✅ Instruction 0xED correctly recognized")
     }
   }
   
@@ -247,50 +247,50 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "pass basic smoke test" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 ADC abs - 基础冒烟测试 ===")
+      println("\n=== test ADC abs - basic smoke test ===")
       
       initCPU(dut)
-      printCPUState(dut, "初始化后")
+      printCPUState(dut, "after initialization")
       
-      println("✅ CPU 初始化成功")
+      println("✅ CPU initialization successful")
     }
   }
   
   it should "be recognized as valid opcode" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== 测试 ADC abs - 指令识别 ===")
+      println("\n=== test ADC abs - instruction recognition ===")
       
       initCPU(dut)
-      println("✅ 指令 0x6D 被正确识别")
+      println("✅ Instruction 0x6D correctly recognized")
     }
   }
   
   // ============================================
 
   // ============================================
-  behavior of "P1 Instructions - Integration"
+  behavior of "P1 Instructionss - Integration"
   
   it should "initialize CPU correctly for all P1 tests" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== P1 指令综合测试 - CPU 初始化 ===")
+      println("\n=== P1 instruction integration test - CPU initialization ===")
       
       initCPU(dut)
       
       // CPU State
-      printCPUState(dut, "初始化后")
+      printCPUState(dut, "after initialization")
       printFlags(dut)
       
       // PC inVector
       val pc = dut.io.debug.regPC.peek().litValue
       assert(pc < 0xFFF0L || pc > 0xFFFF, s"PC should not be in vector table area, got 0x${pc.toString(16)}")
       
-      println("✅ CPU 初始化验证通过")
+      println("✅ CPU initialization verification passed")
     }
   }
   
   it should "maintain stable state for P1 instructions" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== P1 指令综合测试 - 状态稳定性 ===")
+      println("\n=== P1 instruction integration test - state stability ===")
       
       initCPU(dut)
       
@@ -303,23 +303,23 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
       val finalPC = dut.io.debug.regPC.peek().litValue
       val finalState = dut.io.debug.state.peek().litValue
       
-      println(f"初始 PC: 0x$initialPC%04X, 状态: $initialState")
-      println(f"最终 PC: 0x$finalPC%04X, 状态: $finalState")
+      println(f"Initial PC: 0x$initialPC%04X, state: $initialState")
+      println(f"Final PC: 0x$finalPC%04X, state: $finalState")
       
-      // PC （ExecuteInstruction），to
+      // PC （ExecuteInstructions），to
       assert(finalPC < 0x10000L, "PC should be valid")
       
-      println("✅ 状态稳定性验证通过")
+      println("✅ state stabilityverification passed")
     }
   }
   
   it should "handle all P1 arithmetic instructions" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== P1 指令综合测试 - 算术指令 ===")
+      println("\n=== P1 instruction integration test - arithmetic instructions ===")
       
       initCPU(dut)
       
-      // P1 Instruction：
+      // P1 Instructions：
       // - ADC zp (0x65)
       // - ADC abs (0x6D)
       // - SBC zp,X (0xF5)
@@ -328,29 +328,29 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
       // - DEC zp,X (0xD6)
       // - DEC abs,X (0xDE)
       
-      println("✅ 算术指令组验证通过")
+      println("✅ arithmetic instruction group verified")
     }
   }
   
   it should "handle all P1 shift instructions" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== P1 指令综合测试 - 移位指令 ===")
+      println("\n=== P1 instruction integration test - shift instructions ===")
       
       initCPU(dut)
       
-      // P1 Instruction：
+      // P1 Instructions：
       // - LSR abs (0x4E)
       // - ASL abs,X (0x1E)
       // - ROL abs (0x2E)
       
-      println("✅ 移位指令组验证通过")
+      println("✅ shift instruction group verified")
     }
   }
 }
 
 /**
-// * P1 Instruction
-// * Instruction
+// * P1 Instructions
+// * Instructions
  */
 class P1CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
   
@@ -360,33 +360,33 @@ class P1CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "handle ADC instructions (zp and abs)" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== P1 算术测试 - ADC 指令组 ===")
+      println("\n=== P1 arithmetic test - ADC instruction group ===")
       
       initCPU(dut)
       
       // ADC zp (0x65) - 28
       // ADC abs (0x6D) - 15
       
-      println("✅ ADC 指令组测试通过")
+      println("✅ ADC instruction group test passed")
     }
   }
   
   it should "handle SBC instructions (zp,X and abs)" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== P1 算术测试 - SBC 指令组 ===")
+      println("\n=== P1 arithmetic test - SBC instruction group ===")
       
       initCPU(dut)
       
       // SBC zp,X (0xF5) - 17
       // SBC abs (0xED) - 16
       
-      println("✅ SBC 指令组测试通过")
+      println("✅ SBC instruction group test passed")
     }
   }
   
   it should "handle INC/DEC instructions" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== P1 算术测试 - INC/DEC 指令组 ===")
+      println("\n=== P1 arithmetic test - INC/DEC instruction group ===")
       
       initCPU(dut)
       
@@ -394,7 +394,7 @@ class P1CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       // DEC zp,X (0xD6) - 21
       // DEC abs,X (0xDE) - 22
       
-      println("✅ INC/DEC 指令组测试通过")
+      println("✅ INC/DEC instruction group test passed")
     }
   }
   
@@ -402,37 +402,37 @@ class P1CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "handle LSR abs instruction" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== P1 移位测试 - LSR abs ===")
+      println("\n=== P1 shift test - LSR abs ===")
       
       initCPU(dut)
       
       // LSR abs (0x4E) - 24
       
-      println("✅ LSR abs 测试通过")
+      println("✅ LSR abs test通过")
     }
   }
   
   it should "handle ASL abs,X instruction" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== P1 移位测试 - ASL abs,X ===")
+      println("\n=== P1 shift test - ASL abs,X ===")
       
       initCPU(dut)
       
       // ASL abs,X (0x1E) - 22
       
-      println("✅ ASL abs,X 测试通过")
+      println("✅ ASL abs,X test通过")
     }
   }
   
   it should "handle ROL abs instruction" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== P1 移位测试 - ROL abs ===")
+      println("\n=== P1 shift test - ROL abs ===")
       
       initCPU(dut)
       
       // ROL abs (0x2E) - 17
       
-      println("✅ ROL abs 测试通过")
+      println("✅ ROL abs test通过")
     }
   }
   
@@ -440,19 +440,19 @@ class P1CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "handle zero page addressing" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== P1 寻址模式测试 - 零页 ===")
+      println("\n=== P1 addressing mode test - zero page ===")
       
       initCPU(dut)
       
       // ADC zp (0x65)
       
-      println("✅ 零页寻址测试通过")
+      println("✅ zero page addressing test passed")
     }
   }
   
   it should "handle zero page X addressing" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== P1 寻址模式测试 - 零页X ===")
+      println("\n=== P1 addressing mode test - zero page X ===")
       
       initCPU(dut)
       
@@ -460,13 +460,13 @@ class P1CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       // DEC zp,X (0xD6)
       // SBC zp,X (0xF5)
       
-      println("✅ 零页X寻址测试通过")
+      println("✅ zero page X addressing test passed")
     }
   }
   
   it should "handle absolute addressing" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== P1 寻址模式测试 - 绝对 ===")
+      println("\n=== P1 addressing mode test - absolute ===")
       
       initCPU(dut)
       
@@ -475,20 +475,20 @@ class P1CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       // SBC abs (0xED)
       // ADC abs (0x6D)
       
-      println("✅ 绝对寻址测试通过")
+      println("✅ absolute addressing test passed")
     }
   }
   
   it should "handle absolute X addressing" in {
     test(new CPU6502Core) { dut =>
-      println("\n=== P1 寻址模式测试 - 绝对X ===")
+      println("\n=== P1 addressing mode test - absolute X ===")
       
       initCPU(dut)
       
       // ASL abs,X (0x1E)
       // DEC abs,X (0xDE)
       
-      println("✅ 绝对X寻址测试通过")
+      println("✅ absolute X addressing test passed")
     }
   }
 }

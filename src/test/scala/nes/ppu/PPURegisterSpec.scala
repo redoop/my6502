@@ -7,7 +7,7 @@ import nes.PPURefactored
 
 /**
 // * PPU Registers -
-// *  CPU Instruction， PPU  8 Registers
+// *  CPU Instructions， PPU  8 Registers
  */
 class PPURegisterSpec extends AnyFlatSpec with ChiselScalatestTester {
   

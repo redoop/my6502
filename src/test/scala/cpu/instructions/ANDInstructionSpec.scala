@@ -5,7 +5,7 @@ import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
 import cpu6502.core._
 
-class ANDInstructionSpec extends AnyFlatSpec with ChiselScalatestTester {
+class ANDInstructionsSpec extends AnyFlatSpec with ChiselScalatestTester {
   
   "AND Immediate" should "compute 0x40 AND 0x80 = 0x00" in {
     test(new LogicInstructionsModule) { dut =>

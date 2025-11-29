@@ -4,9 +4,9 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// Instruction: ADC, SBC, INC, DEC, INX, INY, DEX, DEY
+// Instructions: ADC, SBC, INC, DEC, INX, INY, DEX, DEY
 object ArithmeticInstructions {
-  // CycleInstruction ()
+  // CycleInstructions ()
   val impliedOpcodes = Seq(0xE8, 0xC8, 0xCA, 0x88, 0x1A, 0x3A)
 
   val immediateOpcodes = Seq(0x69, 0xE9)
@@ -36,7 +36,7 @@ object ArithmeticInstructions {
                 adcsbcZeroPageOpcodes ++ adcsbcZeroPageXOpcodes ++ adcsbcAbsoluteOpcodes ++
                 adcsbcIndirectXOpcodes ++ adcsbcIndirectYOpcodes
   
-  // CycleInstructionExecute
+  // CycleInstructionsExecute
   def executeImplied(opcode: UInt, regs: Registers): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)

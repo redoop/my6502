@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// Instruction: BEQ, BNE, BCS, BCC, BMI, BPL, BVC, BVS
+// Instructions: BEQ, BNE, BCS, BCC, BMI, BPL, BVC, BVS
 object BranchInstructions {
   val opcodes = Seq(0xF0, 0xD0, 0xB0, 0x90, 0x30, 0x10, 0x50, 0x70)
   
