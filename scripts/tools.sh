@@ -73,8 +73,8 @@ case "$MODE" in
         
         echo ""
         echo "构建大小:"
-        if [ -f "build/verilator/VNESSystem" ]; then
-            ls -lh build/verilator/VNESSystem | awk '{print $5}'
+        if [ -f "build/verilator/VNESSystemRefactored" ]; then
+            ls -lh build/verilator/VNESSystemRefactored | awk '{print $5}'
         else
             echo "未构建"
         fi

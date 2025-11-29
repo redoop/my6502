@@ -48,7 +48,7 @@ fi
 
 # 设置编译选项
 VERILATOR_FLAGS="--cc --exe --build -Wno-WIDTH -Wno-UNUSED -Wno-UNDRIVEN -Wno-CASEINCOMPLETE"
-VERILATOR_FLAGS="$VERILATOR_FLAGS --top-module NESSystemv2"
+VERILATOR_FLAGS="$VERILATOR_FLAGS --top-module NESSystemRefactored"
 
 case "$MODE" in
     fast)
@@ -77,8 +77,8 @@ verilator $VERILATOR_FLAGS \
     -LDFLAGS "$(pkg-config --libs sdl2)" \
     -Mdir "$PROJECT_DIR/build/verilator" \
     "$PROJECT_DIR/generated/nes/NESSystem.v" \
-    "$PROJECT_DIR/verilator/nes_testbench.cpp"
+    "$PROJECT_DIR/verilator/testbench_main.cpp"
 
 echo ""
 echo "✅ 构建完成！"
-echo "可执行文件: build/verilator/VNESSystem"
+echo "可执行文件: build/verilator/VNESSystemRefactored"

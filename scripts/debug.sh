@@ -43,13 +43,13 @@ case "$MODE" in
         
         case "$MONITOR_TYPE" in
             pc)
-                ./build/verilator/VNESSystem "$ROM" 2>&1 | grep -E "PC:|Opcode:" | head -100
+                ./build/verilator/VNESSystemRefactored "$ROM" 2>&1 | grep -E "PC:|Opcode:" | head -100
                 ;;
             ppu)
-                ./build/verilator/VNESSystem "$ROM" 2>&1 | grep -E "PPU|PPUSTATUS|PPUCTRL" | head -100
+                ./build/verilator/VNESSystemRefactored "$ROM" 2>&1 | grep -E "PPU|PPUSTATUS|PPUCTRL" | head -100
                 ;;
             nmi)
-                ./build/verilator/VNESSystem "$ROM" 2>&1 | grep -E "NMI|nmi" | head -100
+                ./build/verilator/VNESSystemRefactored "$ROM" 2>&1 | grep -E "NMI|nmi" | head -100
                 ;;
             *)
                 echo "❌ 未知监控类型: $MONITOR_TYPE"
