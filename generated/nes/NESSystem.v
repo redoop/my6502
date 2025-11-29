@@ -2619,34 +2619,50 @@ module CPU6502Refactored(
   assign core_io_nmi = io_nmi; // @[CPU6502Refactored.scala 29:17]
 endmodule
 module PPURegisterControl(
-  input        clock,
-  input        reset,
-  input  [2:0] io_cpuAddr,
-  input  [7:0] io_cpuDataIn,
-  output [7:0] io_cpuDataOut,
-  input        io_cpuWrite,
-  input        io_cpuRead,
-  output [7:0] io_regs_ppuCtrl,
-  output [7:0] io_regs_ppuMask,
-  input        io_setVBlank,
-  input        io_clearVBlank,
-  input        io_setSprite0Hit
+  input         clock,
+  input         reset,
+  input  [2:0]  io_cpuAddr,
+  input  [7:0]  io_cpuDataIn,
+  output [7:0]  io_cpuDataOut,
+  input         io_cpuWrite,
+  input         io_cpuRead,
+  output [7:0]  io_regs_ppuCtrl,
+  output [7:0]  io_regs_ppuMask,
+  output [15:0] io_regs_ppuAddr,
+  input         io_setVBlank,
+  input         io_clearVBlank,
+  input         io_setSprite0Hit
 );
   reg [7:0] regs_ppuCtrl; // @[PPURegisters.scala 63:21]
   reg [7:0] regs_ppuMask; // @[PPURegisters.scala 63:21]
   reg [7:0] regs_ppuStatus; // @[PPURegisters.scala 63:21]
+  reg [15:0] regs_ppuAddr; // @[PPURegisters.scala 63:21]
   reg [7:0] regs_ppuData; // @[PPURegisters.scala 63:21]
+  reg  regs_addrLatch; // @[PPURegisters.scala 63:21]
   reg  regs_vblank; // @[PPURegisters.scala 63:21]
   reg  regs_sprite0Hit; // @[PPURegisters.scala 63:21]
   wire [7:0] _io_cpuDataOut_T_1 = 3'h2 == io_cpuAddr ? regs_ppuStatus : 8'h0; // @[Mux.scala 81:58]
   wire  _io_cpuDataOut_T_2 = 3'h4 == io_cpuAddr; // @[Mux.scala 81:61]
   wire [7:0] _io_cpuDataOut_T_3 = 3'h4 == io_cpuAddr ? 8'h0 : _io_cpuDataOut_T_1; // @[Mux.scala 81:58]
   wire  _io_cpuDataOut_T_4 = 3'h7 == io_cpuAddr; // @[Mux.scala 81:61]
+  wire  _T_7 = ~regs_addrLatch; // @[PPURegisters.scala 96:14]
+  wire [15:0] _regs_ppuAddr_T_1 = {io_cpuDataIn,regs_ppuAddr[7:0]}; // @[Cat.scala 33:92]
+  wire [15:0] _regs_ppuAddr_T_3 = {regs_ppuAddr[15:8],io_cpuDataIn}; // @[Cat.scala 33:92]
+  wire [15:0] _GEN_1 = ~regs_addrLatch ? _regs_ppuAddr_T_1 : _regs_ppuAddr_T_3; // @[PPURegisters.scala 96:31 97:24 99:24]
   wire [7:0] _GEN_2 = _io_cpuDataOut_T_4 ? io_cpuDataIn : regs_ppuData; // @[PPURegisters.scala 104:22 63:21 74:24]
+  wire [15:0] _GEN_3 = 3'h6 == io_cpuAddr ? _GEN_1 : regs_ppuAddr; // @[PPURegisters.scala 63:21 74:24]
+  wire  _GEN_4 = 3'h6 == io_cpuAddr ? _T_7 : regs_addrLatch; // @[PPURegisters.scala 101:24 63:21 74:24]
   wire [7:0] _GEN_5 = 3'h6 == io_cpuAddr ? regs_ppuData : _GEN_2; // @[PPURegisters.scala 63:21 74:24]
+  wire [15:0] _GEN_8 = 3'h5 == io_cpuAddr ? regs_ppuAddr : _GEN_3; // @[PPURegisters.scala 63:21 74:24]
+  wire  _GEN_9 = 3'h5 == io_cpuAddr ? regs_addrLatch : _GEN_4; // @[PPURegisters.scala 63:21 74:24]
   wire [7:0] _GEN_10 = 3'h5 == io_cpuAddr ? regs_ppuData : _GEN_5; // @[PPURegisters.scala 63:21 74:24]
+  wire [15:0] _GEN_13 = _io_cpuDataOut_T_2 ? regs_ppuAddr : _GEN_8; // @[PPURegisters.scala 63:21 74:24]
+  wire  _GEN_14 = _io_cpuDataOut_T_2 ? regs_addrLatch : _GEN_9; // @[PPURegisters.scala 63:21 74:24]
   wire [7:0] _GEN_15 = _io_cpuDataOut_T_2 ? regs_ppuData : _GEN_10; // @[PPURegisters.scala 63:21 74:24]
+  wire [15:0] _GEN_19 = 3'h3 == io_cpuAddr ? regs_ppuAddr : _GEN_13; // @[PPURegisters.scala 63:21 74:24]
+  wire  _GEN_20 = 3'h3 == io_cpuAddr ? regs_addrLatch : _GEN_14; // @[PPURegisters.scala 63:21 74:24]
   wire [7:0] _GEN_21 = 3'h3 == io_cpuAddr ? regs_ppuData : _GEN_15; // @[PPURegisters.scala 63:21 74:24]
+  wire  _GEN_27 = 3'h1 == io_cpuAddr ? regs_addrLatch : _GEN_20; // @[PPURegisters.scala 63:21 74:24]
   wire  _GEN_45 = io_cpuRead & io_cpuAddr == 3'h2 ? 1'h0 : regs_vblank; // @[PPURegisters.scala 111:42 112:17 63:21]
   wire  _GEN_48 = io_setVBlank | _GEN_45; // @[PPURegisters.scala 118:22 119:17]
   wire  _GEN_50 = io_setSprite0Hit | regs_sprite0Hit; // @[PPURegisters.scala 124:26 125:21 63:21]
@@ -2654,6 +2670,7 @@ module PPURegisterControl(
   assign io_cpuDataOut = 3'h7 == io_cpuAddr ? regs_ppuData : _io_cpuDataOut_T_3; // @[Mux.scala 81:58]
   assign io_regs_ppuCtrl = regs_ppuCtrl; // @[PPURegisters.scala 139:11]
   assign io_regs_ppuMask = regs_ppuMask; // @[PPURegisters.scala 139:11]
+  assign io_regs_ppuAddr = regs_ppuAddr; // @[PPURegisters.scala 139:11]
   always @(posedge clock) begin
     if (reset) begin // @[PPURegisters.scala 63:21]
       regs_ppuCtrl <= 8'h0; // @[PPURegisters.scala 63:21]
@@ -2677,12 +2694,30 @@ module PPURegisterControl(
       regs_ppuStatus <= _regs_ppuStatus_T; // @[PPURegisters.scala 132:18]
     end
     if (reset) begin // @[PPURegisters.scala 63:21]
+      regs_ppuAddr <= 16'h0; // @[PPURegisters.scala 63:21]
+    end else if (io_cpuWrite) begin // @[PPURegisters.scala 73:21]
+      if (!(3'h0 == io_cpuAddr)) begin // @[PPURegisters.scala 74:24]
+        if (!(3'h1 == io_cpuAddr)) begin // @[PPURegisters.scala 74:24]
+          regs_ppuAddr <= _GEN_19;
+        end
+      end
+    end
+    if (reset) begin // @[PPURegisters.scala 63:21]
       regs_ppuData <= 8'h0; // @[PPURegisters.scala 63:21]
     end else if (io_cpuWrite) begin // @[PPURegisters.scala 73:21]
       if (!(3'h0 == io_cpuAddr)) begin // @[PPURegisters.scala 74:24]
         if (!(3'h1 == io_cpuAddr)) begin // @[PPURegisters.scala 74:24]
           regs_ppuData <= _GEN_21;
         end
+      end
+    end
+    if (reset) begin // @[PPURegisters.scala 63:21]
+      regs_addrLatch <= 1'h0; // @[PPURegisters.scala 63:21]
+    end else if (io_cpuRead & io_cpuAddr == 3'h2) begin // @[PPURegisters.scala 111:42]
+      regs_addrLatch <= 1'h0; // @[PPURegisters.scala 113:20]
+    end else if (io_cpuWrite) begin // @[PPURegisters.scala 73:21]
+      if (!(3'h0 == io_cpuAddr)) begin // @[PPURegisters.scala 74:24]
+        regs_addrLatch <= _GEN_27;
       end
     end
     if (reset) begin // @[PPURegisters.scala 63:21]
@@ -2709,6 +2744,7 @@ module PPURefactored(
   input         io_cpuRead,
   output [8:0]  io_pixelX,
   output [8:0]  io_pixelY,
+  output [5:0]  io_pixelColor,
   output        io_vblank,
   output        io_nmiOut,
   input         io_chrLoadEn,
@@ -2726,6 +2762,7 @@ module PPURefactored(
   wire  regControl_io_cpuRead; // @[PPURefactored.scala 50:26]
   wire [7:0] regControl_io_regs_ppuCtrl; // @[PPURefactored.scala 50:26]
   wire [7:0] regControl_io_regs_ppuMask; // @[PPURefactored.scala 50:26]
+  wire [15:0] regControl_io_regs_ppuAddr; // @[PPURefactored.scala 50:26]
   wire  regControl_io_setVBlank; // @[PPURefactored.scala 50:26]
   wire  regControl_io_clearVBlank; // @[PPURefactored.scala 50:26]
   wire  regControl_io_setSprite0Hit; // @[PPURefactored.scala 50:26]
@@ -2754,13 +2791,17 @@ module PPURefactored(
   reg [12:0] chrRom_spritePatternLow_addr_pipe_0;
   reg  chrRom_spritePatternHigh_en_pipe_0;
   reg [12:0] chrRom_spritePatternHigh_addr_pipe_0;
-  reg [7:0] nametableRam [0:2047]; // @[PPURefactored.scala 104:33]
-  wire  nametableRam_tileIndex_en; // @[PPURefactored.scala 104:33]
-  wire [10:0] nametableRam_tileIndex_addr; // @[PPURefactored.scala 104:33]
-  wire [7:0] nametableRam_tileIndex_data; // @[PPURefactored.scala 104:33]
-  wire  nametableRam_attrByte_en; // @[PPURefactored.scala 104:33]
-  wire [10:0] nametableRam_attrByte_addr; // @[PPURefactored.scala 104:33]
-  wire [7:0] nametableRam_attrByte_data; // @[PPURefactored.scala 104:33]
+  reg [7:0] nametableRam [0:2047]; // @[PPURefactored.scala 109:33]
+  wire  nametableRam_tileIndex_en; // @[PPURefactored.scala 109:33]
+  wire [10:0] nametableRam_tileIndex_addr; // @[PPURefactored.scala 109:33]
+  wire [7:0] nametableRam_tileIndex_data; // @[PPURefactored.scala 109:33]
+  wire  nametableRam_attrByte_en; // @[PPURefactored.scala 109:33]
+  wire [10:0] nametableRam_attrByte_addr; // @[PPURefactored.scala 109:33]
+  wire [7:0] nametableRam_attrByte_data; // @[PPURefactored.scala 109:33]
+  wire [7:0] nametableRam_MPORT_1_data; // @[PPURefactored.scala 109:33]
+  wire [10:0] nametableRam_MPORT_1_addr; // @[PPURefactored.scala 109:33]
+  wire  nametableRam_MPORT_1_mask; // @[PPURefactored.scala 109:33]
+  wire  nametableRam_MPORT_1_en; // @[PPURefactored.scala 109:33]
   reg  nametableRam_tileIndex_en_pipe_0;
   reg [10:0] nametableRam_tileIndex_addr_pipe_0;
   reg  nametableRam_attrByte_en_pipe_0;
@@ -2776,55 +2817,149 @@ module PPURefactored(
   wire  _GEN_3 = _T_1 & _T_3 ? 1'h0 : vblankFlag; // @[PPURefactored.scala 85:51 86:16 76:27]
   wire  _GEN_5 = scanline == 9'hf1 & pixel == 9'h1 | _GEN_3; // @[PPURefactored.scala 82:45 83:16]
   wire  nmiEnable = regControl_io_regs_ppuCtrl[7]; // @[PPURefactored.scala 91:31]
+  reg [5:0] paletteRam_0; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_1; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_2; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_3; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_4; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_5; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_6; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_7; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_8; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_9; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_10; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_11; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_12; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_13; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_14; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_15; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_16; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_17; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_18; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_19; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_20; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_21; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_22; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_23; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_24; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_25; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_26; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_27; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_28; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_29; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_30; // @[PPURefactored.scala 101:27]
+  reg [5:0] paletteRam_31; // @[PPURefactored.scala 101:27]
+  wire  _T_9 = io_cpuWrite & io_cpuAddr == 3'h7; // @[PPURefactored.scala 112:20]
+  wire [4:0] paletteAddr = regControl_io_regs_ppuAddr[4:0]; // @[PPURefactored.scala 116:32]
+  wire  _T_15 = regControl_io_regs_ppuAddr >= 16'h2000 & regControl_io_regs_ppuAddr < 16'h3f00; // @[PPURefactored.scala 118:36]
+  wire  _GEN_84 = regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff ? 1'h0 : _T_15; // @[PPURefactored.scala 109:33 114:54]
+  wire  isRendering = scanline < 9'hf0 & pixel < 9'h100; // @[PPURefactored.scala 132:38]
   wire [11:0] nametableBase = {regControl_io_regs_ppuCtrl[1:0],10'h0}; // @[Cat.scala 33:92]
-  wire [9:0] _tileX_T = {{1'd0}, pixel}; // @[PPURefactored.scala 125:22]
-  wire [5:0] tileX = _tileX_T[8:3]; // @[PPURefactored.scala 125:33]
-  wire [9:0] _tileY_T = {{1'd0}, scanline}; // @[PPURefactored.scala 126:25]
-  wire [5:0] tileY = _tileY_T[8:3]; // @[PPURefactored.scala 126:36]
-  wire [10:0] _tileAddr_T = {tileY, 5'h0}; // @[PPURefactored.scala 127:41]
-  wire [11:0] _GEN_608 = {{1'd0}, _tileAddr_T}; // @[PPURefactored.scala 127:32]
-  wire [11:0] _tileAddr_T_2 = nametableBase + _GEN_608; // @[PPURefactored.scala 127:32]
-  wire [11:0] _GEN_609 = {{6'd0}, tileX}; // @[PPURefactored.scala 127:47]
-  wire [11:0] tileAddr = _tileAddr_T_2 + _GEN_609; // @[PPURefactored.scala 127:47]
-  wire [12:0] patternBase = regControl_io_regs_ppuCtrl[4] ? 13'h1000 : 13'h0; // @[PPURefactored.scala 130:24]
-  wire [2:0] fineY = _tileY_T[2:0]; // @[PPURefactored.scala 131:35]
-  wire [11:0] _patternAddr_T = {nametableRam_tileIndex_data, 4'h0}; // @[PPURefactored.scala 132:46]
-  wire [12:0] _GEN_610 = {{1'd0}, _patternAddr_T}; // @[PPURefactored.scala 132:33]
-  wire [12:0] _patternAddr_T_2 = patternBase + _GEN_610; // @[PPURefactored.scala 132:33]
-  wire [12:0] _GEN_611 = {{10'd0}, fineY}; // @[PPURefactored.scala 132:52]
-  wire [12:0] patternAddr = _patternAddr_T_2 + _GEN_611; // @[PPURefactored.scala 132:52]
-  wire [2:0] fineX = _tileX_T[2:0]; // @[PPURefactored.scala 136:32]
-  wire [2:0] bitPos = 3'h7 - fineX; // @[PPURefactored.scala 137:20]
-  wire [7:0] _pixelBit_T = chrRom_patternHigh_data >> bitPos; // @[PPURefactored.scala 138:32]
-  wire [1:0] _pixelBit_T_2 = {_pixelBit_T[0], 1'h0}; // @[PPURefactored.scala 138:46]
-  wire [7:0] _pixelBit_T_3 = chrRom_patternLow_data >> bitPos; // @[PPURefactored.scala 138:67]
-  wire [1:0] _GEN_612 = {{1'd0}, _pixelBit_T_3[0]}; // @[PPURefactored.scala 138:52]
-  wire [1:0] pixelBit = _pixelBit_T_2 | _GEN_612; // @[PPURefactored.scala 138:52]
-  wire [11:0] _attrAddr_T_1 = nametableBase + 12'h3c0; // @[PPURefactored.scala 140:32]
-  wire [6:0] _attrAddr_T_3 = {tileY[5:2], 3'h0}; // @[PPURefactored.scala 140:58]
-  wire [11:0] _GEN_613 = {{5'd0}, _attrAddr_T_3}; // @[PPURefactored.scala 140:42]
-  wire [11:0] _attrAddr_T_5 = _attrAddr_T_1 + _GEN_613; // @[PPURefactored.scala 140:42]
-  wire [11:0] _GEN_614 = {{8'd0}, tileX[5:2]}; // @[PPURefactored.scala 140:64]
-  wire [11:0] attrAddr = _attrAddr_T_5 + _GEN_614; // @[PPURefactored.scala 140:64]
-  wire [4:0] spriteSize = regControl_io_regs_ppuCtrl[5] ? 5'h10 : 5'h8; // @[PPURefactored.scala 153:23]
-  wire  inSpriteX = pixel < 9'h8; // @[PPURefactored.scala 155:45]
-  wire [7:0] _GEN_617 = {{3'd0}, spriteSize}; // @[PPURefactored.scala 156:62]
-  wire [8:0] _inSpriteY_T_1 = {{1'd0}, _GEN_617}; // @[PPURefactored.scala 156:62]
-  wire [8:0] _GEN_618 = {{1'd0}, _inSpriteY_T_1[7:0]}; // @[PPURefactored.scala 156:51]
-  wire  inSpriteY = scanline < _GEN_618; // @[PPURefactored.scala 156:51]
-  wire  spriteActive = inSpriteX & inSpriteY; // @[PPURefactored.scala 157:32]
-  wire [8:0] spriteFineX = pixel - 9'h0; // @[PPURefactored.scala 159:27]
-  wire [8:0] spriteFineY = scanline - 9'h0; // @[PPURefactored.scala 160:30]
-  wire [12:0] spritePatternBase = regControl_io_regs_ppuCtrl[3] ? 13'h1000 : 13'h0; // @[PPURefactored.scala 161:30]
-  wire [13:0] _spritePatternAddr_T_1 = {{1'd0}, spritePatternBase}; // @[PPURefactored.scala 162:45]
-  wire [12:0] _GEN_619 = {{4'd0}, spriteFineY}; // @[PPURefactored.scala 162:65]
-  wire [12:0] spritePatternAddr = _spritePatternAddr_T_1[12:0] + _GEN_619; // @[PPURefactored.scala 162:65]
-  wire [8:0] spriteBitPos = 9'h7 - spriteFineX; // @[PPURefactored.scala 166:26]
-  wire [7:0] _spritePixelBit_T = chrRom_spritePatternHigh_data >> spriteBitPos; // @[PPURefactored.scala 167:44]
-  wire [1:0] _spritePixelBit_T_2 = {_spritePixelBit_T[0], 1'h0}; // @[PPURefactored.scala 167:64]
-  wire [7:0] _spritePixelBit_T_3 = chrRom_spritePatternLow_data >> spriteBitPos; // @[PPURefactored.scala 167:91]
-  wire [1:0] _GEN_620 = {{1'd0}, _spritePixelBit_T_3[0]}; // @[PPURefactored.scala 167:70]
-  wire [1:0] spritePixelBit = _spritePixelBit_T_2 | _GEN_620; // @[PPURefactored.scala 167:70]
+  wire [9:0] _tileX_T = {{1'd0}, pixel}; // @[PPURefactored.scala 144:22]
+  wire [5:0] tileX = _tileX_T[8:3]; // @[PPURefactored.scala 144:33]
+  wire [9:0] _tileY_T = {{1'd0}, scanline}; // @[PPURefactored.scala 145:25]
+  wire [5:0] tileY = _tileY_T[8:3]; // @[PPURefactored.scala 145:36]
+  wire [10:0] _tileAddr_T = {tileY, 5'h0}; // @[PPURefactored.scala 146:41]
+  wire [11:0] _GEN_717 = {{1'd0}, _tileAddr_T}; // @[PPURefactored.scala 146:32]
+  wire [11:0] _tileAddr_T_2 = nametableBase + _GEN_717; // @[PPURefactored.scala 146:32]
+  wire [11:0] _GEN_718 = {{6'd0}, tileX}; // @[PPURefactored.scala 146:47]
+  wire [11:0] tileAddr = _tileAddr_T_2 + _GEN_718; // @[PPURefactored.scala 146:47]
+  wire [12:0] patternBase = regControl_io_regs_ppuCtrl[4] ? 13'h1000 : 13'h0; // @[PPURefactored.scala 149:24]
+  wire [2:0] fineY = _tileY_T[2:0]; // @[PPURefactored.scala 150:35]
+  wire [11:0] _patternAddr_T = {nametableRam_tileIndex_data, 4'h0}; // @[PPURefactored.scala 151:46]
+  wire [12:0] _GEN_719 = {{1'd0}, _patternAddr_T}; // @[PPURefactored.scala 151:33]
+  wire [12:0] _patternAddr_T_2 = patternBase + _GEN_719; // @[PPURefactored.scala 151:33]
+  wire [12:0] _GEN_720 = {{10'd0}, fineY}; // @[PPURefactored.scala 151:52]
+  wire [12:0] patternAddr = _patternAddr_T_2 + _GEN_720; // @[PPURefactored.scala 151:52]
+  wire [2:0] fineX = _tileX_T[2:0]; // @[PPURefactored.scala 155:32]
+  wire [2:0] bitPos = 3'h7 - fineX; // @[PPURefactored.scala 156:20]
+  wire [7:0] _pixelBit_T = chrRom_patternHigh_data >> bitPos; // @[PPURefactored.scala 157:32]
+  wire [1:0] _pixelBit_T_2 = {_pixelBit_T[0], 1'h0}; // @[PPURefactored.scala 157:46]
+  wire [7:0] _pixelBit_T_3 = chrRom_patternLow_data >> bitPos; // @[PPURefactored.scala 157:67]
+  wire [1:0] _GEN_721 = {{1'd0}, _pixelBit_T_3[0]}; // @[PPURefactored.scala 157:52]
+  wire [1:0] pixelBit = _pixelBit_T_2 | _GEN_721; // @[PPURefactored.scala 157:52]
+  wire [11:0] _attrAddr_T_1 = nametableBase + 12'h3c0; // @[PPURefactored.scala 159:32]
+  wire [6:0] _attrAddr_T_3 = {tileY[5:2], 3'h0}; // @[PPURefactored.scala 159:58]
+  wire [11:0] _GEN_722 = {{5'd0}, _attrAddr_T_3}; // @[PPURefactored.scala 159:42]
+  wire [11:0] _attrAddr_T_5 = _attrAddr_T_1 + _GEN_722; // @[PPURefactored.scala 159:42]
+  wire [11:0] _GEN_723 = {{8'd0}, tileX[5:2]}; // @[PPURefactored.scala 159:64]
+  wire [11:0] attrAddr = _attrAddr_T_5 + _GEN_723; // @[PPURefactored.scala 159:64]
+  wire [4:0] spriteSize = regControl_io_regs_ppuCtrl[5] ? 5'h10 : 5'h8; // @[PPURefactored.scala 172:23]
+  wire  inSpriteX = pixel < 9'h8; // @[PPURefactored.scala 174:45]
+  wire [7:0] _GEN_742 = {{3'd0}, spriteSize}; // @[PPURefactored.scala 175:62]
+  wire [8:0] _inSpriteY_T_1 = {{1'd0}, _GEN_742}; // @[PPURefactored.scala 175:62]
+  wire [8:0] _GEN_743 = {{1'd0}, _inSpriteY_T_1[7:0]}; // @[PPURefactored.scala 175:51]
+  wire  inSpriteY = scanline < _GEN_743; // @[PPURefactored.scala 175:51]
+  wire  spriteActive = inSpriteX & inSpriteY; // @[PPURefactored.scala 176:32]
+  wire [8:0] spriteFineX = pixel - 9'h0; // @[PPURefactored.scala 178:27]
+  wire [8:0] spriteFineY = scanline - 9'h0; // @[PPURefactored.scala 179:30]
+  wire [12:0] spritePatternBase = regControl_io_regs_ppuCtrl[3] ? 13'h1000 : 13'h0; // @[PPURefactored.scala 180:30]
+  wire [13:0] _spritePatternAddr_T_1 = {{1'd0}, spritePatternBase}; // @[PPURefactored.scala 181:45]
+  wire [12:0] _GEN_744 = {{4'd0}, spriteFineY}; // @[PPURefactored.scala 181:65]
+  wire [12:0] spritePatternAddr = _spritePatternAddr_T_1[12:0] + _GEN_744; // @[PPURefactored.scala 181:65]
+  wire [8:0] spriteBitPos = 9'h7 - spriteFineX; // @[PPURefactored.scala 185:26]
+  wire [7:0] _spritePixelBit_T = chrRom_spritePatternHigh_data >> spriteBitPos; // @[PPURefactored.scala 186:44]
+  wire [1:0] _spritePixelBit_T_2 = {_spritePixelBit_T[0], 1'h0}; // @[PPURefactored.scala 186:64]
+  wire [7:0] _spritePixelBit_T_3 = chrRom_spritePatternLow_data >> spriteBitPos; // @[PPURefactored.scala 186:91]
+  wire [1:0] _GEN_745 = {{1'd0}, _spritePixelBit_T_3[0]}; // @[PPURefactored.scala 186:70]
+  wire [1:0] spritePixelBit = _spritePixelBit_T_2 | _GEN_745; // @[PPURefactored.scala 186:70]
+  reg [7:0] finalColor; // @[PPURefactored.scala 202:27]
+  reg [7:0] patternLowReg; // @[PPURefactored.scala 206:30]
+  reg [7:0] patternHighReg; // @[PPURefactored.scala 207:31]
+  reg [7:0] attrByteReg; // @[PPURefactored.scala 208:28]
+  reg [2:0] fineXReg; // @[PPURefactored.scala 211:25]
+  wire [2:0] bitPosReg = 3'h7 - fineXReg; // @[PPURefactored.scala 212:23]
+  wire [7:0] _pixelBitReg_T = patternHighReg >> bitPosReg; // @[PPURefactored.scala 213:38]
+  wire [1:0] _pixelBitReg_T_2 = {_pixelBitReg_T[0], 1'h0}; // @[PPURefactored.scala 213:55]
+  wire [7:0] _pixelBitReg_T_3 = patternLowReg >> bitPosReg; // @[PPURefactored.scala 213:79]
+  wire [1:0] _GEN_747 = {{1'd0}, _pixelBitReg_T_3[0]}; // @[PPURefactored.scala 213:61]
+  wire [1:0] pixelBitReg = _pixelBitReg_T_2 | _GEN_747; // @[PPURefactored.scala 213:61]
+  reg [5:0] tileXReg; // @[PPURefactored.scala 215:25]
+  reg [5:0] tileYReg; // @[PPURefactored.scala 216:25]
+  wire [2:0] _attrShiftReg_T_1 = {tileYReg[1], 2'h0}; // @[PPURefactored.scala 217:36]
+  wire [1:0] _attrShiftReg_T_3 = {tileXReg[1], 1'h0}; // @[PPURefactored.scala 217:57]
+  wire [2:0] _GEN_748 = {{1'd0}, _attrShiftReg_T_3}; // @[PPURefactored.scala 217:42]
+  wire [2:0] attrShiftReg = _attrShiftReg_T_1 | _GEN_748; // @[PPURefactored.scala 217:42]
+  wire [7:0] _paletteIdxReg_T = attrByteReg >> attrShiftReg; // @[PPURefactored.scala 218:36]
+  wire [1:0] paletteIdxReg = _paletteIdxReg_T[1:0]; // @[PPURefactored.scala 218:52]
+  wire [3:0] _bgPaletteAddrReg_T = {paletteIdxReg, 2'h0}; // @[PPURefactored.scala 220:41]
+  wire [3:0] _GEN_749 = {{2'd0}, pixelBitReg}; // @[PPURefactored.scala 220:47]
+  wire [3:0] bgPaletteAddrReg = _bgPaletteAddrReg_T | _GEN_749; // @[PPURefactored.scala 220:47]
+  wire [5:0] _GEN_684 = 4'h1 == bgPaletteAddrReg ? paletteRam_1 : paletteRam_0; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_685 = 4'h2 == bgPaletteAddrReg ? paletteRam_2 : _GEN_684; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_686 = 4'h3 == bgPaletteAddrReg ? paletteRam_3 : _GEN_685; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_687 = 4'h4 == bgPaletteAddrReg ? paletteRam_4 : _GEN_686; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_688 = 4'h5 == bgPaletteAddrReg ? paletteRam_5 : _GEN_687; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_689 = 4'h6 == bgPaletteAddrReg ? paletteRam_6 : _GEN_688; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_690 = 4'h7 == bgPaletteAddrReg ? paletteRam_7 : _GEN_689; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_691 = 4'h8 == bgPaletteAddrReg ? paletteRam_8 : _GEN_690; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_692 = 4'h9 == bgPaletteAddrReg ? paletteRam_9 : _GEN_691; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_693 = 4'ha == bgPaletteAddrReg ? paletteRam_10 : _GEN_692; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_694 = 4'hb == bgPaletteAddrReg ? paletteRam_11 : _GEN_693; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_695 = 4'hc == bgPaletteAddrReg ? paletteRam_12 : _GEN_694; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_696 = 4'hd == bgPaletteAddrReg ? paletteRam_13 : _GEN_695; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_697 = 4'he == bgPaletteAddrReg ? paletteRam_14 : _GEN_696; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_698 = 4'hf == bgPaletteAddrReg ? paletteRam_15 : _GEN_697; // @[PPURefactored.scala 221:{23,23}]
+  wire [4:0] _GEN_750 = {{1'd0}, bgPaletteAddrReg}; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_699 = 5'h10 == _GEN_750 ? paletteRam_16 : _GEN_698; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_700 = 5'h11 == _GEN_750 ? paletteRam_17 : _GEN_699; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_701 = 5'h12 == _GEN_750 ? paletteRam_18 : _GEN_700; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_702 = 5'h13 == _GEN_750 ? paletteRam_19 : _GEN_701; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_703 = 5'h14 == _GEN_750 ? paletteRam_20 : _GEN_702; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_704 = 5'h15 == _GEN_750 ? paletteRam_21 : _GEN_703; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_705 = 5'h16 == _GEN_750 ? paletteRam_22 : _GEN_704; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_706 = 5'h17 == _GEN_750 ? paletteRam_23 : _GEN_705; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_707 = 5'h18 == _GEN_750 ? paletteRam_24 : _GEN_706; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_708 = 5'h19 == _GEN_750 ? paletteRam_25 : _GEN_707; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_709 = 5'h1a == _GEN_750 ? paletteRam_26 : _GEN_708; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_710 = 5'h1b == _GEN_750 ? paletteRam_27 : _GEN_709; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_711 = 5'h1c == _GEN_750 ? paletteRam_28 : _GEN_710; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_712 = 5'h1d == _GEN_750 ? paletteRam_29 : _GEN_711; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_713 = 5'h1e == _GEN_750 ? paletteRam_30 : _GEN_712; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] _GEN_714 = 5'h1f == _GEN_750 ? paletteRam_31 : _GEN_713; // @[PPURefactored.scala 221:{23,23}]
+  wire [5:0] bgColorReg = pixelBitReg == 2'h0 ? paletteRam_0 : _GEN_714; // @[PPURefactored.scala 221:23]
+  wire [5:0] _GEN_715 = pixelBitReg != 2'h0 ? bgColorReg : paletteRam_0; // @[PPURefactored.scala 224:16 225:31 227:18]
+  wire [5:0] _GEN_716 = isRendering ? _GEN_715 : paletteRam_0; // @[PPURefactored.scala 223:21 230:16]
   PPURegisterControl regControl ( // @[PPURefactored.scala 50:26]
     .clock(regControl_clock),
     .reset(regControl_reset),
@@ -2835,6 +2970,7 @@ module PPURefactored(
     .io_cpuRead(regControl_io_cpuRead),
     .io_regs_ppuCtrl(regControl_io_regs_ppuCtrl),
     .io_regs_ppuMask(regControl_io_regs_ppuMask),
+    .io_regs_ppuAddr(regControl_io_regs_ppuAddr),
     .io_setVBlank(regControl_io_setVBlank),
     .io_clearVBlank(regControl_io_clearVBlank),
     .io_setSprite0Hit(regControl_io_setSprite0Hit)
@@ -2857,17 +2993,22 @@ module PPURefactored(
   assign chrRom_MPORT_en = io_chrLoadEn;
   assign nametableRam_tileIndex_en = nametableRam_tileIndex_en_pipe_0;
   assign nametableRam_tileIndex_addr = nametableRam_tileIndex_addr_pipe_0;
-  assign nametableRam_tileIndex_data = nametableRam[nametableRam_tileIndex_addr]; // @[PPURefactored.scala 104:33]
+  assign nametableRam_tileIndex_data = nametableRam[nametableRam_tileIndex_addr]; // @[PPURefactored.scala 109:33]
   assign nametableRam_attrByte_en = nametableRam_attrByte_en_pipe_0;
   assign nametableRam_attrByte_addr = nametableRam_attrByte_addr_pipe_0;
-  assign nametableRam_attrByte_data = nametableRam[nametableRam_attrByte_addr]; // @[PPURefactored.scala 104:33]
+  assign nametableRam_attrByte_data = nametableRam[nametableRam_attrByte_addr]; // @[PPURefactored.scala 109:33]
+  assign nametableRam_MPORT_1_data = io_cpuDataIn;
+  assign nametableRam_MPORT_1_addr = regControl_io_regs_ppuAddr[10:0];
+  assign nametableRam_MPORT_1_mask = 1'h1;
+  assign nametableRam_MPORT_1_en = _T_9 & _GEN_84;
   assign io_cpuDataOut = regControl_io_cpuDataOut; // @[PPURefactored.scala 55:17]
-  assign io_pixelX = pixel; // @[PPURefactored.scala 197:13]
-  assign io_pixelY = scanline; // @[PPURefactored.scala 198:13]
-  assign io_vblank = vblankFlag; // @[PPURefactored.scala 200:13]
+  assign io_pixelX = pixel; // @[PPURefactored.scala 234:13]
+  assign io_pixelY = scanline; // @[PPURefactored.scala 235:13]
+  assign io_pixelColor = finalColor[5:0]; // @[PPURefactored.scala 236:30]
+  assign io_vblank = vblankFlag; // @[PPURefactored.scala 237:13]
   assign io_nmiOut = nmiEnable & vblankFlag; // @[PPURefactored.scala 92:26]
-  assign io_debug_ppuCtrl = regControl_io_regs_ppuCtrl; // @[PPURefactored.scala 203:20]
-  assign io_debug_ppuMask = regControl_io_regs_ppuMask; // @[PPURefactored.scala 204:20]
+  assign io_debug_ppuCtrl = regControl_io_regs_ppuCtrl; // @[PPURefactored.scala 243:20]
+  assign io_debug_ppuMask = regControl_io_regs_ppuMask; // @[PPURefactored.scala 244:20]
   assign regControl_clock = clock;
   assign regControl_reset = reset;
   assign regControl_io_cpuAddr = io_cpuAddr; // @[PPURefactored.scala 51:25]
@@ -2876,14 +3017,14 @@ module PPURefactored(
   assign regControl_io_cpuRead = io_cpuRead; // @[PPURefactored.scala 54:25]
   assign regControl_io_setVBlank = scanline == 9'hf1 & pixel == 9'h1; // @[PPURefactored.scala 82:27]
   assign regControl_io_clearVBlank = scanline == 9'hf1 & pixel == 9'h1 ? 1'h0 : _T_7; // @[PPURefactored.scala 78:29 82:45]
-  assign regControl_io_setSprite0Hit = spriteActive & spritePixelBit != 2'h0 & pixelBit != 2'h0 & pixel != 9'hff; // @[PPURefactored.scala 174:67]
+  assign regControl_io_setSprite0Hit = spriteActive & spritePixelBit != 2'h0 & pixelBit != 2'h0 & pixel != 9'hff; // @[PPURefactored.scala 193:67]
   always @(posedge clock) begin
     if (chrRom_MPORT_en & chrRom_MPORT_mask) begin
       chrRom[chrRom_MPORT_addr] <= chrRom_MPORT_data; // @[PPURefactored.scala 95:27]
     end
     chrRom_patternLow_en_pipe_0 <= 1'h1;
     if (1'h1) begin
-      chrRom_patternLow_addr_pipe_0 <= _patternAddr_T_2 + _GEN_611;
+      chrRom_patternLow_addr_pipe_0 <= _patternAddr_T_2 + _GEN_720;
     end
     chrRom_patternHigh_en_pipe_0 <= 1'h1;
     if (1'h1) begin
@@ -2891,11 +3032,14 @@ module PPURefactored(
     end
     chrRom_spritePatternLow_en_pipe_0 <= 1'h1;
     if (1'h1) begin
-      chrRom_spritePatternLow_addr_pipe_0 <= _spritePatternAddr_T_1[12:0] + _GEN_619;
+      chrRom_spritePatternLow_addr_pipe_0 <= _spritePatternAddr_T_1[12:0] + _GEN_744;
     end
     chrRom_spritePatternHigh_en_pipe_0 <= 1'h1;
     if (1'h1) begin
       chrRom_spritePatternHigh_addr_pipe_0 <= spritePatternAddr + 13'h8;
+    end
+    if (nametableRam_MPORT_1_en & nametableRam_MPORT_1_mask) begin
+      nametableRam[nametableRam_MPORT_1_addr] <= nametableRam_MPORT_1_data; // @[PPURefactored.scala 109:33]
     end
     nametableRam_tileIndex_en_pipe_0 <= 1'h1;
     if (1'h1) begin
@@ -2926,6 +3070,305 @@ module PPURefactored(
     end else begin
       vblankFlag <= _GEN_5;
     end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_0 <= 6'h9; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h0 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_0 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_1 <= 6'h1; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h1 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_1 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_2 <= 6'h0; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h2 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_2 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_3 <= 6'h1; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h3 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_3 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_4 <= 6'h0; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h4 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_4 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_5 <= 6'h2; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h5 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_5 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_6 <= 6'h2; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h6 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_6 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_7 <= 6'hd; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h7 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_7 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_8 <= 6'h8; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h8 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_8 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_9 <= 6'h10; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h9 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_9 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_10 <= 6'h8; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'ha == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_10 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_11 <= 6'h24; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'hb == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_11 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_12 <= 6'h0; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'hc == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_12 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_13 <= 6'h0; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'hd == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_13 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_14 <= 6'h4; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'he == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_14 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_15 <= 6'h2c; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'hf == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_15 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_16 <= 6'h9; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h10 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_16 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_17 <= 6'h1; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h11 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_17 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_18 <= 6'h34; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h12 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_18 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_19 <= 6'h3; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h13 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_19 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_20 <= 6'h0; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h14 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_20 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_21 <= 6'h4; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h15 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_21 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_22 <= 6'h0; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h16 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_22 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_23 <= 6'h14; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h17 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_23 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_24 <= 6'h8; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h18 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_24 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_25 <= 6'h3a; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h19 == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_25 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_26 <= 6'h0; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h1a == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_26 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_27 <= 6'h2; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h1b == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_27 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_28 <= 6'h0; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h1c == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_28 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_29 <= 6'h20; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h1d == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_29 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_30 <= 6'h2c; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h1e == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_30 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 101:27]
+      paletteRam_31 <= 6'h8; // @[PPURefactored.scala 101:27]
+    end else if (io_cpuWrite & io_cpuAddr == 3'h7) begin // @[PPURefactored.scala 112:43]
+      if (regControl_io_regs_ppuAddr >= 16'h3f00 & regControl_io_regs_ppuAddr <= 16'h3fff) begin // @[PPURefactored.scala 114:54]
+        if (5'h1f == paletteAddr) begin // @[PPURefactored.scala 117:31]
+          paletteRam_31 <= io_cpuDataIn[5:0]; // @[PPURefactored.scala 117:31]
+        end
+      end
+    end
+    if (reset) begin // @[PPURefactored.scala 202:27]
+      finalColor <= 8'h0; // @[PPURefactored.scala 202:27]
+    end else begin
+      finalColor <= {{2'd0}, _GEN_716};
+    end
+    patternLowReg <= chrRom_patternLow_data; // @[PPURefactored.scala 206:30]
+    patternHighReg <= chrRom_patternHigh_data; // @[PPURefactored.scala 207:31]
+    attrByteReg <= nametableRam_attrByte_data; // @[PPURefactored.scala 208:28]
+    fineXReg <= _tileX_T[2:0]; // @[PPURefactored.scala 155:32]
+    tileXReg <= _tileX_T[8:3]; // @[PPURefactored.scala 144:33]
+    tileYReg <= _tileY_T[8:3]; // @[PPURefactored.scala 145:36]
   end
 endmodule
 module NESSystemRefactored(
@@ -2976,6 +3419,7 @@ module NESSystemRefactored(
   wire  ppu_io_cpuRead; // @[NESSystemRefactored.scala 54:19]
   wire [8:0] ppu_io_pixelX; // @[NESSystemRefactored.scala 54:19]
   wire [8:0] ppu_io_pixelY; // @[NESSystemRefactored.scala 54:19]
+  wire [5:0] ppu_io_pixelColor; // @[NESSystemRefactored.scala 54:19]
   wire  ppu_io_vblank; // @[NESSystemRefactored.scala 54:19]
   wire  ppu_io_nmiOut; // @[NESSystemRefactored.scala 54:19]
   wire  ppu_io_chrLoadEn; // @[NESSystemRefactored.scala 54:19]
@@ -3035,6 +3479,7 @@ module NESSystemRefactored(
     .io_cpuRead(ppu_io_cpuRead),
     .io_pixelX(ppu_io_pixelX),
     .io_pixelY(ppu_io_pixelY),
+    .io_pixelColor(ppu_io_pixelColor),
     .io_vblank(ppu_io_vblank),
     .io_nmiOut(ppu_io_nmiOut),
     .io_chrLoadEn(ppu_io_chrLoadEn),
@@ -3059,7 +3504,7 @@ module NESSystemRefactored(
   assign ram_MPORT_1_en = cpu_io_memWrite & isRam;
   assign io_pixelX = ppu_io_pixelX; // @[NESSystemRefactored.scala 121:13]
   assign io_pixelY = ppu_io_pixelY; // @[NESSystemRefactored.scala 122:13]
-  assign io_pixelColor = 6'h0; // @[NESSystemRefactored.scala 123:17]
+  assign io_pixelColor = ppu_io_pixelColor; // @[NESSystemRefactored.scala 123:17]
   assign io_vblank = ppu_io_vblank; // @[NESSystemRefactored.scala 124:13]
   assign io_audioOut = 16'h0; // @[NESSystemRefactored.scala 125:15]
   assign io_debug_cpuPC = cpu_io_debug_regPC; // @[NESSystemRefactored.scala 128:18]
