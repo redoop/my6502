@@ -11,6 +11,9 @@
 #include <iomanip>
 #include <SDL.h>
 
+// 全局静默模式标志
+bool g_quiet_mode = false;
+
 // NES 调色板 (RGB)
 const uint32_t NES_PALETTE[64] = {
     0x545454, 0x001E74, 0x081090, 0x300088, 0x440064, 0x5C0030, 0x540400, 0x3C1800,
@@ -61,13 +64,16 @@ public:
             SDL_WINDOWPOS_CENTERED,
             SDL_WINDOWPOS_CENTERED,
             256 * 3, 240 * 3,
-            SDL_WINDOW_SHOWN
+            SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI
         );
         
         if (!window) {
             std::cerr << "窗口创建失败: " << SDL_GetError() << std::endl;
             exit(1);
         }
+        
+        // macOS: 激活窗口
+        SDL_RaiseWindow(window);
         
         renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
         if (!renderer) {
@@ -87,7 +93,7 @@ public:
             exit(1);
         }
         
-        std::cout << "✅ SDL 初始化完成 (快速模式)" << std::endl;
+        if (!g_quiet_mode) std::cout << "✅ SDL 初始化完成 (快速模式)" << std::endl;
     }
     
     ~NESEmulator() {
@@ -116,9 +122,11 @@ public:
         int prg_size = header[4] * 16384;
         int chr_size = header[5] * 8192;
         
-        std::cout << "📦 加载 ROM:" << std::endl;
-        std::cout << "   PRG ROM: " << prg_size << " 字节" << std::endl;
-        std::cout << "   CHR ROM: " << chr_size << " 字节" << std::endl;
+        if (!g_quiet_mode) {
+            std::cout << "📦 加载 ROM:" << std::endl;
+            std::cout << "   PRG ROM: " << prg_size << " 字节" << std::endl;
+            std::cout << "   CHR ROM: " << chr_size << " 字节" << std::endl;
+        }
         
         // 读取 PRG ROM
         prg_rom.resize(prg_size);
@@ -139,7 +147,7 @@ public:
     }
     
     void loadROMToHardware() {
-        std::cout << "⬆️  加载 ROM 到硬件..." << std::endl;
+        if (!g_quiet_mode) std::cout << "⬆️  加载 ROM 到硬件..." << std::endl;
         
         // 加载 PRG ROM
         size_t prg_offset = 0;
@@ -154,11 +162,11 @@ public:
             dut->io_prgLoadData = prg_rom[prg_offset + i];
             tick();
             
-            if (i % 4096 == 0) {
+            if (!g_quiet_mode && i % 4096 == 0) {
                 std::cout << "\r   PRG: " << (i * 100 / 32768) << "%" << std::flush;
             }
         }
-        std::cout << "\r   PRG: 100%" << std::endl;
+        if (!g_quiet_mode) std::cout << "\r   PRG: 100%" << std::endl;
         
         // 加载 CHR ROM
         if (!chr_rom.empty()) {
@@ -168,16 +176,16 @@ public:
                 dut->io_chrLoadData = chr_rom[i];
                 tick();
                 
-                if (i % 2048 == 0) {
+                if (!g_quiet_mode && i % 2048 == 0) {
                     std::cout << "\r   CHR: " << (i * 100 / std::min(chr_rom.size(), (size_t)8192)) << "%" << std::flush;
                 }
             }
-            std::cout << "\r   CHR: 100%" << std::endl;
+            if (!g_quiet_mode) std::cout << "\r   CHR: 100%" << std::endl;
         }
         
         dut->io_prgLoadEn = 0;
         dut->io_chrLoadEn = 0;
-        std::cout << "✅ ROM 加载完成" << std::endl;
+        if (!g_quiet_mode) std::cout << "✅ ROM 加载完成" << std::endl;
     }
     
     void tick() {
@@ -192,53 +200,83 @@ public:
         dut->clock = 1;
         dut->eval();
         
-        // 监控 PPUCTRL 写入 (每次变化时打印)
-        static uint8_t last_ppuctrl = 0;
-        uint8_t ppuctrl = dut->io_debug_ppuCtrl;
-        if (ppuctrl != last_ppuctrl) {
-            printf("\n🎨 PPUCTRL 变化: 0x%02X -> 0x%02X (Cycle %llu, PC=0x%04X)\n",
-                   last_ppuctrl, ppuctrl, (unsigned long long)cycle_count, dut->io_debug_cpuPC);
-            last_ppuctrl = ppuctrl;
+        // 监控所有内存读取 (前 100000 周期)
+        if (cycle_count < 100000) {
+            uint16_t memAddr = dut->io_debug_cpuMemAddr;
+            uint8_t memDataIn = dut->io_debug_cpuMemDataIn;
+            bool memRead = dut->io_debug_cpuMemRead;
+            
+            if (memRead) {
+                printf("[Cycle %llu] MEM READ: Addr=0x%04X Data=0x%02X%s\n", 
+                       (unsigned long long)cycle_count, memAddr, memDataIn,
+                       (memAddr >= 0x2000 && memAddr < 0x4000) ? " (PPU)" : "");
+            }
         }
         
-        // Debug: 每 10000 个周期打印一次 CPU 状态
-        static uint64_t last_debug_cycle = 0;
-        static uint16_t last_pc = 0;
-        static int stuck_count = 0;
-        
-        if (cycle_count - last_debug_cycle >= 10000) {
-            uint16_t pc = dut->io_debug_cpuPC;
-            uint8_t a = dut->io_debug_cpuA;
-            uint8_t x = dut->io_debug_cpuX;
-            uint8_t y = dut->io_debug_cpuY;
-            bool vblank = dut->io_vblank;
-            bool nmi = dut->io_debug_nmi;
-            uint8_t state = dut->io_debug_cpuState;
-            uint8_t cycle = dut->io_debug_cpuCycle;
-            uint8_t opcode = dut->io_debug_cpuOpcode;
-            
-            const char* state_names[] = {"Reset", "Fetch", "Execute", "NMI", "Done"};
-            const char* state_name = (state < 5) ? state_names[state] : "Unknown";
-            
-            printf("\n[Cycle %llu] PC=0x%04X A=0x%02X X=0x%02X Y=0x%02X State=%s(%d) Cycle=%d Opcode=0x%02X VBlank=%d NMI=%d PPUCTRL=0x%02X\n",
-                   (unsigned long long)cycle_count, pc, a, x, y, state_name, state, cycle, opcode, vblank, nmi, ppuctrl);
-            
-            // 检测 PC 是否卡死
-            if (pc == last_pc) {
-                stuck_count++;
-                printf("⚠️  CPU 卡死！PC 没有变化 (连续 %d 次)\n", stuck_count);
-                
-                if (stuck_count >= 3) {
-                    printf("\n🔴 CPU 完全卡死在 State=%s, Cycle=%d, Opcode=0x%02X\n", state_name, cycle, opcode);
-                    printf("   这可能是指令未实现或状态机错误\n");
-                    exit(1);
-                }
-            } else {
-                stuck_count = 0;
+        // 监控 PPUCTRL 写入 (静默模式下禁用)
+        if (!g_quiet_mode) {
+            static uint8_t last_ppuctrl = 0;
+            uint8_t ppuctrl = dut->io_debug_ppuCtrl;
+            if (ppuctrl != last_ppuctrl) {
+                printf("\n🎨 PPUCTRL 变化: 0x%02X -> 0x%02X (Cycle %llu, PC=0x%04X)\n",
+                       last_ppuctrl, ppuctrl, (unsigned long long)cycle_count, dut->io_debug_cpuPC);
+                last_ppuctrl = ppuctrl;
             }
+        }
+        
+        // Debug: 每 10000 个周期打印一次 CPU 状态 (静默模式下禁用)
+        if (!g_quiet_mode) {
+            static uint64_t last_debug_cycle = 0;
+            static uint16_t last_pc = 0;
+            static int stuck_count = 0;
             
-            last_pc = pc;
-            last_debug_cycle = cycle_count;
+            if (cycle_count - last_debug_cycle >= 10000) {
+                uint16_t pc = dut->io_debug_cpuPC;
+                uint8_t a = dut->io_debug_cpuA;
+                uint8_t x = dut->io_debug_cpuX;
+                uint8_t y = dut->io_debug_cpuY;
+                bool vblank = dut->io_vblank;
+                bool nmi = dut->io_debug_nmi;
+                uint8_t state = dut->io_debug_cpuState;
+                uint8_t cycle = dut->io_debug_cpuCycle;
+                uint8_t opcode = dut->io_debug_cpuOpcode;
+                uint8_t ppuctrl = dut->io_debug_ppuCtrl;
+                
+                const char* state_names[] = {"Reset", "Fetch", "Execute", "NMI", "Done"};
+                const char* state_name = (state < 5) ? state_names[state] : "Unknown";
+                
+                uint16_t memAddr = dut->io_debug_cpuMemAddr;
+                uint8_t memDataIn = dut->io_debug_cpuMemDataIn;
+                bool memRead = dut->io_debug_cpuMemRead;
+                
+                printf("\n[Cycle %llu] PC=0x%04X A=0x%02X X=0x%02X Y=0x%02X State=%s(%d) Cycle=%d Opcode=0x%02X VBlank=%d NMI=%d PPUCTRL=0x%02X\n",
+                       (unsigned long long)cycle_count, pc, a, x, y, state_name, state, cycle, opcode, vblank, nmi, ppuctrl);
+                
+                // 监控 PPU 寄存器读取
+                if (memRead && memAddr >= 0x2000 && memAddr < 0x4000) {
+                    printf("   [MEM READ] Addr=0x%04X Data=0x%02X (PPU Reg)\n", memAddr, memDataIn);
+                }
+                
+                // 检测 PC 是否卡死
+                if (pc == last_pc) {
+                    stuck_count++;
+                    
+                    // 如果在等待 VBlank，允许更长时间
+                    int max_stuck = (opcode == 0xF0 && pc == 0xC7A8) ? 100 : 3;
+                    
+                    if (stuck_count >= max_stuck) {
+                        printf("⚠️  CPU 卡死！PC 没有变化 (连续 %d 次)\n", stuck_count);
+                        printf("\n🔴 CPU 完全卡死在 State=%s, Cycle=%d, Opcode=0x%02X\n", state_name, cycle, opcode);
+                        printf("   这可能是指令未实现或状态机错误\n");
+                        exit(1);
+                    }
+                } else {
+                    stuck_count = 0;
+                }
+                
+                last_pc = pc;
+                last_debug_cycle = cycle_count;
+            }
         }
     }
     
@@ -320,6 +358,11 @@ public:
         if (cycle_count % 1000000 == 0) {
             printf("\n📺 PPU Status: pixelX=%d pixelY=%d vblank=%d\n", 
                    x, y, dut->io_vblank);
+            
+            // 调试：检查是否到达 scanline 241
+            if (y >= 240) {
+                printf("   ⚠️  Scanline %d, Pixel %d (need pixel=340 to advance)\n", y, x);
+            }
             
             // 检查 PPU 是否在运行
             if (x == last_pixelX && y == last_pixelY) {
@@ -409,12 +452,21 @@ public:
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::cerr << "用法: " << argv[0] << " <rom文件>" << std::endl;
+        std::cerr << "用法: " << argv[0] << " <rom文件> [--quiet]" << std::endl;
         return 1;
     }
     
-    std::cout << "🚀 NES Verilator 仿真器 (快速模式)" << std::endl;
-    std::cout << "====================================" << std::endl;
+    // 检查静默模式
+    for (int i = 2; i < argc; i++) {
+        if (std::string(argv[i]) == "--quiet") {
+            g_quiet_mode = true;
+        }
+    }
+    
+    if (!g_quiet_mode) {
+        std::cout << "🚀 NES Verilator 仿真器 (快速模式)" << std::endl;
+        std::cout << "====================================" << std::endl;
+    }
     
     Verilated::commandArgs(argc, argv);
     
@@ -434,8 +486,8 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    // 额外的 reset 周期
-    for (int i = 0; i < 10; i++) {
+    // 额外的 reset 周期 - 让 ROM 数据稳定
+    for (int i = 0; i < 50; i++) {
         dut->clock = 0;
         dut->eval();
         dut->clock = 1;
@@ -449,8 +501,8 @@ int main(int argc, char** argv) {
     
     std::cout << "🔄 释放 Reset，CPU 启动中..." << std::endl;
     
-    // CPU reset 序列
-    for (int i = 0; i < 20; i++) {
+    // CPU reset 序列 - 需要足够周期完成 Reset Vector 读取
+    for (int i = 0; i < 50; i++) {
         dut->clock = 0;
         dut->eval();
         dut->clock = 1;

@@ -10,7 +10,7 @@ import nes.core._
  * 合并 PPU, PPUv2, PPUv3, PPUSimplified 的功能
  * 与测试用例衔接
  */
-class PPURefactored extends Module {
+class PPURefactored(enableDebug: Boolean = false) extends Module {
   val io = IO(new Bundle {
     // CPU 接口
     val cpuAddr = Input(UInt(3.W))
@@ -47,7 +47,7 @@ class PPURefactored extends Module {
   })
   
   // 寄存器控制模块
-  val regControl = Module(new PPURegisterControl)
+  val regControl = Module(new PPURegisterControl(enableDebug))
   regControl.io.cpuAddr := io.cpuAddr
   regControl.io.cpuDataIn := io.cpuDataIn
   regControl.io.cpuWrite := io.cpuWrite
@@ -60,42 +60,57 @@ class PPURefactored extends Module {
   val scanline = RegInit(0.U(9.W))
   val pixel = RegInit(0.U(9.W))
   
+  // Debug: 每1000个周期打印一次
+  val debugCounter = RegInit(0.U(32.W))
+  debugCounter := debugCounter + 1.U
+  when(debugCounter === 10000.U) {
+    printf("[PPU Debug] scanline=%d pixel=%d\n", scanline, pixel)
+    debugCounter := 0.U
+  }
+  
   // 像素计数
   when(pixel === 340.U) {
     pixel := 0.U
     when(scanline === 261.U) {
       scanline := 0.U
+      printf("[PPU] Frame complete, reset to scanline 0\n")
     }.otherwise {
       scanline := scanline + 1.U
+      when(scanline === 240.U) {
+        printf("[PPU] Entering VBlank region, next scanline=241\n")
+      }
     }
   }.otherwise {
     pixel := pixel + 1.U
   }
   
-  // VBlank 控制
-  val vblankFlag = RegInit(false.B)
+  // VBlank 控制 - 在 pixel 0 设置，这样 pixel 1 时就生效了
   regControl.io.setVBlank := false.B
   regControl.io.clearVBlank := false.B
   regControl.io.setSprite0Hit := false.B
   regControl.io.setSpriteOverflow := false.B
   
-  when(scanline === 241.U && pixel === 1.U) {
-    vblankFlag := true.B
+  when(scanline === 241.U && pixel === 0.U) {
     regControl.io.setVBlank := true.B
-  }.elsewhen(scanline === 261.U && pixel === 1.U) {
-    vblankFlag := false.B
+    printf("[PPU] VBlank START at scanline=241 pixel=0\n")
+  }.elsewhen(scanline === 261.U && pixel === 0.U) {
     regControl.io.clearVBlank := true.B
+    printf("[PPU] VBlank END at scanline=261 pixel=0\n")
   }
   
-  // NMI 生成 - 只在 VBlank 开始时产生一个周期的脉冲
+  // NMI 生成 - 在 pixel 1 触发（此时 vblankFlag 已经设置）
   val nmiEnable = regs.ppuCtrl(7)
   val nmiTrigger = RegInit(false.B)
   
-  // VBlank 开始时设置 NMI 触发
+  // VBlank 开始时设置 NMI 触发（保持到帧结束）
   when(scanline === 241.U && pixel === 1.U && nmiEnable) {
     nmiTrigger := true.B
-  }.otherwise {
+    printf("[PPU] NMI Triggered at scanline=241 pixel=1\n")
+  }
+  // VBlank 结束时清除 NMI（pre-render scanline）
+  .elsewhen(scanline === 261.U && pixel === 1.U) {
     nmiTrigger := false.B
+    printf("[PPU] NMI Cleared at scanline=261 pixel=1\n")
   }
   
   io.nmiOut := nmiTrigger
@@ -243,7 +258,7 @@ class PPURefactored extends Module {
   io.pixelX := pixel
   io.pixelY := scanline
   io.pixelColor := finalColor(5, 0)
-  io.vblank := vblankFlag
+  io.vblank := regs.vblank  // 使用寄存器值，反映读取清除
   
   // 防止优化
   dontTouch(finalColor)
@@ -251,7 +266,7 @@ class PPURefactored extends Module {
   // 调试输出
   io.debug.ppuCtrl := regs.ppuCtrl
   io.debug.ppuMask := regs.ppuMask
-  io.debug.ppuStatus := regs.ppuStatus
+  io.debug.ppuStatus := Cat(regs.vblank, regs.sprite0Hit, regs.spriteOverflow, 0.U(5.W))  // 组合逻辑
   io.debug.ppuAddrReg := regs.ppuAddr
   io.debug.paletteInitDone := true.B
 }

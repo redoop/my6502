@@ -67,4 +67,4 @@ echo ""
 echo "按 Ctrl+C 退出"
 echo ""
 
-./build/verilator/VNESSystemRefactored "$ROM"
+./build/verilator/VNESSystemRefactored "$ROM" "$@"

@@ -41,7 +41,7 @@ object PPURegisters {
 }
 
 // PPU 寄存器控制模块
-class PPURegisterControl extends Module {
+class PPURegisterControl(enableDebug: Boolean = false) extends Module {
   val io = IO(new Bundle {
     // CPU 接口
     val cpuAddr = Input(UInt(3.W))
@@ -62,9 +62,14 @@ class PPURegisterControl extends Module {
   
   val regs = RegInit(PPURegisters.default())
   
+  // 延迟清除标志 - 下一个周期才清除
+  val clearVBlankNext = RegInit(false.B)
+  val clearAddrLatchNext = RegInit(false.B)
+  val clearScrollLatchNext = RegInit(false.B)
+  
   // 读取逻辑
   io.cpuDataOut := MuxLookup(io.cpuAddr, 0.U, Seq(
-    2.U -> regs.ppuStatus,  // $2002
+    2.U -> Cat(regs.vblank, regs.sprite0Hit, regs.spriteOverflow, 0.U(5.W)),  // $2002 - 组合逻辑
     4.U -> 0.U,             // $2004 - OAM data (TODO)
     7.U -> regs.ppuData     // $2007
   ))
@@ -74,8 +79,8 @@ class PPURegisterControl extends Module {
     switch(io.cpuAddr) {
       is(0.U) { // $2000 - PPUCTRL
         regs.ppuCtrl := io.cpuDataIn
-        printf("[PPU] Write PPUCTRL = 0x%x (NMI enable = %d)\n", 
-               io.cpuDataIn, io.cpuDataIn(7))
+        // printf("[PPU] Write PPUCTRL = 0x%x (NMI enable = %d)\n", 
+        //        io.cpuDataIn, io.cpuDataIn(7))
       }
       is(1.U) { // $2001 - PPUMASK
         regs.ppuMask := io.cpuDataIn
@@ -109,35 +114,52 @@ class PPURegisterControl extends Module {
     }
   }
   
-  // 读取 PPUSTATUS 清除标志
+  // 读取 PPUSTATUS 清除标志 - 标记下一周期清除
   when(io.cpuRead && io.cpuAddr === 2.U) {
-    printf("[PPU] Read PPUSTATUS = 0x%x\n", regs.ppuStatus)
-    regs.vblank := false.B
-    regs.addrLatch := false.B
-    regs.scrollLatch := false.B
+    if (enableDebug) {
+      printf("[PPU Regs] Read PPUSTATUS: vblank=%d, status=0x%x, will clear next cycle\n", regs.vblank, Cat(regs.vblank, regs.sprite0Hit, regs.spriteOverflow, 0.U(5.W)))
+    }
+    clearVBlankNext := true.B
+    clearAddrLatchNext := true.B
+    clearScrollLatchNext := true.B
   }
   
-  // 状态更新
+  // 状态更新 - 优先级：设置 > 延迟清除 > 外部清除
   when(io.setVBlank) {
     regs.vblank := true.B
-  }
-  when(io.clearVBlank) {
+    if (enableDebug) {
+      printf("[PPU Regs] setVBlank triggered, vblank=%d\n", true.B)
+    }
+  }.elsewhen(clearVBlankNext) {
     regs.vblank := false.B
-  }
-  when(io.setSprite0Hit) {
-    regs.sprite0Hit := true.B
-  }
-  when(io.setSpriteOverflow) {
-    regs.spriteOverflow := true.B
+    clearVBlankNext := false.B  // 清除后立即复位标志
+    if (enableDebug) {
+      printf("[PPU Regs] clearVBlankNext executed, vblank cleared\n")
+    }
+  }.elsewhen(io.clearVBlank) {
+    regs.vblank := false.B
+    if (enableDebug) {
+      printf("[PPU Regs] clearVBlank triggered, vblank=%d\n", false.B)
+    }
   }
   
-  // 组装 PPUSTATUS
-  regs.ppuStatus := Cat(
-    regs.vblank,
-    regs.sprite0Hit,
-    regs.spriteOverflow,
-    0.U(5.W)
-  )
+  // 清除 addr/scroll latch
+  when(clearAddrLatchNext) {
+    regs.addrLatch := false.B
+    clearAddrLatchNext := false.B
+  }
+  when(clearScrollLatchNext) {
+    regs.scrollLatch := false.B
+    clearScrollLatchNext := false.B
+  }
+  
+  // 锁存器清除
+  when(clearAddrLatchNext) {
+    regs.addrLatch := false.B
+  }
+  when(clearScrollLatchNext) {
+    regs.scrollLatch := false.B
+  }
   
   io.regs := regs
 }
