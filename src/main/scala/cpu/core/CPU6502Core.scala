@@ -22,7 +22,7 @@ class CPU6502Core extends Module {
   
   // CPU 状态机
   val sReset :: sFetch :: sExecute :: sNMI :: sDone :: Nil = Enum(5)
-  val state = RegInit(sReset)
+  val state = RegInit(sFetch)  // 默认从 Fetch 开始，只有显式 reset 才进入 sReset
   
   val opcode  = RegInit(0.U(8.W))
   val operand = RegInit(0.U(16.W))

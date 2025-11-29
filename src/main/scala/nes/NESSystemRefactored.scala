@@ -40,6 +40,8 @@ class NESSystemRefactored extends Module {
       val cpuY = UInt(8.W)
       val ppuCtrl = UInt(8.W)
       val ppuMask = UInt(8.W)
+      val vblank = Bool()
+      val nmi = Bool()
       val apuPulse1Active = Bool()
       val apuPulse2Active = Bool()
     })
@@ -51,8 +53,8 @@ class NESSystemRefactored extends Module {
   // PPU
   val ppu = Module(new PPURefactored)
   
-  // APU
-  val apu = Module(new APURefactored)
+  // APU - 暂时禁用，等待完整实现
+  // val apu = Module(new APURefactored)
   
   // PRG ROM (32KB)
   val prgRom = SyncReadMem(32768, UInt(8.W))
@@ -74,14 +76,14 @@ class NESSystemRefactored extends Module {
   // CPU 读取
   val ramData = ram.read(cpuAddr(10, 0))
   val ppuData = ppu.io.cpuDataOut
-  val apuData = apu.io.cpuDataOut
+  // val apuData = apu.io.cpuDataOut
   val prgData = prgRom.read(cpuAddr(14, 0))
   val controllerData = Mux(cpuAddr(0), io.controller2, io.controller1)
   
   cpu.io.memDataIn := MuxCase(0.U, Seq(
     isRam -> ramData,
     isPpuReg -> ppuData,
-    isApuReg -> apuData,
+    // isApuReg -> apuData,
     isController -> controllerData,
     isPrgRom -> prgData
   ))
@@ -105,11 +107,11 @@ class NESSystemRefactored extends Module {
   ppu.io.chrLoadAddr := io.chrLoadAddr
   ppu.io.chrLoadData := io.chrLoadData
   
-  // APU 连接
-  apu.io.cpuAddr := cpuAddr(7, 0)
-  apu.io.cpuDataIn := cpu.io.memDataOut
-  apu.io.cpuWrite := cpu.io.memWrite && isApuReg
-  apu.io.cpuRead := cpu.io.memRead && isApuReg
+  // APU 连接 - 暂时禁用
+  // apu.io.cpuAddr := cpuAddr(7, 0)
+  // apu.io.cpuDataIn := cpu.io.memDataOut
+  // apu.io.cpuWrite := cpu.io.memWrite && isApuReg
+  // apu.io.cpuRead := cpu.io.memRead && isApuReg
   
   // CPU 中断
   cpu.io.reset := false.B
@@ -120,7 +122,7 @@ class NESSystemRefactored extends Module {
   io.pixelY := ppu.io.pixelY
   io.pixelColor := ppu.io.pixelColor
   io.vblank := ppu.io.vblank
-  io.audioOut := apu.io.audioOut
+  io.audioOut := 0.U // apu.io.audioOut
   
   // 调试输出
   io.debug.cpuPC := cpu.io.debug.regPC
@@ -129,8 +131,10 @@ class NESSystemRefactored extends Module {
   io.debug.cpuY := cpu.io.debug.regY
   io.debug.ppuCtrl := ppu.io.debug.ppuCtrl
   io.debug.ppuMask := ppu.io.debug.ppuMask
-  io.debug.apuPulse1Active := apu.io.debug.pulse1Active
-  io.debug.apuPulse2Active := apu.io.debug.pulse2Active
+  io.debug.vblank := ppu.io.vblank
+  io.debug.nmi := ppu.io.nmiOut
+  io.debug.apuPulse1Active := false.B // apu.io.debug.pulse1Active
+  io.debug.apuPulse2Active := false.B // apu.io.debug.pulse2Active
 }
 
 object NESSystemRefactored extends App {

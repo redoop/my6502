@@ -12,7 +12,7 @@ object TransferInstructions {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
     newRegs := regs
-    newRegs.pc := regs.pc + 1.U  // 单字节指令，PC + 1
+    // PC already incremented in Fetch state
     
     result.done := true.B
     result.nextCycle := 0.U

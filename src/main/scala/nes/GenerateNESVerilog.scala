@@ -4,10 +4,10 @@ import chisel3._
 import chisel3.stage.ChiselStage
 
 object GenerateNESVerilog extends App {
-  println("Generating Verilog for NES System v2...")
+  println("Generating Verilog for NES System Refactored...")
   
   (new ChiselStage).emitVerilog(
-    new NESSystemv2,
+    new NESSystemRefactored,
     Array(
       "--target-dir", "generated/nes",
       "--emission-options", "disableMemRandomization,disableRegisterRandomization",
@@ -22,10 +22,10 @@ object GenerateNESVerilog extends App {
 }
 
 object GeneratePPUVerilog extends App {
-  println("Generating Verilog for PPU...")
+  println("Generating Verilog for PPU Refactored...")
   
   (new ChiselStage).emitVerilog(
-    new PPU,
+    new PPURefactored,
     Array(
       "--target-dir", "generated/nes",
       "--emission-options", "disableMemRandomization,disableRegisterRandomization"

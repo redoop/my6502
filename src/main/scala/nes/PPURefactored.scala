@@ -109,14 +109,94 @@ class PPURefactored extends Module {
     oam(io.oamDmaAddr) := io.oamDmaData
   }
   
-  // 简单的背景渲染
+  // 渲染控制
   val isRendering = scanline < 240.U && pixel < 256.U
-  val bgColor = Mux(isRendering, paletteRam(0), 0.U)
+  val bgEnable = regs.ppuMask(3)
+  val spriteEnable = regs.ppuMask(4)
+  val showLeftBg = regs.ppuMask(1)
+  val showLeftSprite = regs.ppuMask(2)
+  
+  // 滚动寄存器
+  val scrollX = RegInit(0.U(8.W))
+  val scrollY = RegInit(0.U(8.W))
+  
+  // 背景渲染
+  val nametableBase = Cat(regs.ppuCtrl(1, 0), 0.U(10.W))
+  val tileX = (pixel + scrollX) >> 3
+  val tileY = (scanline + scrollY) >> 3
+  val tileAddr = nametableBase + (tileY << 5) + tileX
+  val tileIndex = nametableRam.read(tileAddr(10, 0))
+  
+  val patternBase = Mux(regs.ppuCtrl(4), 0x1000.U, 0x0000.U)
+  val fineY = (scanline + scrollY)(2, 0)
+  val patternAddr = patternBase + (tileIndex << 4) + fineY
+  val patternLow = chrRom.read(patternAddr)
+  val patternHigh = chrRom.read(patternAddr + 8.U)
+  
+  val fineX = (pixel + scrollX)(2, 0)
+  val bitPos = 7.U - fineX
+  val pixelBit = ((patternHigh >> bitPos)(0) << 1) | ((patternLow >> bitPos)(0))
+  
+  val attrAddr = nametableBase + 0x3C0.U + ((tileY >> 2) << 3) + (tileX >> 2)
+  val attrByte = nametableRam.read(attrAddr(10, 0))
+  val attrShift = ((tileY(1) << 2) | (tileX(1) << 1))
+  val paletteIdx = (attrByte >> attrShift)(1, 0)
+  
+  val bgPaletteAddr = (paletteIdx << 2) | pixelBit
+  val bgColor = Mux(pixelBit === 0.U, paletteRam(0), paletteRam(bgPaletteAddr))
+  
+  // 精灵渲染
+  val spriteY = oam(0)
+  val spriteTile = oam(1)
+  val spriteAttr = oam(2)
+  val spriteX = oam(3)
+  val spriteSize = Mux(regs.ppuCtrl(5), 16.U, 8.U)
+  
+  val inSpriteX = pixel >= spriteX && pixel < (spriteX + 8.U)
+  val inSpriteY = scanline >= spriteY && scanline < (spriteY + spriteSize)
+  val spriteActive = inSpriteX && inSpriteY
+  
+  val spriteFineX = pixel - spriteX
+  val spriteFineY = scanline - spriteY
+  val spritePatternBase = Mux(regs.ppuCtrl(3), 0x1000.U, 0x0000.U)
+  val spritePatternAddr = spritePatternBase + (spriteTile << 4) + spriteFineY
+  val spritePatternLow = chrRom.read(spritePatternAddr)
+  val spritePatternHigh = chrRom.read(spritePatternAddr + 8.U)
+  
+  val spriteBitPos = 7.U - spriteFineX
+  val spritePixelBit = ((spritePatternHigh >> spriteBitPos)(0) << 1) | ((spritePatternLow >> spriteBitPos)(0))
+  val spritePaletteIdx = spriteAttr(1, 0)
+  val spritePaletteAddr = 0x10.U + (spritePaletteIdx << 2) | spritePixelBit
+  val spriteColor = paletteRam(spritePaletteAddr)
+  val spritePriority = spriteAttr(5)
+  
+  // Sprite 0 Hit
+  when(spriteActive && spritePixelBit =/= 0.U && pixelBit =/= 0.U && pixel =/= 255.U) {
+    regControl.io.setSprite0Hit := true.B
+  }
+  
+  // 优先级混合
+  val hideLeft = pixel < 8.U
+  val showBg = bgEnable && (!hideLeft || showLeftBg)
+  val showSprite = spriteEnable && (!hideLeft || showLeftSprite)
+  
+  val finalColor = WireDefault(paletteRam(0))
+  when(isRendering) {
+    when(showSprite && spriteActive && spritePixelBit =/= 0.U) {
+      when(!showBg || pixelBit === 0.U || !spritePriority) {
+        finalColor := spriteColor
+      }.otherwise {
+        finalColor := bgColor
+      }
+    }.elsewhen(showBg && pixelBit =/= 0.U) {
+      finalColor := bgColor
+    }
+  }
   
   // 输出
   io.pixelX := pixel
   io.pixelY := scanline
-  io.pixelColor := bgColor(5, 0)
+  io.pixelColor := finalColor(5, 0)
   io.vblank := vblankFlag
   
   // 调试输出
