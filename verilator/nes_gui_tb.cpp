@@ -120,29 +120,39 @@ int main(int argc, char** argv) {
         
         top->controller1 = controller;
         
-        // Run simulation (fast mode)
-        for (int i = 0; i < 30000; i++) {
+        // Run simulation for one complete frame
+        // PPU: 341 dots/scanline * 262 scanlines = 89342 PPU cycles
+        // Master clock / 4 = PPU clock, so 89342 * 4 = 357368 master cycles
+        int px = 0, py = 0;
+        for (int i = 0; i < 357368; i++) {
             if (cycle == 10) top->rst_n = 1;
             
-            // Provide ROM data
+            // Clock low
+            top->clk = 0;
+            top->eval();
+            
+            // Provide ROM data AFTER eval (address is stable now)
             uint16_t prg_addr = top->prg_rom_addr & 0x3FFF;
             top->prg_rom_data = (prg_addr < prg_rom.size()) ? 
                 prg_rom[prg_addr] : 0xFF;
             top->chr_rom_data = (top->chr_rom_addr < chr_rom.size()) ? 
                 chr_rom[top->chr_rom_addr] : 0;
             
-            // Clock
-            top->clk = 0;
-            top->eval();
+            // Clock high
             top->clk = 1;
             top->eval();
             
-            // Capture pixels (simple mapping)
-            int px = i % 256;
-            int py = (i / 256) % 240;
-            if (px < 256 && py < 240) {
-                pixels[py * 256 + px] = (top->video_r << 16) | 
-                                        (top->video_g << 8) | top->video_b;
+            // Capture pixels when video_de is active
+            if (top->video_de) {
+                if (px < 256 && py < 240) {
+                    pixels[py * 256 + px] = (top->video_r << 16) | 
+                                            (top->video_g << 8) | top->video_b;
+                }
+                px++;
+                if (px >= 256) {
+                    px = 0;
+                    py++;
+                }
             }
             
             // Capture audio
@@ -156,8 +166,20 @@ int main(int argc, char** argv) {
         
         // Queue audio
         if (audio_dev && audio_pos > 0) {
-            SDL_QueueAudio(audio_dev, audio_buffer, audio_pos * sizeof(int16_t));
+            int queued = SDL_GetQueuedAudioSize(audio_dev);
+            if (queued < 8192) {
+                SDL_QueueAudio(audio_dev, audio_buffer, audio_pos * sizeof(int16_t));
+            }
+            
+            // Debug
+            if (frame % 300 == 0) {
+                std::cout << "Audio: captured=" << audio_pos 
+                          << " samples, queued=" << queued 
+                          << " bytes, value=" << audio_buffer[0] << std::endl;
+            }
             audio_pos = 0;
+        } else if (frame % 300 == 0) {
+            std::cout << "Audio: NO DATA (pos=" << audio_pos << ")" << std::endl;
         }
         
         // Update display
@@ -172,8 +194,33 @@ int main(int argc, char** argv) {
                       << " PRG=0x" << std::hex << (int)top->prg_rom_addr 
                       << " CHR=0x" << (int)top->chr_rom_addr << std::dec
                       << " Video:" << (int)top->video_r << "," 
-                      << (int)top->video_g << "," << (int)top->video_b
-                      << std::endl;
+                      << (int)top->video_g << "," << (int)top->video_b;
+            
+            // Show if rendering is enabled
+            std::cout << " Render:" << (top->video_de ? "ON" : "OFF");
+            
+            // Show controller input
+            if (controller) {
+                std::cout << " Input:";
+                if (controller & 0x80) std::cout << "R";
+                if (controller & 0x40) std::cout << "L";
+                if (controller & 0x20) std::cout << "D";
+                if (controller & 0x10) std::cout << "U";
+                if (controller & 0x08) std::cout << "S";
+                if (controller & 0x04) std::cout << "s";
+                if (controller & 0x02) std::cout << "B";
+                if (controller & 0x01) std::cout << "A";
+            }
+            
+            std::cout << std::endl;
+            
+            // Debug: Show first few nametable bytes every 5 seconds
+            if (frame % 300 == 0) {
+                std::cout << "  [DEBUG] First 32 nametable bytes: ";
+                // Note: Can't access internal VRAM from testbench
+                // This would require adding debug outputs to the Verilog
+                std::cout << "(need debug port)" << std::endl;
+            }
         }
         
         SDL_Delay(16); // ~60 FPS

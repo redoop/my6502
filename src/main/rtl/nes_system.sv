@@ -53,55 +53,55 @@ logic [7:0]  oam[0:255];       // Sprite memory
 logic [7:0]  vram[0:2047];     // Nametable VRAM
 logic [7:0]  palette[0:31];    // Palette RAM
 
-// Initialize VRAM with test pattern
+// Initialize VRAM - with Donkey Kong level pattern
 initial begin
-    // Fill nametable with tile pattern
-    for (int i = 0; i < 960; i++) begin
-        vram[i] = (i[4:0] + i[9:5]) & 8'hFF;
+    // Simulate Donkey Kong level layout
+    // Fill with platform tiles (tile 0x24 = platform, 0x26 = ladder)
+    for (int y = 0; y < 30; y++) begin
+        for (int x = 0; x < 32; x++) begin
+            int addr = y * 32 + x;
+            
+            // Create platform pattern every 4 rows
+            if (y % 4 == 0 || y % 4 == 1) begin
+                vram[addr] = 8'h24;  // Platform tile
+            end else if (x % 8 == 2 || x % 8 == 3) begin
+                vram[addr] = 8'h26;  // Ladder tile
+            end else begin
+                vram[addr] = 8'h00;  // Empty
+            end
+        end
     end
-    // Fill attribute table
+    
+    // Attribute table - pink platforms, cyan ladders
     for (int i = 960; i < 1024; i++) begin
-        vram[i] = 8'hE4;
+        vram[i] = 8'hE4;  // Mixed palettes
     end
     
-    // Initialize test sprites
-    // Sprite 0 - at (64, 64)
-    oam[0] = 8'd64;   // Y position
-    oam[1] = 8'h01;   // Tile index
-    oam[2] = 8'h00;   // Attributes (palette 0)
-    oam[3] = 8'd64;   // X position
-    
-    // Sprite 1 - at (64, 96)
-    oam[4] = 8'd64;
-    oam[5] = 8'h02;
-    oam[6] = 8'h01;   // Palette 1
-    oam[7] = 8'd96;
-    
-    // Sprite 2 - at (96, 64)
-    oam[8] = 8'd96;
-    oam[9] = 8'h03;
-    oam[10] = 8'h02;  // Palette 2
-    oam[11] = 8'd64;
-    
-    // Hide remaining sprites
-    for (int i = 12; i < 256; i++) begin
+    // Clear OAM
+    for (int i = 0; i < 256; i++) begin
         oam[i] = 8'hFF;
     end
     
-    // Initialize palette
-    palette[0] = 8'h0F;  // Universal background
+    // Initialize palette with Donkey Kong colors
+    palette[0] = 8'h0F;  // Black background
+    palette[1] = 8'h30;  // White
+    palette[2] = 8'h27;  // Orange
+    palette[3] = 8'h16;  // Red
+    palette[5] = 8'h11;  // Blue (ladder)
+    palette[6] = 8'h21;  // Cyan
+    palette[7] = 8'h31;  // Light cyan
+    palette[9] = 8'h25;  // Pink (platform)
+    palette[10] = 8'h35; // Light pink
+    palette[11] = 8'h15; // Dark pink
+    palette[13] = 8'h28; // Yellow
+    palette[14] = 8'h38; // Light yellow
+    palette[15] = 8'h18; // Dark yellow
     
-    // Background palettes (0-3)
-    palette[1] = 8'h30;  palette[2] = 8'h10;  palette[3] = 8'h00;
-    palette[5] = 8'h16;  palette[6] = 8'h26;  palette[7] = 8'h06;
-    palette[9] = 8'h11;  palette[10] = 8'h21; palette[11] = 8'h01;
-    palette[13] = 8'h27; palette[14] = 8'h28; palette[15] = 8'h17;
-    
-    // Sprite palettes (4-7)
-    palette[17] = 8'h30; palette[18] = 8'h27; palette[19] = 8'h16; // Palette 4 (white/orange/red)
-    palette[21] = 8'h11; palette[22] = 8'h21; palette[23] = 8'h31; // Palette 5 (blue/cyan/light)
-    palette[25] = 8'h1A; palette[26] = 8'h2A; palette[27] = 8'h3A; // Palette 6 (green)
-    palette[29] = 8'h28; palette[30] = 8'h38; palette[31] = 8'h18; // Palette 7 (yellow)
+    // Sprite palettes
+    palette[17] = 8'h30; palette[18] = 8'h27; palette[19] = 8'h16;
+    palette[21] = 8'h11; palette[22] = 8'h21; palette[23] = 8'h31;
+    palette[25] = 8'h1A; palette[26] = 8'h2A; palette[27] = 8'h3A;
+    palette[29] = 8'h28; palette[30] = 8'h38; palette[31] = 8'h18;
 end
 
 // PPU registers
@@ -156,12 +156,15 @@ always_comb begin
     
     casez (cpu_addr)
         16'b0001????????????: cpu_data_in = ram[cpu_addr[10:0]];    // $0000-$1FFF
-        16'h2002:             cpu_data_in = ppustatus;
+        16'h2002: begin
+            // Return VBlank status directly (combinational)
+            cpu_data_in = {vblank_sync, ppustatus[6:0]};
+        end
         16'h2004:             cpu_data_in = oam[oamaddr];
         16'h2007:             cpu_data_in = ppudata_buffer;
         16'h4015:             cpu_data_in = apu_status;
-        16'h4016:             cpu_data_in = {7'b0, controller1[0]};
-        16'h4017:             cpu_data_in = {7'b0, controller2[0]};
+        16'h4016: cpu_data_in = {7'b0, controller1[0]};
+        16'h4017: cpu_data_in = {7'b0, controller2[0]};
         16'b01??????????????,
         16'b1???????????????: cpu_data_in = prg_rom_data;           // $6000-$FFFF
         default:              cpu_data_in = 8'h00;
@@ -169,6 +172,8 @@ always_comb begin
 end
 
 // CPU writes
+logic [15:0] vram_write_count;
+
 always_ff @(posedge cpu_clk or negedge rst_n) begin
     if (!rst_n) begin
         ppuctrl <= 0;
@@ -177,6 +182,9 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
         ppuaddr <= 0;
         ppuaddr_latch <= 0;
         dma_active <= 0;
+        ppuscroll_x <= 0;
+        ppuscroll_y <= 0;
+        vram_write_count <= 0;
     end else if (!cpu_rw) begin
         casez (cpu_addr)
             16'b0001????????????: ram[cpu_addr[10:0]] <= cpu_data_out;
@@ -202,6 +210,7 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
                     // CHR ROM (read-only)
                 end else if (ppuaddr[13:0] < 14'h3F00) begin
                     vram[ppuaddr[10:0]] <= cpu_data_out;
+                    vram_write_count <= vram_write_count + 1;  // Count writes
                 end else begin
                     palette[ppuaddr[4:0]] <= cpu_data_out;
                 end
@@ -228,11 +237,27 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
     end
 end
 
-// PPUSTATUS read side effects
-always_ff @(posedge cpu_clk) begin
-    if (cpu_rw && cpu_addr == 16'h2002) begin
-        ppustatus[7] <= 0;      // Clear VBlank flag
-        ppuaddr_latch <= 0;     // Reset address latch
+// PPUSTATUS management - sync VBlank and handle reads
+logic vblank_sync;
+always_ff @(posedge cpu_clk or negedge rst_n) begin
+    if (!rst_n) begin
+        ppustatus <= 0;
+        vblank_sync <= 0;
+        ppuaddr_latch <= 0;
+    end else begin
+        // Sync vblank from PPU clock domain
+        vblank_sync <= vblank;
+        
+        // Set VBlank flag on rising edge (only if not being cleared by read)
+        if (vblank && !vblank_sync && !(cpu_rw && cpu_addr == 16'h2002)) begin
+            ppustatus[7] <= 1;
+        end
+        
+        // Clear VBlank flag on $2002 read (happens AFTER the read returns current value)
+        if (cpu_rw && cpu_addr == 16'h2002) begin
+            ppustatus[7] <= 0;
+            ppuaddr_latch <= 0;
+        end
     end
 end
 
@@ -283,15 +308,14 @@ always_ff @(posedge ppu_clk or negedge rst_n) begin
         // VBlank control
         if (scanline == 241 && dot == 1) begin
             vblank <= 1;
-            ppustatus[7] <= 1;
-            if (ppuctrl[7]) nmi <= 1;  // Trigger NMI if enabled
+            if (ppuctrl[7]) begin
+                nmi <= 1;
+            end
         end
         
         if (scanline == 261 && dot == 1) begin
             vblank <= 0;
-            ppustatus[7] <= 0;
-            ppustatus[6] <= 0;  // Clear sprite 0 hit
-            nmi <= 0;
+            nmi <= 0;  // Clear NMI signal
         end
         
         // Rendering active
@@ -304,7 +328,7 @@ assign video_hsync = (dot >= 280 && dot < 304);
 assign video_vsync = (scanline >= 243 && scanline < 246);
 assign video_de = (scanline < 240) && (dot < 256);
 
-// PPU rendering - with sprite support
+// PPU rendering - with scrolling support
 logic [7:0] tile_index;
 logic [7:0] attr_byte;
 logic [1:0] attr_bits;
@@ -312,6 +336,7 @@ logic [7:0] pattern_lo_reg, pattern_hi_reg;
 logic [1:0] pixel_value;
 logic [4:0] bg_palette_idx;
 logic [4:0] tile_x, tile_y;
+logic [8:0] scroll_x, scroll_y;  // 9-bit for wrapping
 logic [9:0] attr_addr;
 logic [13:0] chr_addr_out;
 
@@ -334,51 +359,52 @@ always_ff @(posedge ppu_clk) begin
     end
 end
 
-// Sprite evaluation - check all 64 sprites
+// Sprite evaluation - simplified and fixed
 always_comb begin
     sprite_active = 0;
     sprite_pixel = 0;
     sprite_palette_idx = 0;
-    sprite_pattern_lo = 0;
-    sprite_pattern_hi = 0;
     
-    // Scan sprites (simplified - check first 8)
+    // Check first 8 sprites
     for (int i = 0; i < 8; i++) begin
         sprite_y = oam[i * 4 + 0];
         sprite_tile = oam[i * 4 + 1];
         sprite_attr = oam[i * 4 + 2];
         sprite_x = oam[i * 4 + 3];
         
-        // Check if sprite is on current scanline
-        if (scanline >= sprite_y && scanline < sprite_y + 8) begin
-            // Check if sprite is at current X position
-            if (dot >= sprite_x && dot < sprite_x + 8) begin
-                sprite_active = 1;
-                
-                // Get sprite pattern (simplified - use same as background)
-                sprite_pattern_lo = chr_rom_data;
-                sprite_pattern_hi = chr_rom_data;
-                
-                // Extract pixel
-                sprite_pixel = {sprite_pattern_hi[7-(dot-sprite_x)], 
-                               sprite_pattern_lo[7-(dot-sprite_x)]};
-                
-                // Sprite palette (4-7)
-                if (sprite_pixel != 0) begin
-                    sprite_palette_idx = {1'b1, sprite_attr[1:0], sprite_pixel};
+        // Check if sprite is visible (not hidden at 0xFF)
+        if (sprite_y < 8'hEF) begin
+            // Check if sprite is on current scanline
+            if (scanline >= sprite_y && scanline < (sprite_y + 8)) begin
+                // Check if sprite is at current X position
+                if (dot >= sprite_x && dot < (sprite_x + 8)) begin
+                    sprite_active = 1;
+                    
+                    // Use CHR ROM data (simplified - same as background for now)
+                    sprite_pixel = {chr_rom_data[7-(dot-sprite_x)], chr_rom_data[7-(dot-sprite_x)]};
+                    
+                    // Sprite palette (16-31)
+                    if (sprite_pixel != 0) begin
+                        sprite_palette_idx = {1'b1, sprite_attr[1:0], sprite_pixel};
+                    end
+                    
+                    break;
                 end
-                
-                break;  // Use first sprite found
             end
         end
     end
 end
 
-// Background rendering
+// Background rendering with scrolling
 always_comb begin
     if (scanline < 240 && dot < 256) begin
-        tile_x = dot[7:3];
-        tile_y = scanline[7:3];
+        // Apply scroll offset
+        scroll_x = dot + ppuscroll_x;
+        scroll_y = scanline + ppuscroll_y;
+        
+        // Calculate tile position with wrapping
+        tile_x = scroll_x[7:3] & 5'h1F;  // Wrap at 32 tiles
+        tile_y = scroll_y[7:3] & 5'h1F;
         
         tile_index = vram[{tile_y, tile_x}];
         
@@ -393,14 +419,16 @@ always_comb begin
         endcase
         
         if (dot[2:0] == 3'd5) begin
-            chr_addr_out = {ppuctrl[4], tile_index, 1'b0, scanline[2:0]};
+            chr_addr_out = {ppuctrl[4], tile_index, 1'b0, scroll_y[2:0]};
         end else if (dot[2:0] == 3'd7) begin
-            chr_addr_out = {ppuctrl[4], tile_index, 1'b1, scanline[2:0]};
+            chr_addr_out = {ppuctrl[4], tile_index, 1'b1, scroll_y[2:0]};
         end else begin
-            chr_addr_out = {ppuctrl[4], tile_index, 1'b0, scanline[2:0]};
+            chr_addr_out = {ppuctrl[4], tile_index, 1'b0, scroll_y[2:0]};
         end
         
-        pixel_value = {pattern_hi_reg[7-dot[2:0]], pattern_lo_reg[7-dot[2:0]]};
+        // Use scrolled fine X
+        pixel_value = {pattern_hi_reg[7-scroll_x[2:0]], 
+                       pattern_lo_reg[7-scroll_x[2:0]]};
         
         if (pixel_value == 0) begin
             bg_palette_idx = 5'h00;
@@ -413,20 +441,24 @@ always_comb begin
     end
 end
 
-// NES palette lookup - with sprite support
+// NES palette lookup - use palette RAM
 logic [23:0] nes_color;
 logic [4:0] final_palette_idx;
+logic [7:0] palette_color;
 
 always_comb begin
-    // Sprite has priority over background (if not transparent)
+    // Sprite has priority over background
     if (sprite_active && sprite_pixel != 0) begin
         final_palette_idx = sprite_palette_idx;
     end else begin
         final_palette_idx = bg_palette_idx;
     end
     
-    // Use palette index directly as NES color
-    case (final_palette_idx[5:0])
+    // Read from palette RAM
+    palette_color = palette[final_palette_idx];
+    
+    // Convert to RGB using NES palette
+    case (palette_color[5:0])
         6'h00: nes_color = 24'h545454;
         6'h01: nes_color = 24'h001E74;
         6'h02: nes_color = 24'h081090;
@@ -511,33 +543,105 @@ end
 // APU Audio Generation
 //=============================================================================
 logic [15:0] audio_counter;
-logic [15:0] pulse1_out;
+logic [15:0] pulse1_timer, pulse2_timer;
+logic [3:0] pulse1_duty, pulse2_duty;
+logic [3:0] pulse1_volume, pulse2_volume;
+logic pulse1_enabled, pulse2_enabled;
+logic pulse1_out_bit, pulse2_out_bit;
+logic [15:0] pulse1_out, pulse2_out;
+logic [15:0] test_tone;
 
-// Simple 440Hz test tone
+// Test tone generator (440Hz)
 always_ff @(posedge cpu_clk or negedge rst_n) begin
     if (!rst_n) begin
         audio_counter <= 0;
-        pulse1_out <= 0;
+        test_tone <= 0;
     end else begin
         audio_counter <= audio_counter + 1;
-        if (audio_counter >= 2034) begin
+        if (audio_counter >= 2034) begin  // 1.79MHz / 440Hz / 2
             audio_counter <= 0;
-            pulse1_out <= ~pulse1_out[15] ? 16'h2000 : 16'h0000;
+            test_tone <= ~test_tone[15] ? 16'h1000 : 16'h0000;
         end
     end
 end
 
-assign audio_l = pulse1_out;
-assign audio_r = pulse1_out;
+// Pulse 1 channel
+always_ff @(posedge cpu_clk or negedge rst_n) begin
+    if (!rst_n) begin
+        pulse1_timer <= 0;
+        pulse1_duty <= 0;
+        pulse1_enabled <= 0;
+    end else begin
+        pulse1_volume <= apu_pulse1[0][3:0];
+        pulse1_enabled <= apu_status[0];
+        
+        if (pulse1_timer == 0) begin
+            pulse1_timer <= {apu_pulse1[3][2:0], apu_pulse1[2]};
+            pulse1_duty <= pulse1_duty + 1;
+        end else begin
+            pulse1_timer <= pulse1_timer - 1;
+        end
+        
+        case (apu_pulse1[0][7:6])
+            2'b00: pulse1_out_bit <= (pulse1_duty[2:0] == 3'd0);
+            2'b01: pulse1_out_bit <= (pulse1_duty[2:0] < 3'd2);
+            2'b10: pulse1_out_bit <= (pulse1_duty[2:0] < 3'd4);
+            2'b11: pulse1_out_bit <= (pulse1_duty[2:0] >= 3'd2);
+        endcase
+        
+        if (pulse1_enabled && pulse1_out_bit) begin
+            pulse1_out <= {pulse1_volume, 12'h000};
+        end else begin
+            pulse1_out <= 16'h0000;
+        end
+    end
+end
+
+// Pulse 2 channel
+always_ff @(posedge cpu_clk or negedge rst_n) begin
+    if (!rst_n) begin
+        pulse2_timer <= 0;
+        pulse2_duty <= 0;
+        pulse2_enabled <= 0;
+    end else begin
+        pulse2_volume <= apu_pulse2[0][3:0];
+        pulse2_enabled <= apu_status[1];
+        
+        if (pulse2_timer == 0) begin
+            pulse2_timer <= {apu_pulse2[3][2:0], apu_pulse2[2]};
+            pulse2_duty <= pulse2_duty + 1;
+        end else begin
+            pulse2_timer <= pulse2_timer - 1;
+        end
+        
+        case (apu_pulse2[0][7:6])
+            2'b00: pulse2_out_bit <= (pulse2_duty[2:0] == 3'd0);
+            2'b01: pulse2_out_bit <= (pulse2_duty[2:0] < 3'd2);
+            2'b10: pulse2_out_bit <= (pulse2_duty[2:0] < 3'd4);
+            2'b11: pulse2_out_bit <= (pulse2_duty[2:0] >= 3'd2);
+        endcase
+        
+        if (pulse2_enabled && pulse2_out_bit) begin
+            pulse2_out <= {pulse2_volume, 12'h000};
+        end else begin
+            pulse2_out <= 16'h0000;
+        end
+    end
+end
+
+// Mix: test tone + game audio
+assign audio_l = test_tone + pulse1_out + pulse2_out;
+assign audio_r = test_tone + pulse1_out + pulse2_out;
 
 //=============================================================================
 // Cartridge Interface (Mapper 0 - NROM)
 //=============================================================================
 always_comb begin
     if (cpu_addr >= 16'h8000) begin
-        prg_rom_addr = cpu_addr[13:0];
+        // For 16KB ROM: mirror $C000-$FFFF to $8000-$BFFF
+        prg_rom_addr = {1'b0, cpu_addr[13:0]};  // Force bit 14 to 0 for 16KB mirroring
     end else begin
-        prg_rom_addr = 14'h0000;
+        prg_rom_addr = 15'h0000;
     end
 end
 
@@ -571,7 +675,8 @@ typedef enum logic [2:0] {
     DECODE,
     EXECUTE,
     MEMORY,
-    WRITEBACK
+    WRITEBACK,
+    NMI_HANDLER
 } state_t;
 
 state_t state, next_state;
@@ -579,6 +684,10 @@ logic [7:0] opcode, operand, alu_result;
 logic [15:0] ea;  // Effective address
 logic [2:0] cycle_count;
 logic [15:0] reset_vector;
+logic [2:0] nmi_cycle;
+logic       nmi_pending;
+logic       nmi_prev;  // Previous NMI state for edge detection
+logic [7:0] indirect_addr_lo, indirect_addr_hi;  // For indirect addressing
 
 // Temporary variables for ALU operations
 logic [8:0] temp_sum, temp_diff;
@@ -592,8 +701,22 @@ always_ff @(posedge clk or negedge rst_n) begin
         SP <= 8'hFD;
         A <= 0; X <= 0; Y <= 0;
         C <= 0; Z <= 0; I <= 1; D <= 0; B <= 0; V <= 0; N <= 0;
+        nmi_cycle <= 0;
+        nmi_pending <= 0;
+        nmi_prev <= 0;
     end else begin
         state <= next_state;
+        nmi_prev <= nmi;
+        
+        // Detect NMI rising edge
+        if (nmi && !nmi_prev && !nmi_pending && state == FETCH) begin
+            nmi_pending <= 1;
+        end
+        
+        // Debug: Print store instructions
+        if (state == EXECUTE && (opcode == 8'h8D || opcode == 8'h85)) begin
+            $display("CPU: STA addr=$%04x data=$%02x rw=%b", addr, data_out, rw);
+        end
         
         case (state)
             RESET: begin
@@ -615,16 +738,17 @@ always_ff @(posedge clk or negedge rst_n) begin
             FETCH: begin
                 addr <= PC;
                 rw <= 1;
-                opcode <= data_in;
                 PC <= PC + 1;
                 cycle_count <= 0;
             end
             
             DECODE: begin
+                // Read opcode (data is now stable)
+                opcode <= data_in;
                 // Fetch operand if needed
                 addr <= PC;
                 operand <= data_in;
-                if (opcode[1:0] != 2'b10 || opcode[4:2] == 3'b100) begin
+                if (data_in[1:0] != 2'b10 || data_in[4:2] == 3'b100) begin
                     PC <= PC + 1;
                 end
             end
@@ -635,52 +759,20 @@ always_ff @(posedge clk or negedge rst_n) begin
                     // LDA
                     8'hA9: begin A <= operand; Z <= (operand == 0); N <= operand[7]; end
                     8'hA5: begin addr <= {8'h00, operand}; rw <= 1; end
+                    8'hB5: begin addr <= {8'h00, operand + X}; rw <= 1; end  // LDA zp,X
                     8'hAD: begin addr <= {data_in, operand}; rw <= 1; end
-                    
-                    // LDX
-                    8'hA2: begin X <= operand; Z <= (operand == 0); N <= operand[7]; end
-                    8'hA6: begin addr <= {8'h00, operand}; rw <= 1; end
-                    
-                    // LDY
-                    8'hA0: begin Y <= operand; Z <= (operand == 0); N <= operand[7]; end
-                    8'hA4: begin addr <= {8'h00, operand}; rw <= 1; end
+                    8'hBD: begin addr <= {data_in, operand} + X; rw <= 1; end  // LDA abs,X
+                    8'hB9: begin addr <= {data_in, operand} + Y; rw <= 1; end  // LDA abs,Y
+                    8'hA1: begin addr <= {8'h00, operand + X}; rw <= 1; cycle_count <= 1; end  // LDA (ind,X) - read pointer
+                    8'hB1: begin addr <= {8'h00, operand}; rw <= 1; cycle_count <= 1; end      // LDA (ind),Y - read pointer
                     
                     // STA
                     8'h85: begin addr <= {8'h00, operand}; data_out <= A; rw <= 0; end
+                    8'h95: begin addr <= {8'h00, operand + X}; data_out <= A; rw <= 0; end  // STA zp,X
                     8'h8D: begin addr <= {data_in, operand}; data_out <= A; rw <= 0; end
-                    
-                    // STX
-                    8'h86: begin addr <= {8'h00, operand}; data_out <= X; rw <= 0; end
-                    
-                    // STY
-                    8'h84: begin addr <= {8'h00, operand}; data_out <= Y; rw <= 0; end
-                    
-                    // ADC
-                    8'h69: begin
-                        temp_sum = A + operand + C;
-                        C <= temp_sum[8];
-                        A <= temp_sum[7:0];
-                        Z <= (temp_sum[7:0] == 0);
-                        N <= temp_sum[7];
-                        V <= (A[7] == operand[7]) && (A[7] != temp_sum[7]);
-                    end
-                    
-                    // SBC
-                    8'hE9: begin
-                        temp_diff = A - operand - !C;
-                        C <= !temp_diff[8];
-                        A <= temp_diff[7:0];
-                        Z <= (temp_diff[7:0] == 0);
-                        N <= temp_diff[7];
-                    end
-                    
-                    // AND
-                    8'h29: begin
-                        temp_result = A & operand;
-                        A <= temp_result;
-                        Z <= (temp_result == 0);
-                        N <= temp_result[7];
-                    end
+                    8'h9D: begin addr <= {data_in, operand} + X; data_out <= A; rw <= 0; end  // STA abs,X
+                    8'h81: begin addr <= {8'h00, operand + X}; rw <= 1; cycle_count <= 1; end  // STA (ind,X)
+                    8'h91: begin addr <= {8'h00, operand}; rw <= 1; cycle_count <= 1; end      // STA (ind),Y
                     
                     // ORA
                     8'h09: begin
@@ -689,10 +781,94 @@ always_ff @(posedge clk or negedge rst_n) begin
                         Z <= (temp_result == 0);
                         N <= temp_result[7];
                     end
+                    8'h05: begin addr <= {8'h00, operand}; rw <= 1; end  // ORA zp
+                    8'h01: begin addr <= {8'h00, operand + X}; rw <= 1; cycle_count <= 1; end  // ORA (ind,X)
+                    
+                    // AND
+                    8'h29: begin
+                        temp_result = A & operand;
+                        A <= temp_result;
+                        Z <= (temp_result == 0);
+                        N <= temp_result[7];
+                    end
+                    8'h21: begin addr <= {8'h00, operand + X}; rw <= 1; cycle_count <= 1; end  // AND (ind,X)
                     
                     // EOR
                     8'h49: begin
                         temp_result = A ^ operand;
+                        A <= temp_result;
+                        Z <= (temp_result == 0);
+                        N <= temp_result[7];
+                    end
+                    
+                    // ADC
+                    8'h69: begin  // ADC #imm
+                        temp_sum = A + operand + C;
+                        C <= temp_sum[8];
+                        A <= temp_sum[7:0];
+                        Z <= (temp_sum[7:0] == 0);
+                        N <= temp_sum[7];
+                        V <= (A[7] == operand[7]) && (A[7] != temp_sum[7]);
+                    end
+                    8'h65: begin addr <= {8'h00, operand}; rw <= 1; end  // ADC zp
+                    8'h75: begin addr <= {8'h00, operand + X}; rw <= 1; end  // ADC zp,X
+                    8'h6D: begin addr <= {data_in, operand}; rw <= 1; end  // ADC abs
+                    8'h7D: begin addr <= {data_in, operand} + X; rw <= 1; end  // ADC abs,X
+                    8'h79: begin addr <= {data_in, operand} + Y; rw <= 1; end  // ADC abs,Y
+                    
+                    // SBC
+                    8'hE9: begin  // SBC #imm
+                        temp_diff = A - operand - !C;
+                        C <= !temp_diff[8];
+                        A <= temp_diff[7:0];
+                        Z <= (temp_diff[7:0] == 0);
+                        N <= temp_diff[7];
+                    end
+                    8'hE5: begin addr <= {8'h00, operand}; rw <= 1; end  // SBC zp
+                    8'hF5: begin addr <= {8'h00, operand + X}; rw <= 1; end  // SBC zp,X
+                    8'hED: begin addr <= {data_in, operand}; rw <= 1; end  // SBC abs
+                    8'hFD: begin addr <= {data_in, operand} + X; rw <= 1; end  // SBC abs,X
+                    8'hF9: begin addr <= {data_in, operand} + Y; rw <= 1; end  // SBC abs,Y
+                    
+                    // BIT
+                    8'h24: begin  // BIT zp
+                        addr <= {8'h00, operand};
+                        rw <= 1;
+                    end
+                    
+                    // ASL
+                    8'h0A: begin  // ASL A
+                        C <= A[7];
+                        A <= {A[6:0], 1'b0};
+                        Z <= (A[6:0] == 0);
+                        N <= A[6];
+                    end
+                    8'h06: begin  // ASL zp
+                        addr <= {8'h00, operand};
+                        rw <= 1;
+                    end
+                    
+                    // LSR
+                    8'h4A: begin  // LSR A
+                        C <= A[0];
+                        A <= {1'b0, A[7:1]};
+                        Z <= (A[7:1] == 0);
+                        N <= 0;
+                    end
+                    
+                    // ROL
+                    8'h2A: begin  // ROL A
+                        temp_result = {A[6:0], C};
+                        C <= A[7];
+                        A <= temp_result;
+                        Z <= (temp_result == 0);
+                        N <= temp_result[7];
+                    end
+                    
+                    // ROR
+                    8'h6A: begin  // ROR A
+                        temp_result = {C, A[7:1]};
+                        C <= A[0];
                         A <= temp_result;
                         Z <= (temp_result == 0);
                         N <= temp_result[7];
@@ -705,6 +881,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                         Z <= (A == operand);
                         N <= temp_result[7];
                     end
+                    8'hC5: begin addr <= {8'h00, operand}; rw <= 1; end  // CMP zp
                     
                     // CPX
                     8'hE0: begin
@@ -721,6 +898,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                         Z <= (Y == operand);
                         N <= temp_result[7];
                     end
+                    8'hC4: begin addr <= {8'h00, operand}; rw <= 1; end  // CPY zp
                     
                     // INC
                     8'hE6: begin
@@ -826,6 +1004,22 @@ always_ff @(posedge clk or negedge rst_n) begin
                         rw <= 1;
                     end
                     
+                    // BRK
+                    8'h00: begin
+                        addr <= {8'h01, SP};
+                        data_out <= PC[15:8];
+                        rw <= 0;
+                        SP <= SP - 1;
+                        B <= 1;
+                    end
+                    
+                    // RTI
+                    8'h40: begin
+                        SP <= SP + 1;
+                        addr <= {8'h01, SP + 1};
+                        rw <= 1;
+                    end
+                    
                     // BEQ
                     8'hF0: if (Z) PC <= PC + {{8{operand[7]}}, operand};
                     
@@ -879,41 +1073,171 @@ always_ff @(posedge clk or negedge rst_n) begin
             end
             
             MEMORY: begin
-                // Memory access for load instructions
-                if (opcode == 8'hA5 || opcode == 8'hAD) begin
+                // Indirect addressing - multi-cycle
+                if ((opcode == 8'hA1 || opcode == 8'h81 || opcode == 8'h01 || opcode == 8'h21 || opcode == 8'hB1 || opcode == 8'h91) && cycle_count == 1) begin
+                    // Read low byte of pointer
+                    indirect_addr_lo <= data_in;
+                    addr <= addr + 1;
+                    cycle_count <= 2;
+                    rw <= 1;
+                end else if ((opcode == 8'hA1 || opcode == 8'h81 || opcode == 8'h01 || opcode == 8'h21) && cycle_count == 2) begin
+                    // (ind,X): Read high byte, form address
+                    indirect_addr_hi <= data_in;
+                    addr <= {data_in, indirect_addr_lo};
+                    cycle_count <= 0;
+                    if (opcode == 8'h81) begin
+                        data_out <= A;
+                        rw <= 0;  // Write for STA
+                    end else begin
+                        rw <= 1;  // Read for LDA/ORA/AND
+                    end
+                end else if ((opcode == 8'hB1 || opcode == 8'h91) && cycle_count == 2) begin
+                    // (ind),Y: Read high byte, form address + Y
+                    indirect_addr_hi <= data_in;
+                    addr <= {data_in, indirect_addr_lo} + Y;
+                    cycle_count <= 0;
+                    if (opcode == 8'h91) begin
+                        data_out <= A;
+                        rw <= 0;  // Write for STA
+                    end else begin
+                        rw <= 1;  // Read for LDA
+                    end
+                end else if (opcode == 8'hA5 || opcode == 8'hAD || opcode == 8'hB5 || opcode == 8'hBD || opcode == 8'hB9 || opcode == 8'hA1 || opcode == 8'hB1) begin
                     A <= data_in;
                     Z <= (data_in == 0);
                     N <= data_in[7];
-                end else if (opcode == 8'hA6) begin
+                    rw <= 1;
+                end else if (opcode == 8'hA6 || opcode == 8'hB6 || opcode == 8'hAE) begin
                     X <= data_in;
                     Z <= (data_in == 0);
                     N <= data_in[7];
-                end else if (opcode == 8'hA4) begin
+                    rw <= 1;
+                end else if (opcode == 8'hA4 || opcode == 8'hB4) begin
                     Y <= data_in;
                     Z <= (data_in == 0);
                     N <= data_in[7];
+                    rw <= 1;
                 end else if (opcode == 8'h68) begin
                     A <= data_in;
                     Z <= (data_in == 0);
                     N <= data_in[7];
+                    rw <= 1;
                 end else if (opcode == 8'h28) begin
                     {N, V, B, D, I, Z, C} <= {data_in[7:6], data_in[4:0]};
+                    rw <= 1;
+                end else if (opcode == 8'h05) begin  // ORA zp
+                    temp_result = A | data_in;
+                    A <= temp_result;
+                    Z <= (temp_result == 0);
+                    N <= temp_result[7];
+                    rw <= 1;
+                end else if (opcode == 8'h01) begin  // ORA (ind,X)
+                    temp_result = A | data_in;
+                    A <= temp_result;
+                    Z <= (temp_result == 0);
+                    N <= temp_result[7];
+                    rw <= 1;
+                end else if (opcode == 8'h21) begin  // AND (ind,X)
+                    temp_result = A & data_in;
+                    A <= temp_result;
+                    Z <= (temp_result == 0);
+                    N <= temp_result[7];
+                    rw <= 1;
+                end else if (opcode == 8'h24) begin  // BIT zp
+                    Z <= ((A & data_in) == 0);
+                    N <= data_in[7];
+                    V <= data_in[6];
+                    rw <= 1;
+                end else if (opcode == 8'h06) begin  // ASL zp
+                    C <= data_in[7];
+                    alu_result <= {data_in[6:0], 1'b0};
+                    Z <= (data_in[6:0] == 0);
+                    N <= data_in[6];
+                    data_out <= {data_in[6:0], 1'b0};
+                    rw <= 0;  // Write back
+                end else if (opcode == 8'hC5) begin  // CMP zp
+                    temp_result = A - data_in;
+                    C <= (A >= data_in);
+                    Z <= (A == data_in);
+                    N <= temp_result[7];
+                    rw <= 1;
+                end else if (opcode == 8'hC4) begin  // CPY zp
+                    temp_result = Y - data_in;
+                    C <= (Y >= data_in);
+                    Z <= (Y == data_in);
+                    N <= temp_result[7];
+                    rw <= 1;
+                end else if (opcode == 8'h65 || opcode == 8'h75 || opcode == 8'h6D || opcode == 8'h7D || opcode == 8'h79) begin  // ADC
+                    temp_sum = A + data_in + C;
+                    C <= temp_sum[8];
+                    A <= temp_sum[7:0];
+                    Z <= (temp_sum[7:0] == 0);
+                    N <= temp_sum[7];
+                    V <= (A[7] == data_in[7]) && (A[7] != temp_sum[7]);
+                    rw <= 1;
+                end else if (opcode == 8'hE5 || opcode == 8'hF5 || opcode == 8'hED || opcode == 8'hFD || opcode == 8'hF9) begin  // SBC
+                    temp_diff = A - data_in - !C;
+                    C <= !temp_diff[8];
+                    A <= temp_diff[7:0];
+                    Z <= (temp_diff[7:0] == 0);
+                    N <= temp_diff[7];
+                    rw <= 1;
+                end else if (opcode == 8'h85 || opcode == 8'h8D || 
+                             opcode == 8'h86 || opcode == 8'h84 ||
+                             opcode == 8'h95 || opcode == 8'h9D ||
+                             opcode == 8'h96 || opcode == 8'h94) begin
+                    // Store operations - keep rw=0 for one more cycle
+                    rw <= 1;  // Will be set to 1 next cycle
                 end
-                rw <= 1;
             end
             
             WRITEBACK: begin
                 rw <= 1;
             end
+            
+            NMI_HANDLER: begin
+                case (nmi_cycle)
+                    0: begin  // Push PCH
+                        addr <= {8'h01, SP};
+                        data_out <= PC[15:8];
+                        rw <= 0;
+                        SP <= SP - 1;
+                        nmi_cycle <= 1;
+                    end
+                    1: begin  // Push PCL
+                        addr <= {8'h01, SP};
+                        data_out <= PC[7:0];
+                        rw <= 0;
+                        SP <= SP - 1;
+                        nmi_cycle <= 2;
+                    end
+                    2: begin  // Push status
+                        addr <= {8'h01, SP};
+                        data_out <= {N, V, 1'b1, B, D, I, Z, C};
+                        rw <= 0;
+                        SP <= SP - 1;
+                        nmi_cycle <= 3;
+                    end
+                    3: begin  // Read NMI vector low
+                        addr <= 16'hFFFA;
+                        rw <= 1;
+                        nmi_cycle <= 4;
+                    end
+                    4: begin  // Read NMI vector high
+                        PC[7:0] <= data_in;
+                        addr <= 16'hFFFB;
+                        rw <= 1;
+                        nmi_cycle <= 5;
+                    end
+                    5: begin  // Jump to NMI handler
+                        PC[15:8] <= data_in;
+                        nmi_cycle <= 0;
+                        nmi_pending <= 0;
+                        I <= 1;  // Disable interrupts
+                    end
+                endcase
+            end
         endcase
-        
-        // NMI handling
-        if (nmi && state == FETCH) begin
-            addr <= {8'h01, SP};
-            data_out <= PC[15:8];
-            rw <= 0;
-            SP <= SP - 3;
-        end
     end
 end
 
@@ -924,18 +1248,42 @@ always_comb begin
             if (cycle_count == 2) next_state = FETCH;
             else next_state = RESET;
         end
-        FETCH: next_state = DECODE;
+        FETCH: begin
+            if (nmi_pending) next_state = NMI_HANDLER;
+            else next_state = DECODE;
+        end
         DECODE: next_state = EXECUTE;
         EXECUTE: begin
             // Check if memory access needed
-            if (opcode[1:0] == 2'b01 && opcode[4:2] != 3'b100) begin
+            if ((opcode[1:0] == 2'b01 && opcode[4:2] != 3'b100) ||  // Load instructions
+                (opcode == 8'h85 || opcode == 8'h8D || opcode == 8'h95 || opcode == 8'h9D ||  // STA
+                 opcode == 8'h86 || opcode == 8'h96 ||               // STX
+                 opcode == 8'h84 || opcode == 8'h94 ||               // STY
+                 opcode == 8'hA5 || opcode == 8'hAD || opcode == 8'hB5 || opcode == 8'hBD || opcode == 8'hB9 ||  // LDA
+                 opcode == 8'hA6 || opcode == 8'hB6 || opcode == 8'hAE ||  // LDX
+                 opcode == 8'hA4 || opcode == 8'hB4 ||               // LDY
+                 opcode == 8'h05 || opcode == 8'h24 || opcode == 8'h06 ||  // ORA zp, BIT zp, ASL zp
+                 opcode == 8'hC5 || opcode == 8'hC4 ||               // CMP zp, CPY zp
+                 opcode == 8'h65 || opcode == 8'h75 || opcode == 8'h6D || opcode == 8'h7D || opcode == 8'h79 ||  // ADC
+                 opcode == 8'hE5 || opcode == 8'hF5 || opcode == 8'hED || opcode == 8'hFD || opcode == 8'hF9 ||  // SBC
+                 opcode == 8'hA1 || opcode == 8'hB1 ||               // LDA (ind,X), LDA (ind),Y
+                 opcode == 8'h81 || opcode == 8'h91 ||               // STA (ind,X), STA (ind),Y
+                 opcode == 8'h01 || opcode == 8'h21)) begin          // ORA (ind,X), AND (ind,X)
                 next_state = MEMORY;
             end else begin
                 next_state = FETCH;
             end
         end
-        MEMORY: next_state = WRITEBACK;
+        MEMORY: begin
+            // Stay in MEMORY for multi-cycle indirect addressing
+            if (cycle_count > 0) next_state = MEMORY;
+            else next_state = WRITEBACK;
+        end
         WRITEBACK: next_state = FETCH;
+        NMI_HANDLER: begin
+            if (nmi_cycle == 5) next_state = FETCH;
+            else next_state = NMI_HANDLER;
+        end
         default: next_state = FETCH;
     endcase
 end
