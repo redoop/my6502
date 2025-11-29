@@ -3,8 +3,8 @@ package cpu6502
 import chisel3._
 import cpu6502.core._
 
-// 6502 CPU 顶层模块 (重构版)
-// 保持与原 CPU6502 相同的接口，内部使用模块化实现
+// 6502 CPU Module (Refactored Version)
+// CPU6502 Interface，Module
 class CPU6502Refactored extends Module {
   val io = IO(new Bundle {
     val memAddr    = Output(UInt(16.W))
@@ -13,8 +13,8 @@ class CPU6502Refactored extends Module {
     val memWrite   = Output(Bool())
     val memRead    = Output(Bool())
     val debug      = Output(new DebugBundle)
-    val reset      = Input(Bool())  // Reset 信号
-    val nmi        = Input(Bool())  // NMI 中断信号
+    val reset      = Input(Bool())  // Reset Signal
+    val nmi        = Input(Bool())  // NMI Interrupt Signal
   })
 
   val core = Module(new CPU6502Core)

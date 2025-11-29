@@ -19,7 +19,7 @@ class WaitLoopSpec extends AnyFlatSpec with ChiselScalatestTester {
       println("=== Simulating Game Wait Loop ===")
       println("Code: LDA $2002 / AND #$80 / BEQ loop")
       
-      // 模拟循环：等待 VBlank
+      // ：Wait VBlank
       var loopCount = 0
       var exitLoop = false
       
@@ -34,7 +34,7 @@ class WaitLoopSpec extends AnyFlatSpec with ChiselScalatestTester {
         
         println(f"  Loop $loopCount: PPUSTATUS=0x$ppuStatus%02x VBlank=$vblank")
         
-        // 停止读取
+        // Read
         dut.io.cpuRead.poke(false.B)
         
         // 2. AND #$80 (Check VBlank bit)
@@ -43,14 +43,14 @@ class WaitLoopSpec extends AnyFlatSpec with ChiselScalatestTester {
         
         // 3. BEQ (Branch if zero)
         if (zeroFlag) {
-          // 继续循环
+
           println(f"    -> Z=1, branch back (VBlank not set)")
           loopCount += 1
           
-          // 运行一些周期模拟循环
+          // Cycle
           dut.clock.step(100)
         } else {
-          // 退出循环
+
           println(f"    -> Z=0, exit loop (VBlank set!)")
           exitLoop = true
         }
@@ -72,12 +72,12 @@ class WaitLoopSpec extends AnyFlatSpec with ChiselScalatestTester {
       
       println("\n=== Testing VBlank Timing ===")
       
-      // 运行到接近 VBlank
+      // to VBlank
       val cyclesTo240 = 240 * 341
       println(f"Running $cyclesTo240 cycles to scanline 240...")
       dut.clock.step(cyclesTo240)
       
-      // 现在开始轮询
+      // inStart
       var foundVBlank = false
       for (i <- 0 until 1000 if !foundVBlank) {
         dut.io.cpuAddr.poke(2.U)

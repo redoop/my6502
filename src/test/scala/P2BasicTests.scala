@@ -6,15 +6,15 @@ import org.scalatest.flatspec.AnyFlatSpec
 import cpu6502.core._
 
 /**
- * P2 一般指令单元测试
- * 测试 Donkey Kong 中使用频率较低的 7 条指令（<10次）
+// * P2 Instruction
+// *  Donkey Kong  7 Instruction（<10）
  */
 class P2BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   
   import TestHelpers._
   
   // ============================================
-  // P2-1: JMP ind (0x6C) - 14次 ⚠️ 重要：需要测试页边界bug
+  // P2-1: JMP ind (0x6C) - 14 ⚠️ ：bug
   // ============================================
   behavior of "P2-1: JMP ind (0x6C)"
   
@@ -35,7 +35,7 @@ class P2BasicTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // 验证 0x6C 是一个有效的操作码
+      // 0x6C ValidOpcode
       println("✅ 指令 0x6C 被正确识别")
     }
   }
@@ -46,9 +46,9 @@ class P2BasicTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // 6502 的 JMP indirect 有一个著名的硬件 bug：
-      // 当间接地址在页边界（0x??FF）时，不会跨页读取高字节
-      // 例如：JMP ($12FF) 会读取 $12FF 和 $1200，而不是 $12FF 和 $1300
+      // 6502  JMP indirect  bug：
+      // Addressin（0x??FF）when，Read
+      // ：JMP ($12FF) Read $12FF  $1200， $12FF  $1300
       
       println("⚠️  需要验证页边界 bug 的正确实现")
       println("✅ 页边界 bug 测试通过")
@@ -56,7 +56,7 @@ class P2BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   }
   
   // ============================================
-  // P2-2: ADC zp,X (0x75) - 12次
+  // P2-2: ADC zp,X (0x75) - 12
   // ============================================
   behavior of "P2-2: ADC zp,X (0x75)"
   
@@ -81,7 +81,7 @@ class P2BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   }
   
   // ============================================
-  // P2-3: ROR abs,X (0x7E) - 12次
+  // P2-3: ROR abs,X (0x7E) - 12
   // ============================================
   behavior of "P2-3: ROR abs,X (0x7E)"
   
@@ -106,7 +106,7 @@ class P2BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   }
   
   // ============================================
-  // P2-4: ADC (ind,X) (0x61) - 11次
+  // P2-4: ADC (ind,X) (0x61) - 11
   // ============================================
   behavior of "P2-4: ADC (ind,X) (0x61)"
   
@@ -131,7 +131,7 @@ class P2BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   }
   
   // ============================================
-  // P2-5: ADC (ind),Y (0x71) - 9次
+  // P2-5: ADC (ind),Y (0x71) - 9
   // ============================================
   behavior of "P2-5: ADC (ind),Y (0x71)"
   
@@ -156,7 +156,7 @@ class P2BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   }
   
   // ============================================
-  // P2-6: ROR abs (0x6E) - 8次
+  // P2-6: ROR abs (0x6E) - 8
   // ============================================
   behavior of "P2-6: ROR abs (0x6E)"
   
@@ -181,7 +181,7 @@ class P2BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   }
   
   // ============================================
-  // P2-7: ROR zp,X (0x76) - 5次
+  // P2-7: ROR zp,X (0x76) - 5
   // ============================================
   behavior of "P2-7: ROR zp,X (0x76)"
   
@@ -206,7 +206,7 @@ class P2BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   }
   
   // ============================================
-  // 综合测试
+
   // ============================================
   behavior of "P2 Instructions - Integration"
   
@@ -216,11 +216,11 @@ class P2BasicTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // 验证 CPU 状态
+      // CPU State
       printCPUState(dut, "初始化后")
       printFlags(dut)
       
-      // 验证 PC 不在向量表区域
+      // PC inVector
       val pc = dut.io.debug.regPC.peek().litValue
       assert(pc < 0xFFF0L || pc > 0xFFFF, s"PC should not be in vector table area, got 0x${pc.toString(16)}")
       
@@ -237,7 +237,7 @@ class P2BasicTests extends AnyFlatSpec with ChiselScalatestTester {
       val initialPC = dut.io.debug.regPC.peek().litValue
       val initialState = dut.io.debug.state.peek().litValue
       
-      // 运行几个周期
+      // Cycle
       waitCycles(dut, 5)
       
       val finalPC = dut.io.debug.regPC.peek().litValue
@@ -246,7 +246,7 @@ class P2BasicTests extends AnyFlatSpec with ChiselScalatestTester {
       println(f"初始 PC: 0x$initialPC%04X, 状态: $initialState")
       println(f"最终 PC: 0x$finalPC%04X, 状态: $finalState")
       
-      // PC 可能会改变（执行指令），但不应该跳到奇怪的地方
+      // PC （ExecuteInstruction），to
       assert(finalPC < 0x10000L, "PC should be valid")
       
       println("✅ 状态稳定性验证通过")
@@ -259,7 +259,7 @@ class P2BasicTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // P2 包含多个 ADC 指令：
+      // P2  ADC Instruction：
       // - ADC zp,X (0x75)
       // - ADC (ind,X) (0x61)
       // - ADC (ind),Y (0x71)
@@ -274,7 +274,7 @@ class P2BasicTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // P2 包含多个 ROR 指令：
+      // P2  ROR Instruction：
       // - ROR abs,X (0x7E)
       // - ROR abs (0x6E)
       // - ROR zp,X (0x76)
@@ -289,8 +289,8 @@ class P2BasicTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // JMP ind (0x6C) 是唯一的跳转指令
-      // 需要特别注意页边界 bug
+      // JMP ind (0x6C) Instruction
+      // bug
       
       println("✅ JMP indirect 验证通过")
     }
@@ -298,8 +298,8 @@ class P2BasicTests extends AnyFlatSpec with ChiselScalatestTester {
 }
 
 /**
- * P2 指令分类测试
- * 按指令类型分组测试
+// * P2 Instruction
+// * Instruction
  */
 class P2CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
   
@@ -313,9 +313,9 @@ class P2CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // ADC zp,X (0x75) - 12次
-      // ADC (ind,X) (0x61) - 11次
-      // ADC (ind),Y (0x71) - 9次
+      // ADC zp,X (0x75) - 12
+      // ADC (ind,X) (0x61) - 11
+      // ADC (ind),Y (0x71) - 9
       
       println("✅ ADC 指令组测试通过")
     }
@@ -328,7 +328,7 @@ class P2CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       initCPU(dut)
       
       // ADC zp,X (0x75)
-      // 零页 X 索引寻址
+      // X
       
       println("✅ ADC zp,X 测试通过")
     }
@@ -341,7 +341,7 @@ class P2CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       initCPU(dut)
       
       // ADC (ind,X) (0x61)
-      // 间接 X 索引寻址
+      // X
       
       println("✅ ADC (ind,X) 测试通过")
     }
@@ -354,7 +354,7 @@ class P2CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       initCPU(dut)
       
       // ADC (ind),Y (0x71)
-      // 间接 Y 索引寻址
+      // Y
       
       println("✅ ADC (ind),Y 测试通过")
     }
@@ -368,9 +368,9 @@ class P2CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // ROR abs,X (0x7E) - 12次
-      // ROR abs (0x6E) - 8次
-      // ROR zp,X (0x76) - 5次
+      // ROR abs,X (0x7E) - 12
+      // ROR abs (0x6E) - 8
+      // ROR zp,X (0x76) - 5
       
       println("✅ ROR 指令组测试通过")
     }
@@ -383,7 +383,7 @@ class P2CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       initCPU(dut)
       
       // ROR abs,X (0x7E)
-      // 绝对 X 索引寻址
+      // X
       
       println("✅ ROR abs,X 测试通过")
     }
@@ -396,7 +396,7 @@ class P2CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       initCPU(dut)
       
       // ROR abs (0x6E)
-      // 绝对寻址
+
       
       println("✅ ROR abs 测试通过")
     }
@@ -409,7 +409,7 @@ class P2CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       initCPU(dut)
       
       // ROR zp,X (0x76)
-      // 零页 X 索引寻址
+      // X
       
       println("✅ ROR zp,X 测试通过")
     }
@@ -423,8 +423,8 @@ class P2CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // JMP ind (0x6C) - 14次
-      // 间接寻址跳转
+      // JMP ind (0x6C) - 14
+
       
       println("✅ JMP indirect 测试通过")
     }
@@ -436,9 +436,9 @@ class P2CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // 6502 硬件 bug 测试：
-      // JMP ($12FF) 应该读取 $12FF 和 $1200
-      // 而不是 $12FF 和 $1300
+      // 6502  bug ：
+      // JMP ($12FF) Read $12FF  $1200
+      // $12FF  $1300
       
       println("⚠️  这是 6502 的已知硬件 bug，必须正确实现")
       println("✅ 页边界 bug 测试通过")
@@ -522,8 +522,8 @@ class P2CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
 }
 
 /**
- * P2 特殊测试
- * 测试 JMP indirect 的页边界 bug
+// * P2
+// *  JMP indirect  bug
  */
 class P2SpecialTests extends AnyFlatSpec with ChiselScalatestTester {
   
@@ -564,8 +564,8 @@ class P2SpecialTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // 这里应该验证实际的实现
-      // 但需要更复杂的内存接口模拟
+
+      // Memory Interface
       
       println("⚠️  需要在集成测试中验证实际行为")
       println("✅ 基础验证通过")

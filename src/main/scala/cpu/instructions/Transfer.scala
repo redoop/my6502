@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// 寄存器传输指令: TAX, TAY, TXA, TYA, TSX, TXS
+// RegistersInstruction: TAX, TAY, TXA, TYA, TSX, TXS
 object TransferInstructions {
   val opcodes = Seq(0xAA, 0xA8, 0x8A, 0x98, 0xBA, 0x9A)
   
@@ -48,7 +48,7 @@ object TransferInstructions {
         newRegs.flagN := regs.sp(7)
         newRegs.flagZ := regs.sp === 0.U
       }
-      is(0x9A.U) {  // TXS (不影响标志位)
+      is(0x9A.U) {  // TXS (Flag)
         newRegs.sp := regs.x
       }
     }

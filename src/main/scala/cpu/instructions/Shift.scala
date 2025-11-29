@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// 移位指令: ASL, LSR, ROL, ROR
+// Instruction: ASL, LSR, ROL, ROR
 object ShiftInstructions {
   val accumulatorOpcodes = Seq(0x0A, 0x4A, 0x2A, 0x6A)
   val zeroPageOpcodes = Seq(0x06, 0x46, 0x26, 0x66)
@@ -15,7 +15,7 @@ object ShiftInstructions {
   val opcodes = accumulatorOpcodes ++ zeroPageOpcodes ++ zeroPageXOpcodes ++ 
                 absoluteOpcodes ++ absoluteXOpcodes
   
-  // 累加器模式 (单周期)
+  // (Cycle)
   def executeAccumulator(opcode: UInt, regs: Registers): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -59,7 +59,7 @@ object ShiftInstructions {
     result
   }
   
-  // 零页模式 (多周期)
+  // (Cycle)
   def executeZeroPage(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -126,7 +126,7 @@ object ShiftInstructions {
     result
   }
   
-  // 通用移位操作
+
   private def doShift(opcode: UInt, data: UInt, carry: Bool): (UInt, Bool) = {
     val oldCarry = carry.asUInt
     val result = Wire(UInt(8.W))
@@ -157,7 +157,7 @@ object ShiftInstructions {
     (result, newCarry)
   }
   
-  // 零页 X 索引
+  // X
   def executeZeroPageX(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -200,7 +200,7 @@ object ShiftInstructions {
     result
   }
   
-  // 绝对寻址
+
   def executeAbsolute(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -250,7 +250,7 @@ object ShiftInstructions {
     result
   }
   
-  // 绝对 X 索引
+  // X
   def executeAbsoluteX(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)

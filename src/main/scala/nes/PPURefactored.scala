@@ -5,38 +5,38 @@ import chisel3.util._
 import nes.core._
 
 /**
- * PPU 重构版本
- * 参考 CPU6502Refactored 的模块化设计
- * 合并 PPU, PPUv2, PPUv3, PPUSimplified 的功能
- * 与测试用例衔接
+// * PPU Refactored Version
+// *  CPU6502Refactored Module
+// * and PPU, PPUv2, PPUv3, PPUSimplified
+// *
  */
 class PPURefactored(enableDebug: Boolean = false) extends Module {
   val io = IO(new Bundle {
-    // CPU 接口
+    // CPU Interface
     val cpuAddr = Input(UInt(3.W))
     val cpuDataIn = Input(UInt(8.W))
     val cpuDataOut = Output(UInt(8.W))
     val cpuWrite = Input(Bool())
     val cpuRead = Input(Bool())
     
-    // OAM DMA 接口
+    // OAM DMA Interface
     val oamDmaAddr = Input(UInt(8.W))
     val oamDmaData = Input(UInt(8.W))
     val oamDmaWrite = Input(Bool())
     
-    // 视频输出
+    // Output
     val pixelX = Output(UInt(9.W))
     val pixelY = Output(UInt(9.W))
     val pixelColor = Output(UInt(6.W))
     val vblank = Output(Bool())
     val nmiOut = Output(Bool())
     
-    // CHR ROM 加载接口
+    // CHR ROM Interface
     val chrLoadEn = Input(Bool())
     val chrLoadAddr = Input(UInt(13.W))
     val chrLoadData = Input(UInt(8.W))
     
-    // 调试接口
+    // Debug Interface
     val debug = Output(new Bundle {
       val ppuCtrl = UInt(8.W)
       val ppuMask = UInt(8.W)
@@ -46,7 +46,7 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
     })
   })
   
-  // 寄存器控制模块
+  // RegistersControlModule
   val regControl = Module(new PPURegisterControl(enableDebug))
   regControl.io.cpuAddr := io.cpuAddr
   regControl.io.cpuDataIn := io.cpuDataIn
@@ -56,11 +56,11 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
   
   val regs = regControl.io.regs
   
-  // 扫描线和像素计数器
+
   val scanline = RegInit(0.U(9.W))
   val pixel = RegInit(0.U(9.W))
   
-  // Debug: 每1000个周期打印一次
+  // Debug: 1000Cycle
   val debugCounter = RegInit(0.U(32.W))
   debugCounter := debugCounter + 1.U
   when(debugCounter === 10000.U) {
@@ -68,7 +68,7 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
     debugCounter := 0.U
   }
   
-  // 像素计数
+
   when(pixel === 340.U) {
     pixel := 0.U
     when(scanline === 261.U) {
@@ -84,7 +84,7 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
     pixel := pixel + 1.U
   }
   
-  // VBlank 控制 - 在 pixel 0 设置，这样 pixel 1 时就生效了
+  // VBlank Control - in pixel 0 Set， pixel 1 when
   regControl.io.setVBlank := false.B
   regControl.io.clearVBlank := false.B
   regControl.io.setSprite0Hit := false.B
@@ -98,16 +98,16 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
     printf("[PPU] VBlank END at scanline=261 pixel=0\n")
   }
   
-  // NMI 生成 - 在 pixel 1 触发（此时 vblankFlag 已经设置）
+  // NMI  - in pixel 1 Trigger（when vblankFlag Set）
   val nmiEnable = regs.ppuCtrl(7)
   val nmiTrigger = RegInit(false.B)
   
-  // VBlank 开始时设置 NMI 触发（保持到帧结束）
+  // VBlank StartwhenSet NMI Trigger（to）
   when(scanline === 241.U && pixel === 1.U && nmiEnable) {
     nmiTrigger := true.B
     printf("[PPU] NMI Triggered at scanline=241 pixel=1\n")
   }
-  // VBlank 结束时清除 NMI（pre-render scanline）
+  // VBlank whenClear NMI（pre-render scanline）
   .elsewhen(scanline === 261.U && pixel === 1.U) {
     nmiTrigger := false.B
     printf("[PPU] NMI Cleared at scanline=261 pixel=1\n")
@@ -121,7 +121,7 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
     chrRom.write(io.chrLoadAddr, io.chrLoadData)
   }
   
-  // 调色板 RAM (32 bytes) - 初始化为默认 NES 调色板
+  // RAM (32 bytes) - Initializefor NES
   val paletteRam = RegInit(VecInit(Seq(
     0x09.U, 0x01.U, 0x00.U, 0x01.U, 0x00.U, 0x02.U, 0x02.U, 0x0D.U,
     0x08.U, 0x10.U, 0x08.U, 0x24.U, 0x00.U, 0x00.U, 0x04.U, 0x2C.U,
@@ -129,18 +129,18 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
     0x08.U, 0x3A.U, 0x00.U, 0x02.U, 0x00.U, 0x20.U, 0x2C.U, 0x08.U
   )))
   
-  // 名称表 RAM (2KB)
+  // RAM (2KB)
   val nametableRam = SyncReadMem(2048, UInt(8.W))
   
-  // 调色板和 Nametable 写入逻辑 (通过 PPUDATA $2007)
+  // Nametable Write ( PPUDATA $2007)
   when(io.cpuWrite && io.cpuAddr === 7.U) {  // PPUDATA
     val ppuAddr = regs.ppuAddr
     when(ppuAddr >= 0x3F00.U && ppuAddr <= 0x3FFF.U) {
-      // 调色板区域
+
       val paletteAddr = ppuAddr(4, 0)
       paletteRam(paletteAddr) := io.cpuDataIn
     }.elsewhen(ppuAddr >= 0x2000.U && ppuAddr < 0x3F00.U) {
-      // Nametable 区域
+      // Nametable
       val ntAddr = ppuAddr(10, 0)
       nametableRam.write(ntAddr, io.cpuDataIn)
     }
@@ -152,18 +152,18 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
     oam(io.oamDmaAddr) := io.oamDmaData
   }
   
-  // 渲染控制
+  // Control
   val isRendering = scanline < 240.U && pixel < 256.U
   val bgEnable = regs.ppuMask(3)
   val spriteEnable = regs.ppuMask(4)
   val showLeftBg = regs.ppuMask(1)
   val showLeftSprite = regs.ppuMask(2)
   
-  // 滚动寄存器
+  // Registers
   val scrollX = RegInit(0.U(8.W))
   val scrollY = RegInit(0.U(8.W))
   
-  // 背景渲染
+
   val nametableBase = Cat(regs.ppuCtrl(1, 0), 0.U(10.W))
   val tileX = (pixel + scrollX) >> 3
   val tileY = (scanline + scrollY) >> 3
@@ -188,7 +188,7 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
   val bgPaletteAddr = (paletteIdx << 2) | pixelBit
   val bgColor = Mux(pixelBit === 0.U, paletteRam(0), paletteRam(bgPaletteAddr))
   
-  // 精灵渲染
+
   val spriteY = oam(0)
   val spriteTile = oam(1)
   val spriteAttr = oam(2)
@@ -218,20 +218,20 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
     regControl.io.setSprite0Hit := true.B
   }
   
-  // 优先级混合
+
   val hideLeft = pixel < 8.U
   val showBg = bgEnable && (!hideLeft || showLeftBg)
   val showSprite = spriteEnable && (!hideLeft || showLeftSprite)
   
   val finalColor = RegInit(0.U(8.W))
   
-  // 背景渲染管道 - 缓存读取的数据
+  // - ReadData
   val tileIndexReg = RegNext(tileIndex)
   val patternLowReg = RegNext(patternLow)
   val patternHighReg = RegNext(patternHigh)
   val attrByteReg = RegNext(attrByte)
   
-  // 使用缓存的数据计算像素
+  // Data
   val fineXReg = RegNext(fineX)
   val bitPosReg = 7.U - fineXReg
   val pixelBitReg = ((patternHighReg >> bitPosReg)(0) << 1) | ((patternLowReg >> bitPosReg)(0))
@@ -245,28 +245,28 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
   val bgColorReg = Mux(pixelBitReg === 0.U, paletteRam(0), paletteRam(bgPaletteAddrReg))
   
   when(isRendering) {
-    finalColor := paletteRam(0)  // 默认背景色
+    finalColor := paletteRam(0)
     when(pixelBitReg =/= 0.U) {
-      // 使用正确的调色板地址：基址 + 像素值
+      // Address： +
       finalColor := bgColorReg
     }
   }.otherwise {
     finalColor := paletteRam(0)
   }
   
-  // 输出
+  // Output
   io.pixelX := pixel
   io.pixelY := scanline
   io.pixelColor := finalColor(5, 0)
-  io.vblank := regs.vblank  // 使用寄存器值，反映读取清除
+  io.vblank := regs.vblank  // Registers，ReadClear
   
-  // 防止优化
+
   dontTouch(finalColor)
   
-  // 调试输出
+  // Output
   io.debug.ppuCtrl := regs.ppuCtrl
   io.debug.ppuMask := regs.ppuMask
-  io.debug.ppuStatus := Cat(regs.vblank, regs.sprite0Hit, regs.spriteOverflow, 0.U(5.W))  // 组合逻辑
+  io.debug.ppuStatus := Cat(regs.vblank, regs.sprite0Hit, regs.spriteOverflow, 0.U(5.W))
   io.debug.ppuAddrReg := regs.ppuAddr
   io.debug.paletteInitDone := true.B
 }

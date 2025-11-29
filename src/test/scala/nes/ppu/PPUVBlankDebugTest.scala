@@ -18,7 +18,7 @@ class PPUVBlankDebugTest extends AnyFlatSpec with ChiselScalatestTester {
       
       println("=== Scanline Progression Test ===")
       
-      // 检查前几个 scanline
+      // scanline
       for (sl <- 0 until 5) {
         val targetCycles = sl * 341
         if (sl > 0) dut.clock.step(341)
@@ -29,13 +29,13 @@ class PPUVBlankDebugTest extends AnyFlatSpec with ChiselScalatestTester {
         println(f"Scanline $sl: y=$y x=$x vblank=$vb")
       }
       
-      // 跳到 scanline 240
+      // to scanline 240
       dut.clock.step((240 - 4) * 341)
       val y240 = dut.io.pixelY.peek().litValue
       val vb240 = dut.io.vblank.peek().litValue
       println(f"Scanline 240: y=$y240 vblank=$vb240")
       
-      // 进入 scanline 241
+      // scanline 241
       dut.clock.step(341)
       val y241_0 = dut.io.pixelY.peek().litValue
       val x241_0 = dut.io.pixelX.peek().litValue

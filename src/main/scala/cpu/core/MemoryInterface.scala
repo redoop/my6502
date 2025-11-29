@@ -2,7 +2,7 @@ package cpu6502.core
 
 import chisel3._
 
-// 内存接口 Bundle
+// Memory Interface Bundle
 class MemoryIO extends Bundle {
   val addr    = Output(UInt(16.W))
   val dataOut = Output(UInt(8.W))

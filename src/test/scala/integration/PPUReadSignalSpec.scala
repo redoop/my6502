@@ -18,15 +18,15 @@ class PPUReadSignalSpec extends AnyFlatSpec with ChiselScalatestTester {
       
       println("=== PPU cpuRead Signal Test ===")
       
-      // 运行到 VBlank
+      // to VBlank
       dut.clock.step(241 * 341 + 10)
       
-      // 验证 VBlank 已设置
+      // VBlank Set
       val vblank = dut.io.vblank.peek().litValue
       println(f"VBlank = $vblank")
       assert(vblank == 1)
       
-      // 测试 1: cpuRead=0 时不应该触发
+      // 1: cpuRead=0 whenTrigger
       println("\nTest 1: cpuRead=0")
       dut.io.cpuAddr.poke(2.U)
       dut.io.cpuRead.poke(false.B)
@@ -35,7 +35,7 @@ class PPUReadSignalSpec extends AnyFlatSpec with ChiselScalatestTester {
       println(f"  VBlank after = $vb1 (should stay 1)")
       assert(vb1 == 1, "VBlank should not be cleared when cpuRead=0")
       
-      // 测试 2: cpuRead=1, cpuAddr=2 应该触发
+      // 2: cpuRead=1, cpuAddr=2 Trigger
       println("\nTest 2: cpuRead=1, cpuAddr=2")
       dut.io.cpuRead.poke(true.B)
       dut.clock.step(1)
@@ -47,7 +47,7 @@ class PPUReadSignalSpec extends AnyFlatSpec with ChiselScalatestTester {
       val vb2 = dut.io.vblank.peek().litValue
       println(f"  VBlank after = $vb2 (should be 0)")
       
-      // 验证
+
       assert((status & 0x80) != 0, "Should read VBlank=1")
       assert(vb2 == 0, "VBlank should be cleared after read")
     }
@@ -64,16 +64,16 @@ class PPUReadSignalSpec extends AnyFlatSpec with ChiselScalatestTester {
       
       println("\n=== PPU cpuRead Cycle Test ===")
       
-      // 运行到 VBlank
+      // to VBlank
       dut.clock.step(241 * 341 + 10)
       
       println("Simulating LDA $2002:")
       
-      // Cycle 0-1: 地址解码
+      // Cycle 0-1: Address
       println("  Cycle 0-1: Address decode")
       dut.clock.step(2)
       
-      // Cycle 2: memRead=1, 发出读请求
+      // Cycle 2: memRead=1,
       println("  Cycle 2: memRead=1, cpuAddr=2")
       dut.io.cpuAddr.poke(2.U)
       dut.io.cpuRead.poke(true.B)
@@ -82,7 +82,7 @@ class PPUReadSignalSpec extends AnyFlatSpec with ChiselScalatestTester {
       val status2 = dut.io.cpuDataOut.peek().litValue
       println(f"    PPUSTATUS = 0x$status2%02x")
       
-      // Cycle 3: memRead=0, CPU 读取数据
+      // Cycle 3: memRead=0, CPU ReadData
       println("  Cycle 3: memRead=0, CPU reads data")
       dut.io.cpuRead.poke(false.B)
       dut.clock.step(1)
@@ -90,7 +90,7 @@ class PPUReadSignalSpec extends AnyFlatSpec with ChiselScalatestTester {
       val vblank3 = dut.io.vblank.peek().litValue
       println(f"    VBlank = $vblank3")
       
-      // 关键：CPU 应该在 Cycle 2 触发 PPU 读取
+      // ：CPU in Cycle 2 Trigger PPU Read
       assert((status2 & 0x80) != 0, "Cycle 2 should see VBlank")
       println("\n✓ PPU cpuRead works in Cycle 2")
     }

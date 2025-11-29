@@ -6,15 +6,15 @@ import org.scalatest.flatspec.AnyFlatSpec
 import cpu6502.core._
 
 /**
- * P1 重要指令单元测试
- * 测试 Donkey Kong 中使用频率中等的 10 条指令（10-25次）
+// * P1 Instruction
+// *  Donkey Kong  10 Instruction（10-25）
  */
 class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   
   import TestHelpers._
   
   // ============================================
-  // P1-1: ADC zp (0x65) - 28次
+  // P1-1: ADC zp (0x65) - 28
   // ============================================
   behavior of "P1-1: ADC zp (0x65)"
   
@@ -35,13 +35,13 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // 验证 0x65 是一个有效的操作码
+      // 0x65 ValidOpcode
       println("✅ 指令 0x65 被正确识别")
     }
   }
   
   // ============================================
-  // P1-2: INC zp,X (0xF6) - 26次
+  // P1-2: INC zp,X (0xF6) - 26
   // ============================================
   behavior of "P1-2: INC zp,X (0xF6)"
   
@@ -66,7 +66,7 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   }
   
   // ============================================
-  // P1-3: LSR abs (0x4E) - 24次
+  // P1-3: LSR abs (0x4E) - 24
   // ============================================
   behavior of "P1-3: LSR abs (0x4E)"
   
@@ -91,7 +91,7 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   }
   
   // ============================================
-  // P1-4: ASL abs,X (0x1E) - 22次
+  // P1-4: ASL abs,X (0x1E) - 22
   // ============================================
   behavior of "P1-4: ASL abs,X (0x1E)"
   
@@ -116,7 +116,7 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   }
   
   // ============================================
-  // P1-5: DEC abs,X (0xDE) - 22次
+  // P1-5: DEC abs,X (0xDE) - 22
   // ============================================
   behavior of "P1-5: DEC abs,X (0xDE)"
   
@@ -141,7 +141,7 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   }
   
   // ============================================
-  // P1-6: DEC zp,X (0xD6) - 21次
+  // P1-6: DEC zp,X (0xD6) - 21
   // ============================================
   behavior of "P1-6: DEC zp,X (0xD6)"
   
@@ -166,7 +166,7 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   }
   
   // ============================================
-  // P1-7: ROL abs (0x2E) - 17次
+  // P1-7: ROL abs (0x2E) - 17
   // ============================================
   behavior of "P1-7: ROL abs (0x2E)"
   
@@ -191,7 +191,7 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   }
   
   // ============================================
-  // P1-8: SBC zp,X (0xF5) - 17次
+  // P1-8: SBC zp,X (0xF5) - 17
   // ============================================
   behavior of "P1-8: SBC zp,X (0xF5)"
   
@@ -216,7 +216,7 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   }
   
   // ============================================
-  // P1-9: SBC abs (0xED) - 16次
+  // P1-9: SBC abs (0xED) - 16
   // ============================================
   behavior of "P1-9: SBC abs (0xED)"
   
@@ -241,7 +241,7 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   }
   
   // ============================================
-  // P1-10: ADC abs (0x6D) - 15次
+  // P1-10: ADC abs (0x6D) - 15
   // ============================================
   behavior of "P1-10: ADC abs (0x6D)"
   
@@ -266,7 +266,7 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
   }
   
   // ============================================
-  // 综合测试
+
   // ============================================
   behavior of "P1 Instructions - Integration"
   
@@ -276,11 +276,11 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // 验证 CPU 状态
+      // CPU State
       printCPUState(dut, "初始化后")
       printFlags(dut)
       
-      // 验证 PC 不在向量表区域
+      // PC inVector
       val pc = dut.io.debug.regPC.peek().litValue
       assert(pc < 0xFFF0L || pc > 0xFFFF, s"PC should not be in vector table area, got 0x${pc.toString(16)}")
       
@@ -297,7 +297,7 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
       val initialPC = dut.io.debug.regPC.peek().litValue
       val initialState = dut.io.debug.state.peek().litValue
       
-      // 运行几个周期
+      // Cycle
       waitCycles(dut, 5)
       
       val finalPC = dut.io.debug.regPC.peek().litValue
@@ -306,7 +306,7 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
       println(f"初始 PC: 0x$initialPC%04X, 状态: $initialState")
       println(f"最终 PC: 0x$finalPC%04X, 状态: $finalState")
       
-      // PC 可能会改变（执行指令），但不应该跳到奇怪的地方
+      // PC （ExecuteInstruction），to
       assert(finalPC < 0x10000L, "PC should be valid")
       
       println("✅ 状态稳定性验证通过")
@@ -319,7 +319,7 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // P1 包含多个算术指令：
+      // P1 Instruction：
       // - ADC zp (0x65)
       // - ADC abs (0x6D)
       // - SBC zp,X (0xF5)
@@ -338,7 +338,7 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // P1 包含多个移位指令：
+      // P1 Instruction：
       // - LSR abs (0x4E)
       // - ASL abs,X (0x1E)
       // - ROL abs (0x2E)
@@ -349,8 +349,8 @@ class P1BasicTests extends AnyFlatSpec with ChiselScalatestTester {
 }
 
 /**
- * P1 指令分类测试
- * 按指令类型分组测试
+// * P1 Instruction
+// * Instruction
  */
 class P1CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
   
@@ -364,8 +364,8 @@ class P1CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // ADC zp (0x65) - 28次
-      // ADC abs (0x6D) - 15次
+      // ADC zp (0x65) - 28
+      // ADC abs (0x6D) - 15
       
       println("✅ ADC 指令组测试通过")
     }
@@ -377,8 +377,8 @@ class P1CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // SBC zp,X (0xF5) - 17次
-      // SBC abs (0xED) - 16次
+      // SBC zp,X (0xF5) - 17
+      // SBC abs (0xED) - 16
       
       println("✅ SBC 指令组测试通过")
     }
@@ -390,9 +390,9 @@ class P1CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // INC zp,X (0xF6) - 26次
-      // DEC zp,X (0xD6) - 21次
-      // DEC abs,X (0xDE) - 22次
+      // INC zp,X (0xF6) - 26
+      // DEC zp,X (0xD6) - 21
+      // DEC abs,X (0xDE) - 22
       
       println("✅ INC/DEC 指令组测试通过")
     }
@@ -406,7 +406,7 @@ class P1CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // LSR abs (0x4E) - 24次
+      // LSR abs (0x4E) - 24
       
       println("✅ LSR abs 测试通过")
     }
@@ -418,7 +418,7 @@ class P1CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // ASL abs,X (0x1E) - 22次
+      // ASL abs,X (0x1E) - 22
       
       println("✅ ASL abs,X 测试通过")
     }
@@ -430,7 +430,7 @@ class P1CategoryTests extends AnyFlatSpec with ChiselScalatestTester {
       
       initCPU(dut)
       
-      // ROL abs (0x2E) - 17次
+      // ROL abs (0x2E) - 17
       
       println("✅ ROL abs 测试通过")
     }

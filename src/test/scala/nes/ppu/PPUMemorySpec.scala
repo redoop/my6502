@@ -6,8 +6,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import nes.PPURefactored
 
 /**
- * PPU 内存测试
- * 测试 CHR ROM, Nametable, Palette, OAM 等内存区域
+// * PPU
+// *  CHR ROM, Nametable, Palette, OAM
  */
 class PPUMemorySpec extends AnyFlatSpec with ChiselScalatestTester {
   
@@ -15,7 +15,7 @@ class PPUMemorySpec extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "load CHR ROM data" in {
     test(new PPURefactored) { dut =>
-      // 加载 CHR ROM
+      // CHR ROM
       dut.io.chrLoadEn.poke(true.B)
       dut.io.chrLoadAddr.poke(0x0000.U)
       dut.io.chrLoadData.poke(0x42.U)
@@ -32,7 +32,7 @@ class PPUMemorySpec extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "load pattern table 0" in {
     test(new PPURefactored) { dut =>
-      // 加载图案表 0 ($0000-$0FFF)
+      // 0 ($0000-$0FFF)
       dut.io.chrLoadEn.poke(true.B)
       for (i <- 0 until 16) {
         dut.io.chrLoadAddr.poke(i.U)
@@ -45,7 +45,7 @@ class PPUMemorySpec extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "load pattern table 1" in {
     test(new PPURefactored) { dut =>
-      // 加载图案表 1 ($1000-$1FFF)
+      // 1 ($1000-$1FFF)
       dut.io.chrLoadEn.poke(true.B)
       for (i <- 0 until 16) {
         dut.io.chrLoadAddr.poke((0x1000 + i).U)
@@ -60,7 +60,7 @@ class PPUMemorySpec extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "write to OAM via DMA" in {
     test(new PPURefactored) { dut =>
-      // OAM DMA 写入
+      // OAM DMA Write
       dut.io.oamDmaWrite.poke(true.B)
       dut.io.oamDmaAddr.poke(0x00.U)
       dut.io.oamDmaData.poke(0x10.U)
@@ -78,7 +78,7 @@ class PPUMemorySpec extends AnyFlatSpec with ChiselScalatestTester {
     test(new PPURefactored) { dut =>
       dut.io.oamDmaWrite.poke(true.B)
       
-      // 写入4个精灵属性
+      // Write4
       for (i <- 0 until 16) {
         dut.io.oamDmaAddr.poke(i.U)
         dut.io.oamDmaData.poke((i * 16).U)
@@ -93,7 +93,7 @@ class PPUMemorySpec extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "set VRAM address" in {
     test(new PPURefactored) { dut =>
-      // 设置 VRAM 地址 $2000
+      // Set VRAM Address $2000
       dut.io.cpuAddr.poke(6.U)  // PPUADDR
       dut.io.cpuDataIn.poke(0x20.U)
       dut.io.cpuWrite.poke(true.B)
@@ -109,7 +109,7 @@ class PPUMemorySpec extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "write to VRAM via PPUDATA" in {
     test(new PPURefactored) { dut =>
-      // 设置地址
+      // SetAddress
       dut.io.cpuAddr.poke(6.U)
       dut.io.cpuDataIn.poke(0x20.U)
       dut.io.cpuWrite.poke(true.B)
@@ -118,7 +118,7 @@ class PPUMemorySpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.cpuWrite.poke(true.B)
       dut.clock.step()
       
-      // 写入数据
+      // WriteData
       dut.io.cpuAddr.poke(7.U)  // PPUDATA
       dut.io.cpuDataIn.poke(0x42.U)
       dut.io.cpuWrite.poke(true.B)

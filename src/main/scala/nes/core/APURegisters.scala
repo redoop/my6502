@@ -3,7 +3,7 @@ package nes.core
 import chisel3._
 import chisel3.util._
 
-// APU 通道寄存器
+// APU Registers
 class PulseChannelRegs extends Bundle {
   val duty = UInt(2.W)
   val loop = Bool()
@@ -44,7 +44,7 @@ class DMCChannelRegs extends Bundle {
   val sampleLength = UInt(8.W)
 }
 
-// APU 寄存器集合
+// APU Registers
 class APURegisters extends Bundle {
   val pulse1 = new PulseChannelRegs
   val pulse2 = new PulseChannelRegs
@@ -108,26 +108,26 @@ object APURegisters {
   }
 }
 
-// APU 寄存器控制模块
+// APU RegistersControlModule
 class APURegisterControl extends Module {
   val io = IO(new Bundle {
-    // CPU 接口
+    // CPU Interface
     val cpuAddr = Input(UInt(8.W))
     val cpuDataIn = Input(UInt(8.W))
     val cpuDataOut = Output(UInt(8.W))
     val cpuWrite = Input(Bool())
     val cpuRead = Input(Bool())
     
-    // 寄存器输出
+    // RegistersOutput
     val regs = Output(new APURegisters)
   })
   
   val regs = RegInit(APURegisters.default())
   
-  // 读取逻辑
+  // Read
   io.cpuDataOut := Mux(io.cpuAddr === 0x15.U, regs.status, 0.U)
   
-  // 写入逻辑
+  // Write
   when(io.cpuWrite) {
     switch(io.cpuAddr) {
       // Pulse 1

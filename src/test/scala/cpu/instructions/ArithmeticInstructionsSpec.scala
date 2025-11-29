@@ -77,11 +77,11 @@ class ArithmeticInstructionsSpec extends AnyFlatSpec with ChiselScalatestTester 
       dut.io.cycle.poke(0.U)
       dut.io.operand.poke(0.U)
       
-      // Cycle 0: 读取地址
+      // Cycle 0: ReadAddress
       dut.io.memDataIn.poke(0x10.U)
       dut.clock.step()
       
-      // Cycle 1: 读取数据并执行
+      // Cycle 1: ReadDataandExecute
       dut.io.cycle.poke(1.U)
       dut.io.operand.poke(0x10.U)
       dut.io.memDataIn.poke(0x30.U)
@@ -100,11 +100,11 @@ class ArithmeticInstructionsSpec extends AnyFlatSpec with ChiselScalatestTester 
       dut.io.cycle.poke(0.U)
       dut.io.operand.poke(0.U)
       
-      // Cycle 0: 读取地址
+      // Cycle 0: ReadAddress
       dut.io.memDataIn.poke(0x20.U)
       dut.clock.step()
       
-      // Cycle 1: 读取数据并执行
+      // Cycle 1: ReadDataandExecute
       dut.io.cycle.poke(1.U)
       dut.io.operand.poke(0x20.U)
       dut.io.memDataIn.poke(0x30.U)
@@ -121,17 +121,17 @@ class ArithmeticInstructionsSpec extends AnyFlatSpec with ChiselScalatestTester 
       dut.io.cycle.poke(0.U)
       dut.io.operand.poke(0.U)
       
-      // Cycle 0: 读取地址
+      // Cycle 0: ReadAddress
       dut.io.memDataIn.poke(0x30.U)
       dut.clock.step()
       
-      // Cycle 1: 读取数据
+      // Cycle 1: ReadData
       dut.io.cycle.poke(1.U)
       dut.io.operand.poke(0x30.U)
       dut.io.memDataIn.poke(0x42.U)
       dut.clock.step()
       
-      // Cycle 2: 写回结果
+      // Cycle 2: Result
       dut.io.cycle.poke(2.U)
       dut.clock.step()
       dut.io.memWrite.expect(true.B)
@@ -146,17 +146,17 @@ class ArithmeticInstructionsSpec extends AnyFlatSpec with ChiselScalatestTester 
       dut.io.cycle.poke(0.U)
       dut.io.operand.poke(0.U)
       
-      // Cycle 0: 读取地址
+      // Cycle 0: ReadAddress
       dut.io.memDataIn.poke(0x40.U)
       dut.clock.step()
       
-      // Cycle 1: 读取数据
+      // Cycle 1: ReadData
       dut.io.cycle.poke(1.U)
       dut.io.operand.poke(0x40.U)
       dut.io.memDataIn.poke(0x01.U)
       dut.clock.step()
       
-      // Cycle 2: 写回结果
+      // Cycle 2: Result
       dut.io.cycle.poke(2.U)
       dut.clock.step()
       dut.io.memWrite.expect(true.B)

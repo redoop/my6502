@@ -5,13 +5,13 @@ import chiseltest._
 import cpu6502.core._
 
 /**
- * 测试辅助工具类
- * 提供常用的测试函数和内存模拟
+// *
+// *
  */
 object TestHelpers {
   
   /**
-   * 初始化 CPU
+// * Initialize CPU
    */
   def initCPU(dut: CPU6502Core): Unit = {
     dut.io.reset.poke(true.B)
@@ -19,14 +19,14 @@ object TestHelpers {
     dut.clock.step(1)
     dut.io.reset.poke(false.B)
     
-    // 等待 reset 序列完成（约 5 个周期）
+    // Wait reset SequenceComplete（ 5 Cycle）
     for (_ <- 0 until 10) {
       dut.clock.step(1)
     }
   }
   
   /**
-   * 等待指定周期数
+// * WaitCycle
    */
   def waitCycles(dut: CPU6502Core, cycles: Int): Unit = {
     for (_ <- 0 until cycles) {
@@ -35,8 +35,8 @@ object TestHelpers {
   }
   
   /**
-   * 等待指令执行完成
-   * 通过检查 CPU 状态来判断
+// * WaitInstructionExecuteComplete
+// *  CPU State
    */
   def waitInstructionComplete(dut: CPU6502Core, maxCycles: Int = 20): Int = {
     var cycles = 0
@@ -49,7 +49,7 @@ object TestHelpers {
       val currentPC = dut.io.debug.regPC.peek().litValue
       val state = dut.io.debug.state.peek().litValue
       
-      // 如果 PC 改变且状态是 Fetch，说明指令执行完成
+      // PC State Fetch，InstructionExecuteComplete
       if (currentPC != lastPC && state == 1) {
         return cycles
       }
@@ -61,7 +61,7 @@ object TestHelpers {
   }
   
   /**
-   * 打印 CPU 状态（用于调试）
+// *  CPU State（）
    */
   def printCPUState(dut: CPU6502Core, label: String = ""): Unit = {
     val pc = dut.io.debug.regPC.peek().litValue
@@ -78,7 +78,7 @@ object TestHelpers {
   }
   
   /**
-   * 打印标志位状态
+// * FlagState
    */
   def printFlags(dut: CPU6502Core): Unit = {
     val flagC = dut.io.debug.flagC.peek().litToBoolean
@@ -90,7 +90,7 @@ object TestHelpers {
   }
   
   /**
-   * 验证标志位
+// * Flag
    */
   def verifyFlags(
     dut: CPU6502Core,
@@ -141,7 +141,7 @@ object TestHelpers {
   }
   
   /**
-   * 验证寄存器值
+// * Registers
    */
   def verifyRegister(
     dut: CPU6502Core,
@@ -167,8 +167,8 @@ object TestHelpers {
 }
 
 /**
- * 简单的内存模拟器
- * 用于测试时提供内存数据
+// *
+// * whenData
  */
 class SimpleMemory {
   private val mem = scala.collection.mutable.Map[Int, Int]()
@@ -213,118 +213,118 @@ class SimpleMemory {
 }
 
 /**
- * 指令构建器
- * 用于构建测试指令序列
+// * Instruction
+// * InstructionSequence
  */
 object InstructionBuilder {
   
   /**
-   * 构建 ASL zp,X 指令
+// *  ASL zp,X Instruction
    */
   def aslZpX(zpAddr: Int): Seq[Int] = {
     Seq(0x16, zpAddr & 0xFF)
   }
   
   /**
-   * 构建 INC abs,X 指令
+// *  INC abs,X Instruction
    */
   def incAbsX(absAddr: Int): Seq[Int] = {
     Seq(0xFE, absAddr & 0xFF, (absAddr >> 8) & 0xFF)
   }
   
   /**
-   * 构建 ASL abs 指令
+// *  ASL abs Instruction
    */
   def aslAbs(absAddr: Int): Seq[Int] = {
     Seq(0x0E, absAddr & 0xFF, (absAddr >> 8) & 0xFF)
   }
   
   /**
-   * 构建 ROL zp,X 指令
+// *  ROL zp,X Instruction
    */
   def rolZpX(zpAddr: Int): Seq[Int] = {
     Seq(0x36, zpAddr & 0xFF)
   }
   
   /**
-   * 构建 LSR abs,X 指令
+// *  LSR abs,X Instruction
    */
   def lsrAbsX(absAddr: Int): Seq[Int] = {
     Seq(0x5E, absAddr & 0xFF, (absAddr >> 8) & 0xFF)
   }
   
   /**
-   * 构建 SBC (ind,X) 指令
+// *  SBC (ind,X) Instruction
    */
   def sbcIndX(zpAddr: Int): Seq[Int] = {
     Seq(0xE1, zpAddr & 0xFF)
   }
   
   /**
-   * 构建 SBC zp 指令
+// *  SBC zp Instruction
    */
   def sbcZp(zpAddr: Int): Seq[Int] = {
     Seq(0xE5, zpAddr & 0xFF)
   }
   
   /**
-   * 构建 LSR zp,X 指令
+// *  LSR zp,X Instruction
    */
   def lsrZpX(zpAddr: Int): Seq[Int] = {
     Seq(0x56, zpAddr & 0xFF)
   }
   
   /**
-   * 构建 ROL abs,X 指令
+// *  ROL abs,X Instruction
    */
   def rolAbsX(absAddr: Int): Seq[Int] = {
     Seq(0x3E, absAddr & 0xFF, (absAddr >> 8) & 0xFF)
   }
   
   /**
-   * 构建 SBC (ind),Y 指令
+// *  SBC (ind),Y Instruction
    */
   def sbcIndY(zpAddr: Int): Seq[Int] = {
     Seq(0xF1, zpAddr & 0xFF)
   }
   
   /**
-   * 构建 LDA #imm 指令（用于设置 A）
+// *  LDA #imm Instruction（Set A）
    */
   def ldaImm(value: Int): Seq[Int] = {
     Seq(0xA9, value & 0xFF)
   }
   
   /**
-   * 构建 LDX #imm 指令（用于设置 X）
+// *  LDX #imm Instruction（Set X）
    */
   def ldxImm(value: Int): Seq[Int] = {
     Seq(0xA2, value & 0xFF)
   }
   
   /**
-   * 构建 LDY #imm 指令（用于设置 Y）
+// *  LDY #imm Instruction（Set Y）
    */
   def ldyImm(value: Int): Seq[Int] = {
     Seq(0xA0, value & 0xFF)
   }
   
   /**
-   * 构建 SEC 指令（设置进位）
+// *  SEC Instruction（Set）
    */
   def sec(): Seq[Int] = {
     Seq(0x38)
   }
   
   /**
-   * 构建 CLC 指令（清除进位）
+// *  CLC Instruction（Clear）
    */
   def clc(): Seq[Int] = {
     Seq(0x18)
   }
   
   /**
-   * 构建 NOP 指令
+// *  NOP Instruction
    */
   def nop(): Seq[Int] = {
     Seq(0xEA)
@@ -332,7 +332,7 @@ object InstructionBuilder {
 }
 
 /**
- * 测试用例数据类
+// * Data
  */
 case class TestCase(
   name: String,

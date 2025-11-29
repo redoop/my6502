@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// 跳转指令: JMP, JSR, RTS, BRK, RTI
+// Instruction: JMP, JSR, RTS, BRK, RTI
 object JumpInstructions {
   val opcodes = Seq(0x4C, 0x6C, 0x20, 0x60, 0x00, 0x40)
   
@@ -62,7 +62,7 @@ object JumpInstructions {
     
     switch(cycle) {
       is(0.U) {
-        // 读取间接地址低字节
+        // ReadAddress
         result.memAddr := regs.pc
         result.memRead := true.B
         result.operand := memDataIn
@@ -70,7 +70,7 @@ object JumpInstructions {
         result.regs := newRegs
       }
       is(1.U) {
-        // 读取间接地址高字节
+        // ReadAddress
         result.memAddr := regs.pc
         result.memRead := true.B
         result.operand := Cat(memDataIn, operand(7, 0))
@@ -78,15 +78,15 @@ object JumpInstructions {
         result.regs := newRegs
       }
       is(2.U) {
-        // 读取目标地址低字节
+        // ReadAddress
         result.memAddr := operand
         result.memRead := true.B
         result.operand := Cat(operand(15, 8), memDataIn)
       }
       is(3.U) {
-        // 读取目标地址高字节 (注意 6502 的 JMP indirect bug: 不跨页)
+        // ReadAddress ( 6502  JMP indirect bug: )
         val indirectAddrHigh = Mux(operand(7, 0) === 0xFF.U,
-          Cat(operand(15, 8), 0.U(8.W)),  // Bug: 回绕到同一页
+          Cat(operand(15, 8), 0.U(8.W)),  // Bug: to
           operand + 1.U)
         result.memAddr := indirectAddrHigh
         result.memRead := true.B
@@ -132,7 +132,7 @@ object JumpInstructions {
         result.nextCycle := 2.U
       }
       is(2.U) {
-        // 压栈 PC-1 的高字节（返回地址指向 JSR 的最后一个字节）
+        // PC-1 （Address JSR ）
         val returnAddr = regs.pc - 1.U
         result.memAddr := Cat(0x01.U(8.W), regs.sp)
         result.memData := returnAddr(15, 8)
@@ -142,7 +142,7 @@ object JumpInstructions {
         result.nextCycle := 3.U
       }
       is(3.U) {
-        // 压栈 PC-1 的低字节
+        // PC-1
         val returnAddr = regs.pc - 1.U
         result.memAddr := Cat(0x01.U(8.W), regs.sp)
         result.memData := returnAddr(7, 0)

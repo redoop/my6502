@@ -3,7 +3,7 @@ package nes.core
 import chisel3._
 import chisel3.util._
 
-// PPU 寄存器定义
+// PPU Registers
 class PPURegisters extends Bundle {
   val ppuCtrl = UInt(8.W)      // $2000
   val ppuMask = UInt(8.W)      // $2001
@@ -13,12 +13,12 @@ class PPURegisters extends Bundle {
   val ppuAddr = UInt(16.W)     // $2006
   val ppuData = UInt(8.W)      // $2007
   
-  // 内部状态
-  val addrLatch = Bool()       // 地址锁存器
-  val scrollLatch = Bool()     // 滚动锁存器
-  val vblank = Bool()          // VBlank 标志
-  val sprite0Hit = Bool()      // Sprite 0 碰撞
-  val spriteOverflow = Bool()  // 精灵溢出
+  // State
+  val addrLatch = Bool()       // Address
+  val scrollLatch = Bool()
+  val vblank = Bool()          // VBlank Flag
+  val sprite0Hit = Bool()      // Sprite 0
+  val spriteOverflow = Bool()
 }
 
 object PPURegisters {
@@ -40,20 +40,20 @@ object PPURegisters {
   }
 }
 
-// PPU 寄存器控制模块
+// PPU RegistersControlModule
 class PPURegisterControl(enableDebug: Boolean = false) extends Module {
   val io = IO(new Bundle {
-    // CPU 接口
+    // CPU Interface
     val cpuAddr = Input(UInt(3.W))
     val cpuDataIn = Input(UInt(8.W))
     val cpuDataOut = Output(UInt(8.W))
     val cpuWrite = Input(Bool())
     val cpuRead = Input(Bool())
     
-    // 寄存器输出
+    // RegistersOutput
     val regs = Output(new PPURegisters)
     
-    // 状态更新输入
+    // StateUpdateInput
     val setVBlank = Input(Bool())
     val clearVBlank = Input(Bool())
     val setSprite0Hit = Input(Bool())
@@ -62,19 +62,19 @@ class PPURegisterControl(enableDebug: Boolean = false) extends Module {
   
   val regs = RegInit(PPURegisters.default())
   
-  // 延迟清除标志 - 下一个周期才清除
+  // ClearFlag - CycleClear
   val clearVBlankNext = RegInit(false.B)
   val clearAddrLatchNext = RegInit(false.B)
   val clearScrollLatchNext = RegInit(false.B)
   
-  // 读取逻辑
+  // Read
   io.cpuDataOut := MuxLookup(io.cpuAddr, 0.U, Seq(
-    2.U -> Cat(regs.vblank, regs.sprite0Hit, regs.spriteOverflow, 0.U(5.W)),  // $2002 - 组合逻辑
+    2.U -> Cat(regs.vblank, regs.sprite0Hit, regs.spriteOverflow, 0.U(5.W)),  // $2002 -
     4.U -> 0.U,             // $2004 - OAM data (TODO)
     7.U -> regs.ppuData     // $2007
   ))
   
-  // 写入逻辑
+  // Write
   when(io.cpuWrite) {
     switch(io.cpuAddr) {
       is(0.U) { // $2000 - PPUCTRL
@@ -114,7 +114,7 @@ class PPURegisterControl(enableDebug: Boolean = false) extends Module {
     }
   }
   
-  // 读取 PPUSTATUS 清除标志 - 标记下一周期清除
+  // Read PPUSTATUS ClearFlag - CycleClear
   when(io.cpuRead && io.cpuAddr === 2.U) {
     if (enableDebug) {
       printf("[PPU Regs] Read PPUSTATUS: vblank=%d, status=0x%x, will clear next cycle\n", regs.vblank, Cat(regs.vblank, regs.sprite0Hit, regs.spriteOverflow, 0.U(5.W)))
@@ -124,7 +124,7 @@ class PPURegisterControl(enableDebug: Boolean = false) extends Module {
     clearScrollLatchNext := true.B
   }
   
-  // 状态更新 - 优先级：设置 > 延迟清除 > 外部清除
+  // StateUpdate - ：Set > Clear > Clear
   when(io.setVBlank) {
     regs.vblank := true.B
     if (enableDebug) {
@@ -132,7 +132,7 @@ class PPURegisterControl(enableDebug: Boolean = false) extends Module {
     }
   }.elsewhen(clearVBlankNext) {
     regs.vblank := false.B
-    clearVBlankNext := false.B  // 清除后立即复位标志
+    clearVBlankNext := false.B  // ClearFlag
     if (enableDebug) {
       printf("[PPU Regs] clearVBlankNext executed, vblank cleared\n")
     }
@@ -143,7 +143,7 @@ class PPURegisterControl(enableDebug: Boolean = false) extends Module {
     }
   }
   
-  // 清除 addr/scroll latch
+  // Clear addr/scroll latch
   when(clearAddrLatchNext) {
     regs.addrLatch := false.B
     clearAddrLatchNext := false.B
@@ -153,7 +153,7 @@ class PPURegisterControl(enableDebug: Boolean = false) extends Module {
     clearScrollLatchNext := false.B
   }
   
-  // 锁存器清除
+  // Clear
   when(clearAddrLatchNext) {
     regs.addrLatch := false.B
   }

@@ -4,40 +4,40 @@ import chisel3._
 import chisel3.util._
 
 // MMC3 Mapper (Mapper 4)
-// 魂斗罗使用的 mapper
+// mapper
 class MMC3Mapper extends Module {
   val io = IO(new Bundle {
-    // CPU 接口
+    // CPU Interface
     val cpuAddr = Input(UInt(16.W))
     val cpuDataIn = Input(UInt(8.W))
     val cpuDataOut = Output(UInt(8.W))
     val cpuWrite = Input(Bool())
     val cpuRead = Input(Bool())
     
-    // PRG ROM 接口
-    val prgAddr = Output(UInt(19.W))  // 最大 512KB
+    // PRG ROM Interface
+    val prgAddr = Output(UInt(19.W))  // 512KB
     val prgData = Input(UInt(8.W))
     
-    // CHR ROM 接口
-    val chrAddr = Output(UInt(17.W))  // 最大 256KB
+    // CHR ROM Interface
+    val chrAddr = Output(UInt(17.W))  // 256KB
     val chrData = Input(UInt(8.W))
     
-    // PPU 接口
+    // PPU Interface
     val ppuAddr = Input(UInt(14.W))
     
-    // IRQ 输出
+    // IRQ Output
     val irqOut = Output(Bool())
     
     // Mirroring
     val mirrorMode = Output(UInt(1.W))  // 0 = vertical, 1 = horizontal
   })
   
-  // MMC3 寄存器
+  // MMC3 Registers
   val bankSelect = RegInit(0.U(3.W))
   val prgRomBankMode = RegInit(false.B)
   val chrA12Inversion = RegInit(false.B)
   
-  // Bank 寄存器 (8 个)
+  // Bank Registers (8 )
   val r0 = RegInit(0.U(8.W))  // CHR bank 0 (2KB)
   val r1 = RegInit(0.U(8.W))  // CHR bank 1 (2KB)
   val r2 = RegInit(0.U(8.W))  // CHR bank 2 (1KB)
@@ -47,7 +47,7 @@ class MMC3Mapper extends Module {
   val r6 = RegInit(0.U(8.W))  // PRG bank 0 (8KB)
   val r7 = RegInit(0.U(8.W))  // PRG bank 1 (8KB)
   
-  // IRQ 寄存器
+  // IRQ Registers
   val irqLatch = RegInit(0.U(8.W))
   val irqCounter = RegInit(0.U(8.W))
   val irqReload = RegInit(false.B)
@@ -58,7 +58,7 @@ class MMC3Mapper extends Module {
   val mirroring = RegInit(0.U(1.W))
   io.mirrorMode := mirroring
   
-  // CPU 写入寄存器
+  // CPU WriteRegisters
   when(io.cpuWrite) {
     switch(io.cpuAddr(15, 13)) {
       is(4.U) {  // $8000-$9FFF
@@ -87,7 +87,7 @@ class MMC3Mapper extends Module {
           mirroring := io.cpuDataIn(0)
         }.otherwise {
           // PRG RAM protect ($A001)
-          // 简化：忽略
+          // ：
         }
       }
       is(6.U) {  // $C000-$DFFF
@@ -120,10 +120,10 @@ class MMC3Mapper extends Module {
   
   when(prgRomBankMode) {
     // Mode 1: $C000 swappable
-    prgBank0 := 0xFE.U  // 倒数第二个 bank
+    prgBank0 := 0xFE.U  // bank
     prgBank1 := r7
     prgBank2 := r6
-    prgBank3 := 0xFF.U  // 最后一个 bank
+    prgBank3 := 0xFF.U  // bank
   }.otherwise {
     // Mode 0: $8000 swappable
     prgBank0 := r6
@@ -132,7 +132,7 @@ class MMC3Mapper extends Module {
     prgBank3 := 0xFF.U
   }
   
-  // PRG 地址映射
+  // PRG Address
   val prgBankNum = WireDefault(0.U(8.W))
   switch(io.cpuAddr(14, 13)) {
     is(0.U) { prgBankNum := prgBank0 }  // $8000-$9FFF
@@ -164,12 +164,12 @@ class MMC3Mapper extends Module {
   
   io.chrAddr := Cat(chrBankNum, ppuAddrAdjusted(9, 0))
   
-  // IRQ 计数器 - 改进的实现
-  // 在 PPU A12 上升沿时递减 (每条扫描线触发一次)
+  // IRQ  -
+  // in PPU A12 Rising Edgewhen (Trigger)
   val a12Last = RegInit(false.B)
-  val a12Filter = RegInit(0.U(4.W))  // 去抖动滤波器
+  val a12Filter = RegInit(0.U(4.W))
   
-  // A12 去抖动: 需要连续 4 个周期保持高电平
+  // A12 :  4 Cycle
   when(io.ppuAddr(12)) {
     when(a12Filter < 15.U) {
       a12Filter := a12Filter + 1.U
@@ -182,25 +182,25 @@ class MMC3Mapper extends Module {
   val a12Rising = a12Stable && !a12Last
   a12Last := a12Stable
   
-  // IRQ 计数器逻辑
+  // IRQ
   when(a12Rising) {
     when(irqCounter === 0.U || irqReload) {
       irqCounter := irqLatch
       irqReload := false.B
-      // 如果 latch 为 0，立即触发 IRQ
+      // latch for 0，Trigger IRQ
       when(irqLatch === 0.U && irqEnable) {
         irqPending := true.B
       }
     }.otherwise {
       irqCounter := irqCounter - 1.U
-      // 计数器递减到 0 时触发 IRQ
+      // to 0 whenTrigger IRQ
       when(irqCounter === 1.U && irqEnable) {
         irqPending := true.B
       }
     }
   }
   
-  // 写入 IRQ disable 时清除 pending
+  // Write IRQ disable whenClear pending
   when(io.cpuWrite && io.cpuAddr(15, 13) === 7.U && io.cpuAddr(0) === 0.U) {
     irqPending := false.B
   }
@@ -208,7 +208,7 @@ class MMC3Mapper extends Module {
   io.irqOut := irqPending
 }
 
-// MMC3 测试模块
+// MMC3 Module
 class MMC3Test extends Module {
   val io = IO(new Bundle {
     val success = Output(Bool())
@@ -216,7 +216,7 @@ class MMC3Test extends Module {
   
   val mapper = Module(new MMC3Mapper)
   
-  // 简单的测试逻辑
+
   mapper.io.cpuAddr := 0.U
   mapper.io.cpuDataIn := 0.U
   mapper.io.cpuWrite := false.B

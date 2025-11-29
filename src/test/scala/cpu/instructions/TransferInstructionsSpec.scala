@@ -84,7 +84,7 @@ class TransferInstructionsSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.flagZIn.poke(false.B)
       dut.clock.step()
       dut.io.spOut.expect(0xAB.U)
-      // TXS 不影响标志位
+      // TXS Flag
       dut.io.flagNOut.expect(false.B)
       dut.io.flagZOut.expect(false.B)
     }

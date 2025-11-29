@@ -3,16 +3,16 @@ package nes
 import java.nio.file.{Files, Paths}
 import scala.collection.mutable.ArrayBuffer
 
-// iNES ROM 数据结构
+// iNES ROM Data
 case class NESROMData(
-  prgROM: Array[Byte],      // PRG ROM 数据
-  chrROM: Array[Byte],      // CHR ROM 数据
-  mapper: Int,              // Mapper 编号
+  prgROM: Array[Byte],      // PRG ROM Data
+  chrROM: Array[Byte],      // CHR ROM Data
+  mapper: Int,              // Mapper
   mirroring: Int,           // 0 = horizontal, 1 = vertical
-  hasBattery: Boolean,      // 是否有电池备份
-  hasTrainer: Boolean,      // 是否有 trainer
-  prgRAMSize: Int,          // PRG RAM 大小
-  chrRAMSize: Int           // CHR RAM 大小
+  hasBattery: Boolean,
+  hasTrainer: Boolean,      // trainer
+  prgRAMSize: Int,          // PRG RAM
+  chrRAMSize: Int           // CHR RAM
 ) {
   def prgBankCount: Int = prgROM.length / 16384  // 16KB banks
   def chrBankCount: Int = if (chrROM.length > 0) chrROM.length / 8192 else 0  // 8KB banks
@@ -31,19 +31,19 @@ case class NESROMData(
   }
 }
 
-// ROM 加载器
+// ROM
 object ROMLoader {
   
-  // iNES 文件头常量
+  // iNES
   val INES_MAGIC = Array[Byte](0x4E, 0x45, 0x53, 0x1A)  // "NES" + 0x1A
   val HEADER_SIZE = 16
   val TRAINER_SIZE = 512
   
   /**
-   * 加载 iNES 格式的 ROM 文件
+// *  iNES  ROM
    * 
-   * @param filename ROM 文件路径
-   * @return NESROMData 对象
+// * @param filename ROM
+// * @return NESROMData
    */
   def loadNESROM(filename: String): NESROMData = {
     val path = Paths.get(filename)
@@ -56,9 +56,9 @@ object ROMLoader {
   }
   
   /**
-   * 解析 iNES 格式数据
+// *  iNES Data
    * 
-   * iNES 文件格式:
+// * iNES :
    * 0-3:   "NES" + 0x1A
    * 4:     PRG ROM size (in 16KB units)
    * 5:     CHR ROM size (in 8KB units)
@@ -70,7 +70,7 @@ object ROMLoader {
    * 11-15: Unused (should be zero)
    */
   def parseINES(bytes: Array[Byte]): NESROMData = {
-    // 验证 magic number
+    // magic number
     if (bytes.length < HEADER_SIZE) {
       throw new RuntimeException("File too small to be a valid NES ROM")
     }
@@ -81,7 +81,7 @@ object ROMLoader {
       }
     }
     
-    // 解析 header
+    // header
     val prgROMSize = (bytes(4) & 0xFF) * 16384  // 16KB units
     val chrROMSize = (bytes(5) & 0xFF) * 8192   // 8KB units
     
@@ -90,13 +90,13 @@ object ROMLoader {
     val flags8 = bytes(8) & 0xFF
     val flags9 = bytes(9) & 0xFF
     
-    // 解析 flags
+    // flags
     val mirroring = flags6 & 0x01
     val hasBattery = (flags6 & 0x02) != 0
     val hasTrainer = (flags6 & 0x04) != 0
     val ignoreMirroring = (flags6 & 0x08) != 0
     
-    // Mapper 编号
+    // Mapper
     val mapperLow = (flags6 >> 4) & 0x0F
     val mapperHigh = (flags7 >> 4) & 0x0F
     val mapper = (mapperHigh << 4) | mapperLow
@@ -104,23 +104,23 @@ object ROMLoader {
     // PRG RAM size
     val prgRAMSize = if (flags8 == 0) 8 else flags8 * 8  // 8KB units
     
-    // CHR RAM size (如果 CHR ROM size = 0)
+    // CHR RAM size ( CHR ROM size = 0)
     val chrRAMSize = if (chrROMSize == 0) 8 else 0
     
-    // 计算数据偏移
+    // Data
     var offset = HEADER_SIZE
     
-    // 跳过 trainer (如果有)
+    // trainer ()
     if (hasTrainer) {
       offset += TRAINER_SIZE
     }
     
-    // 提取 PRG ROM
+    // PRG ROM
     val prgROM = new Array[Byte](prgROMSize)
     Array.copy(bytes, offset, prgROM, 0, prgROMSize)
     offset += prgROMSize
     
-    // 提取 CHR ROM
+    // CHR ROM
     val chrROM = new Array[Byte](chrROMSize)
     if (chrROMSize > 0) {
       Array.copy(bytes, offset, chrROM, 0, chrROMSize)
@@ -139,7 +139,7 @@ object ROMLoader {
   }
   
   /**
-   * 将 ROM 数据转换为可用于 Chisel 测试的格式
+// *  ROM Datafor Chisel
    */
   def romToTestData(rom: NESROMData): (Seq[Int], Seq[Int]) = {
     val prgData = rom.prgROM.map(b => b & 0xFF).toSeq
@@ -148,7 +148,7 @@ object ROMLoader {
   }
   
   /**
-   * 打印 ROM 信息
+// *  ROM
    */
   def printROMInfo(filename: String): Unit = {
     try {
@@ -165,7 +165,7 @@ object ROMLoader {
   }
 }
 
-// 命令行工具
+
 object ROMLoaderApp extends App {
   if (args.length == 0) {
     println("Usage: ROMLoaderApp <rom_file>")

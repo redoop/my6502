@@ -2,7 +2,7 @@ package cpu6502.core
 
 import chisel3._
 
-// 调试信息 Bundle
+// Bundle
 class DebugBundle extends Bundle {
   val regA   = UInt(8.W)
   val regX   = UInt(8.W)

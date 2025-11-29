@@ -42,7 +42,7 @@ class NESIntegrationQuickSpec extends AnyFlatSpec with ChiselScalatestTester {
     test(new NESSystemRefactored) { dut =>
       dut.io.prgLoadEn.poke(true.B)
       
-      for (i <- 0 until 16) {  // 只测试 16 字节
+      for (i <- 0 until 16) {  // 16
         dut.io.prgLoadAddr.poke(i.U)
         dut.io.prgLoadData.poke((i & 0xFF).U)
         dut.clock.step()
@@ -57,7 +57,7 @@ class NESIntegrationQuickSpec extends AnyFlatSpec with ChiselScalatestTester {
     test(new NESSystemRefactored) { dut =>
       dut.io.chrLoadEn.poke(true.B)
       
-      for (i <- 0 until 16) {  // 只测试 16 字节
+      for (i <- 0 until 16) {  // 16
         dut.io.chrLoadAddr.poke(i.U)
         dut.io.chrLoadData.poke((0xFF - i).U)
         dut.clock.step()

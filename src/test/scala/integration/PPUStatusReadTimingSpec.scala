@@ -18,35 +18,35 @@ class PPUStatusReadTimingSpec extends AnyFlatSpec with ChiselScalatestTester {
       
       println("=== PPUSTATUS Read Timing Test ===")
       
-      // 运行到 VBlank
+      // to VBlank
       val cyclesTo241 = 241 * 341 + 10
       dut.clock.step(cyclesTo241)
       
-      // 验证 VBlank 已设置
+      // VBlank Set
       val vblankBefore = dut.io.vblank.peek().litValue
       println(f"✓ VBlank before read = $vblankBefore")
       assert(vblankBefore == 1, "VBlank should be set")
       
-      // 模拟 LDA $2002 的读取
-      // Cycle 0-1: 地址解码 (已完成)
-      // Cycle 2: 发出读请求
+      // LDA $2002 Read
+      // Cycle 0-1: Address (Complete)
+      // Cycle 2:
       dut.io.cpuAddr.poke(2.U)
       dut.io.cpuRead.poke(true.B)
       
-      // Cycle 3: 读取数据 (SyncReadMem 延迟)
+      // Cycle 3: ReadData (SyncReadMem )
       dut.clock.step(1)
       
       val status = dut.io.cpuDataOut.peek().litValue
       println(f"✓ PPUSTATUS = 0x$status%02x")
       
-      // 验证 VBlank bit (bit 7)
+      // VBlank bit (bit 7)
       assert((status & 0x80) != 0, f"PPUSTATUS should have VBlank bit set, got 0x$status%02x")
       
-      // 停止读取
+      // Read
       dut.io.cpuRead.poke(false.B)
       dut.clock.step(1)
       
-      // 验证 VBlank 被清除
+      // VBlank Clear
       val vblankAfter = dut.io.vblank.peek().litValue
       println(f"✓ VBlank after read = $vblankAfter")
       assert(vblankAfter == 0, "VBlank should be cleared after read")
@@ -64,28 +64,28 @@ class PPUStatusReadTimingSpec extends AnyFlatSpec with ChiselScalatestTester {
       
       println("\n=== VBlank Clear Timing Test ===")
       
-      // 运行到 VBlank
+      // to VBlank
       dut.clock.step(241 * 341 + 10)
       
-      // 读取前
+      // Read
       val statusBefore = dut.io.debug.ppuStatus.peek().litValue
       println(f"Before read: PPUSTATUS = 0x$statusBefore%02x")
       
-      // 开始读取
+      // StartRead
       dut.io.cpuAddr.poke(2.U)
       dut.io.cpuRead.poke(true.B)
       dut.clock.step(1)
       
-      // 读取时应该看到 VBlank=1
+      // Readwhento VBlank=1
       val statusDuring = dut.io.cpuDataOut.peek().litValue
       println(f"During read: PPUSTATUS = 0x$statusDuring%02x")
       assert((statusDuring & 0x80) != 0, "Should see VBlank during read")
       
-      // 停止读取
+      // Read
       dut.io.cpuRead.poke(false.B)
       dut.clock.step(1)
       
-      // 读取后应该被清除
+      // ReadClear
       val statusAfter = dut.io.debug.ppuStatus.peek().litValue
       println(f"After read: PPUSTATUS = 0x$statusAfter%02x")
       assert((statusAfter & 0x80) == 0, "VBlank should be cleared after read")
@@ -103,19 +103,19 @@ class PPUStatusReadTimingSpec extends AnyFlatSpec with ChiselScalatestTester {
       
       println("\n=== VBlank Reflection Test ===")
       
-      // 初始状态
+      // State
       val status0 = dut.io.debug.ppuStatus.peek().litValue
       println(f"Initial: PPUSTATUS = 0x$status0%02x")
       assert((status0 & 0x80) == 0, "VBlank should be clear initially")
       
-      // 运行到 VBlank 开始
+      // to VBlank Start
       dut.clock.step(241 * 341)
       
-      // VBlank 应该立即反映到 PPUSTATUS
+      // VBlank to PPUSTATUS
       val status1 = dut.io.debug.ppuStatus.peek().litValue
       println(f"At VBlank: PPUSTATUS = 0x$status1%02x")
       
-      // 注意：由于寄存器延迟，可能需要 1 个周期
+      // ：Registers， 1 Cycle
       dut.clock.step(1)
       val status2 = dut.io.debug.ppuStatus.peek().litValue
       println(f"After 1 cycle: PPUSTATUS = 0x$status2%02x")
@@ -135,10 +135,10 @@ class PPUStatusReadTimingSpec extends AnyFlatSpec with ChiselScalatestTester {
       
       println("\n=== Multiple Read Test ===")
       
-      // 运行到 VBlank
+      // to VBlank
       dut.clock.step(241 * 341 + 10)
       
-      // 第一次读取
+      // Read
       dut.io.cpuAddr.poke(2.U)
       dut.io.cpuRead.poke(true.B)
       dut.clock.step(1)
@@ -149,7 +149,7 @@ class PPUStatusReadTimingSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.cpuRead.poke(false.B)
       dut.clock.step(1)
       
-      // 第二次读取 (VBlank 已被清除)
+      // Read (VBlank Clear)
       dut.io.cpuRead.poke(true.B)
       dut.clock.step(1)
       val status2 = dut.io.cpuDataOut.peek().litValue

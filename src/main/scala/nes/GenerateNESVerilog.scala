@@ -7,11 +7,11 @@ object GenerateNESVerilog extends App {
   println("Generating Verilog for NES System Refactored...")
   
   (new ChiselStage).emitVerilog(
-    new NESSystemRefactored(enableDebug = true),  // 启用调试
+    new NESSystemRefactored(enableDebug = true),  // Enable
     Array(
       "--target-dir", "generated/nes",
       "--emission-options", "disableMemRandomization,disableRegisterRandomization",
-      "-o", "NESSystem"  // 输出文件名为 NESSystem.v
+      "-o", "NESSystem"  // Outputfor NESSystem.v
     )
   )
   

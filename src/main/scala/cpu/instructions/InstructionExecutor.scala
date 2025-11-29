@@ -4,20 +4,20 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// 指令执行结果
+// InstructionExecuteResult
 class ExecutionResult extends Bundle {
-  val done     = Bool()           // 指令执行完成
-  val nextCycle = UInt(3.W)       // 下一周期
-  val regs     = new Registers    // 更新后的寄存器
-  val memAddr  = UInt(16.W)       // 内存地址
-  val memData  = UInt(8.W)        // 写入数据
-  val memWrite = Bool()           // 写使能
-  val memRead  = Bool()           // 读使能
-  val operand  = UInt(16.W)       // 操作数 (用于多周期指令)
+  val done     = Bool()           // InstructionExecuteComplete
+  val nextCycle = UInt(3.W)       // Cycle
+  val regs     = new Registers    // UpdateRegisters
+  val memAddr  = UInt(16.W)       // Address
+  val memData  = UInt(8.W)        // WriteData
+  val memWrite = Bool()
+  val memRead  = Bool()
+  val operand  = UInt(16.W)       // Operand (CycleInstruction)
 }
 
 object ExecutionResult {
-  // 创建默认结果 (保持当前状态)
+  // Result (State)
   def hold(regs: Registers, operand: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     result.done := false.B
@@ -31,7 +31,7 @@ object ExecutionResult {
     result
   }
   
-  // 创建完成结果
+  // CompleteResult
   def complete(regs: Registers): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     result.done := true.B
@@ -46,9 +46,9 @@ object ExecutionResult {
   }
 }
 
-// 辅助函数
+
 object ALUOps {
-  // 更新 N 和 Z 标志
+  // Update N  Z Flag
   def updateNZ(regs: Registers, value: UInt): Registers = {
     val newRegs = Wire(new Registers)
     newRegs := regs

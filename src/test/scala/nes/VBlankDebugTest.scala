@@ -8,13 +8,13 @@ class VBlankDebugTest extends AnyFlatSpec with ChiselScalatestTester {
   
   "PPU" should "set VBlank at scanline 241" in {
     test(new PPURefactored(enableDebug = false)).withAnnotations(Seq(WriteVcdAnnotation)) { ppu =>
-      ppu.clock.setTimeout(0)  // 禁用超时
+      ppu.clock.setTimeout(0)  // Disablewhen
       
-      // 模拟到 scanline 241 (241 * 341 cycles)
+      // to scanline 241 (241 * 341 cycles)
       for (i <- 0 until 241 * 341) {
         ppu.clock.step()
         
-        // 每 1000 个周期打印一次
+        // 1000 Cycle
         if (i % 10000 == 0) {
           val y = ppu.io.pixelY.peek().litValue
           val x = ppu.io.pixelX.peek().litValue
@@ -23,7 +23,7 @@ class VBlankDebugTest extends AnyFlatSpec with ChiselScalatestTester {
         }
       }
       
-      // 再 step 一次让寄存器更新
+      // step RegistersUpdate
       ppu.clock.step()
       
       val vblank = ppu.io.vblank.peek().litToBoolean
@@ -36,19 +36,19 @@ class VBlankDebugTest extends AnyFlatSpec with ChiselScalatestTester {
   
   "PPUSTATUS" should "return VBlank bit when read" in {
     test(new PPURefactored(enableDebug = false)) { ppu =>
-      ppu.clock.setTimeout(0)  // 禁用超时
+      ppu.clock.setTimeout(0)  // Disablewhen
       
-      // 初始化
+      // Initialize
       ppu.io.cpuWrite.poke(false.B)
       ppu.io.cpuRead.poke(false.B)
       ppu.clock.step()
       
-      // 模拟到 VBlank
+      // to VBlank
       for (i <- 0 until 241 * 341 + 100) {
         ppu.clock.step()
       }
       
-      // 读取 PPUSTATUS ($2002)
+      // Read PPUSTATUS ($2002)
       ppu.io.cpuAddr.poke(2.U)
       ppu.io.cpuRead.poke(true.B)
       ppu.clock.step()
@@ -63,14 +63,14 @@ class VBlankDebugTest extends AnyFlatSpec with ChiselScalatestTester {
   
   "PPUSTATUS read" should "clear VBlank flag" in {
     test(new PPURefactored(enableDebug = false)) { ppu =>
-      ppu.clock.setTimeout(0)  // 禁用超时
+      ppu.clock.setTimeout(0)  // Disablewhen
       
-      // 初始化
+      // Initialize
       ppu.io.cpuWrite.poke(false.B)
       ppu.io.cpuRead.poke(false.B)
       ppu.clock.step()
       
-      // 模拟到 VBlank
+      // to VBlank
       for (i <- 0 until 241 * 341 + 100) {
         ppu.clock.step()
       }
@@ -78,12 +78,12 @@ class VBlankDebugTest extends AnyFlatSpec with ChiselScalatestTester {
       val vblankBefore = ppu.io.vblank.peek().litToBoolean
       println(s"   VBlank before read: $vblankBefore")
       
-      // 读取 PPUSTATUS
+      // Read PPUSTATUS
       ppu.io.cpuAddr.poke(2.U)
       ppu.io.cpuRead.poke(true.B)
       ppu.clock.step()
       
-      // 停止读取
+      // Read
       ppu.io.cpuRead.poke(false.B)
       ppu.clock.step()
       
@@ -95,9 +95,9 @@ class VBlankDebugTest extends AnyFlatSpec with ChiselScalatestTester {
   
   "NES System" should "allow CPU to read VBlank" in {
     test(new NESSystemRefactored(enableDebug = false)) { nes =>
-      nes.clock.setTimeout(0)  // 禁用超时
+      nes.clock.setTimeout(0)  // Disablewhen
       
-      // 加载简单测试程序到 $C000
+      // to $C000
       val testProg = Seq(
         0xAD, 0x02, 0x20,  // LDA $2002
         0x29, 0x80,        // AND #$80
@@ -105,7 +105,7 @@ class VBlankDebugTest extends AnyFlatSpec with ChiselScalatestTester {
         0xEA               // NOP (should reach here)
       )
       
-      // 加载程序
+
       nes.io.prgLoadEn.poke(true.B)
       for (i <- testProg.indices) {
         nes.io.prgLoadAddr.poke((0xC000 + i).U)
@@ -119,7 +119,7 @@ class VBlankDebugTest extends AnyFlatSpec with ChiselScalatestTester {
       nes.clock.step(10)
       nes.reset.poke(false.B)
       
-      // 运行 1 帧 + 一些周期
+      // 1  + Cycle
       val maxCycles = 30000
       var escaped = false
       
@@ -127,7 +127,7 @@ class VBlankDebugTest extends AnyFlatSpec with ChiselScalatestTester {
         nes.clock.step()
         
         val pc = nes.io.debug.cpuPC.peek().litValue
-        if (pc > 0xC006) {  // 跳出循环
+        if (pc > 0xC006) {
           escaped = true
           println(f"✅ Test 4: CPU escaped loop at cycle $i, PC=0x$pc%04X")
         }

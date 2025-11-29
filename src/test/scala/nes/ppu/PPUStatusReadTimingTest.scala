@@ -18,29 +18,29 @@ class PPUStatusReadTimingTest extends AnyFlatSpec with ChiselScalatestTester {
       
       println("=== PPUSTATUS Read Timing Test ===")
       
-      // 运行到 VBlank
+      // to VBlank
       val cyclesTo241 = 241 * 341 + 10
       dut.clock.step(cyclesTo241)
       
-      // VBlank 应该被设置
+      // VBlank Set
       val vb1 = dut.io.vblank.peek().litValue
       println(f"✓ VBlank before read = $vb1")
       assert(vb1 == 1)
       
-      // 开始读取 PPUSTATUS
+      // StartRead PPUSTATUS
       dut.io.cpuAddr.poke(2.U)
       dut.io.cpuRead.poke(true.B)
       
-      // 在同一个周期内，PPUSTATUS 应该返回 VBlank=1
+      // inCycle，PPUSTATUS  VBlank=1
       val status = dut.io.cpuDataOut.peek().litValue
       println(f"✓ PPUSTATUS during read = 0x$status%02x")
       assert((status & 0x80) != 0, "PPUSTATUS should show VBlank=1 during read")
       
-      // 清除读取信号
+      // ClearReadSignal
       dut.io.cpuRead.poke(false.B)
       println(s"✓ cpuRead cleared")
       
-      // 下一个周期，VBlank 被清除
+      // Cycle，VBlank Clear
       dut.clock.step(1)
       val vb2 = dut.io.vblank.peek().litValue
       val status2 = dut.io.cpuDataOut.peek().litValue

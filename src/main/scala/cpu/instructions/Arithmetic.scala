@@ -4,31 +4,31 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// 算术指令: ADC, SBC, INC, DEC, INX, INY, DEX, DEY
+// Instruction: ADC, SBC, INC, DEC, INX, INY, DEX, DEY
 object ArithmeticInstructions {
-  // 单周期指令 (隐含寻址)
+  // CycleInstruction ()
   val impliedOpcodes = Seq(0xE8, 0xC8, 0xCA, 0x88, 0x1A, 0x3A)
-  // 立即寻址
+
   val immediateOpcodes = Seq(0x69, 0xE9)
-  // ADC/SBC 零页
+  // ADC/SBC
   val adcsbcZeroPageOpcodes = Seq(0x65, 0xE5)
-  // ADC/SBC 零页 X
+  // ADC/SBC  X
   val adcsbcZeroPageXOpcodes = Seq(0x75, 0xF5)
-  // ADC/SBC 绝对
+  // ADC/SBC
   val adcsbcAbsoluteOpcodes = Seq(0x6D, 0xED)
-  // ADC/SBC 间接 X
+  // ADC/SBC  X
   val adcsbcIndirectXOpcodes = Seq(0x61, 0xE1)
-  // ADC/SBC 间接 Y
+  // ADC/SBC  Y
   val adcsbcIndirectYOpcodes = Seq(0x71, 0xF1)
-  // 零页寻址
+
   val zeroPageOpcodes = Seq(0xE6, 0xC6)
-  // 零页 X 索引
+  // X
   val zeroPageXOpcodes = Seq(0xF6, 0xD6)  // INC, DEC zp,X
-  // 绝对寻址
+
   val absoluteOpcodes = Seq(0xEE, 0xCE)
-  // 绝对 X 索引
+  // X
   val absoluteXOpcodes = Seq(0xFE, 0xDE)  // INC, DEC abs,X
-  // 绝对索引寻址
+
   val absoluteIndexedOpcodes = Seq(0x79, 0xF9, 0x7D, 0xFD)  // ADC/SBC abs,Y/X
   
   val opcodes = impliedOpcodes ++ immediateOpcodes ++ zeroPageOpcodes ++ zeroPageXOpcodes ++
@@ -36,7 +36,7 @@ object ArithmeticInstructions {
                 adcsbcZeroPageOpcodes ++ adcsbcZeroPageXOpcodes ++ adcsbcAbsoluteOpcodes ++
                 adcsbcIndirectXOpcodes ++ adcsbcIndirectYOpcodes
   
-  // 单周期指令执行
+  // CycleInstructionExecute
   def executeImplied(opcode: UInt, regs: Registers): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -94,7 +94,7 @@ object ArithmeticInstructions {
     result
   }
   
-  // ADC 立即寻址
+  // ADC
   def executeADCImmediate(regs: Registers, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -119,7 +119,7 @@ object ArithmeticInstructions {
     result
   }
   
-  // SBC 立即寻址
+  // SBC
   def executeSBCImmediate(regs: Registers, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -144,7 +144,7 @@ object ArithmeticInstructions {
     result
   }
   
-  // INC/DEC 零页 - 多周期
+  // INC/DEC  - Cycle
   def executeZeroPage(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -188,7 +188,7 @@ object ArithmeticInstructions {
     result
   }
   
-  // INC/DEC 零页 X - 多周期
+  // INC/DEC  X - Cycle
   def executeZeroPageX(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -230,7 +230,7 @@ object ArithmeticInstructions {
     result
   }
   
-  // INC/DEC 绝对寻址 - 多周期
+  // INC/DEC  - Cycle
   def executeAbsolute(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -247,7 +247,7 @@ object ArithmeticInstructions {
     
     switch(cycle) {
       is(0.U) {
-        // 读取地址低字节
+        // ReadAddress
         result.memAddr := regs.pc
         result.memRead := true.B
         result.operand := memDataIn
@@ -255,7 +255,7 @@ object ArithmeticInstructions {
         result.regs := newRegs
       }
       is(1.U) {
-        // 读取地址高字节
+        // ReadAddress
         result.memAddr := regs.pc
         result.memRead := true.B
         result.operand := Cat(memDataIn, operand(7, 0))
@@ -263,12 +263,12 @@ object ArithmeticInstructions {
         result.regs := newRegs
       }
       is(2.U) {
-        // 读取数据
+        // ReadData
         result.memAddr := operand
         result.memRead := true.B
       }
       is(3.U) {
-        // 修改并写回
+        // and
         result.memAddr := operand
         val res = Mux(opcode === 0xEE.U, memDataIn + 1.U, memDataIn - 1.U)
         result.memData := res
@@ -283,7 +283,7 @@ object ArithmeticInstructions {
     result
   }
   
-  // INC/DEC 绝对 X 索引 - 多周期
+  // INC/DEC  X  - Cycle
   def executeAbsoluteX(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -332,7 +332,7 @@ object ArithmeticInstructions {
     result
   }
   
-  // 通用 ADC/SBC 操作
+  // ADC/SBC
   private def doADCSBC(opcode: UInt, a: UInt, data: UInt, carry: Bool): (UInt, Bool, Bool, Bool) = {
     val isADC = (opcode === 0x69.U) || (opcode === 0x65.U) || (opcode === 0x75.U) || 
                 (opcode === 0x6D.U) || (opcode === 0x7D.U) || (opcode === 0x79.U) ||
@@ -362,7 +362,7 @@ object ArithmeticInstructions {
     (result, flagC, flagV, flagN)
   }
   
-  // ADC/SBC 零页
+  // ADC/SBC
   def executeADCSBCZeroPage(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -402,7 +402,7 @@ object ArithmeticInstructions {
     result
   }
   
-  // ADC/SBC 零页 X
+  // ADC/SBC  X
   def executeADCSBCZeroPageX(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -442,7 +442,7 @@ object ArithmeticInstructions {
     result
   }
   
-  // ADC/SBC 绝对
+  // ADC/SBC
   def executeADCSBCAbsolute(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -489,7 +489,7 @@ object ArithmeticInstructions {
     result
   }
   
-  // ADC/SBC 间接 X
+  // ADC/SBC  X
   def executeADCSBCIndirectX(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -539,7 +539,7 @@ object ArithmeticInstructions {
     result
   }
   
-  // ADC/SBC 间接 Y
+  // ADC/SBC  Y
   def executeADCSBCIndirectY(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -589,7 +589,7 @@ object ArithmeticInstructions {
     result
   }
   
-  // ADC/SBC 绝对索引寻址 (abs,X 或 abs,Y) - 多周期
+  // ADC/SBC  (abs,X or abs,Y) - Cycle
   def executeAbsoluteIndexed(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -604,13 +604,13 @@ object ArithmeticInstructions {
     result.memRead := false.B
     result.operand := operand
     
-    // 确定使用 X 还是 Y 索引
+    // X  Y
     val useY = (opcode === 0x79.U) || (opcode === 0xF9.U)  // ADC/SBC abs,Y
     val index = Mux(useY, regs.y, regs.x)
     
     switch(cycle) {
       is(0.U) {
-        // 读取地址低字节
+        // ReadAddress
         result.memAddr := regs.pc
         result.memRead := true.B
         result.operand := memDataIn
@@ -618,7 +618,7 @@ object ArithmeticInstructions {
         result.regs := newRegs
       }
       is(1.U) {
-        // 读取地址高字节
+        // ReadAddress
         result.memAddr := regs.pc
         result.memRead := true.B
         result.operand := Cat(memDataIn, operand(7, 0))
@@ -626,13 +626,13 @@ object ArithmeticInstructions {
         result.regs := newRegs
       }
       is(2.U) {
-        // 计算最终地址并读取数据
+        // AddressandReadData
         val addr = operand + index
         result.memAddr := addr
         result.memRead := true.B
       }
       is(3.U) {
-        // 执行 ADC 或 SBC
+        // Execute ADC or SBC
         val isADC = (opcode === 0x79.U) || (opcode === 0x7D.U)
         
         when(isADC) {

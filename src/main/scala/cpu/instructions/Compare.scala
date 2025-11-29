@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// 比较指令: CMP, CPX, CPY
+// Instruction: CMP, CPX, CPY
 object CompareInstructions {
   val immediateOpcodes = Seq(0xC9, 0xE0, 0xC0)
   val zeroPageOpcodes = Seq(0xC5, 0xE4, 0xC4)  // CMP, CPX, CPY
@@ -20,7 +20,7 @@ object CompareInstructions {
                 absoluteOpcodes ++ absoluteXOpcodes ++ absoluteYOpcodes ++
                 indirectXOpcodes ++ indirectYOpcodes ++ indirectOpcodes
   
-  // 立即寻址
+
   def executeImmediate(opcode: UInt, regs: Registers, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -52,7 +52,7 @@ object CompareInstructions {
     result
   }
   
-  // CMP 零页 - 多周期
+  // CMP  - Cycle
   def executeZeroPage(cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -91,7 +91,7 @@ object CompareInstructions {
     result
   }
   
-  // 通用比较操作
+
   private def doCompare(opcode: UInt, regs: Registers, data: UInt): (Bool, Bool, Bool) = {
     val regValue = MuxCase(regs.a, Seq(
       (opcode === 0xE0.U || opcode === 0xE4.U || opcode === 0xEC.U) -> regs.x,  // CPX
@@ -104,7 +104,7 @@ object CompareInstructions {
     (flagC, flagZ, flagN)
   }
   
-  // 零页寻址（通用）
+  // （）
   def executeZeroPageGeneric(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -142,7 +142,7 @@ object CompareInstructions {
     result
   }
   
-  // 零页 X 索引
+  // X
   def executeZeroPageX(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -180,7 +180,7 @@ object CompareInstructions {
     result
   }
   
-  // 绝对寻址
+
   def executeAbsolute(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -225,7 +225,7 @@ object CompareInstructions {
     result
   }
   
-  // 绝对索引 (X 或 Y)
+  // (X or Y)
   def executeAbsoluteIndexed(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -273,7 +273,7 @@ object CompareInstructions {
     result
   }
   
-  // 间接 X 索引
+  // X
   def executeIndirectX(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -321,7 +321,7 @@ object CompareInstructions {
     result
   }
   
-  // 间接 Y 索引
+  // Y
   def executeIndirectY(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -369,7 +369,7 @@ object CompareInstructions {
     result
   }
   
-  // 间接寻址 (65C02) - CMP (indirect)
+  // (65C02) - CMP (indirect)
   def executeIndirect(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)

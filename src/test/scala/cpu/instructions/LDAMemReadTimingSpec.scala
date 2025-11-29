@@ -47,7 +47,7 @@ class LDAMemReadTimingSpec extends AnyFlatSpec with ChiselScalatestTester {
       val aOut = dut.io.aOut.peek().litValue
       println(f"Cycle 3: memRead=$memRead3 memAddr=0x$memAddr3%04x done=$done A=0x$aOut%02x")
       
-      // 验证
+
       assert(memRead2 == 1, "Cycle 2 should have memRead=1")
       println(f"\n✓ memRead timing verified")
       println(f"  Critical: Cycle 2 memRead=$memRead2")

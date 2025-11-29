@@ -67,7 +67,7 @@ class FlagInstructionsSpec extends AnyFlatSpec with ChiselScalatestTester {
   }
 }
 
-// 测试用模块
+// Module
 class FlagTestModule extends Module {
   val io = IO(new Bundle {
     val opcode   = Input(UInt(8.W))

@@ -29,3 +29,4 @@ test_run_dir/
 # OS
 .DS_Store
 Thumbs.db
+nes_trace.vcd

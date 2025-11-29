@@ -3,15 +3,15 @@ package cpu6502.core
 import chisel3._
 import chisel3.util._
 
-// 6502 CPU 寄存器组
+// 6502 CPU Registers
 class Registers extends Bundle {
-  val a  = UInt(8.W)   // 累加器
-  val x  = UInt(8.W)   // X 索引寄存器
-  val y  = UInt(8.W)   // Y 索引寄存器
-  val sp = UInt(8.W)   // 栈指针
-  val pc = UInt(16.W)  // 程序计数器
+  val a  = UInt(8.W)
+  val x  = UInt(8.W)   // X Registers
+  val y  = UInt(8.W)   // Y Registers
+  val sp = UInt(8.W)
+  val pc = UInt(16.W)
   
-  // 状态标志 (P 寄存器)
+  // StateFlag (P Registers)
   val flagC = Bool()   // Carry
   val flagZ = Bool()   // Zero
   val flagI = Bool()   // Interrupt Disable
@@ -39,12 +39,12 @@ object Registers {
     regs
   }
   
-  // 获取状态寄存器字节 (NV1BDIZC format)
+  // StateRegisters (NV1BDIZC format)
   def getStatus(regs: Registers): UInt = {
     Cat(regs.flagN, regs.flagV, 1.U(1.W), 1.U(1.W), regs.flagD, regs.flagI, regs.flagZ, regs.flagC)
   }
   
-  // 从字节设置状态标志
+  // fromSetStateFlag
   def setStatus(regs: Registers, status: UInt): Registers = {
     val newRegs = Wire(new Registers)
     newRegs := regs

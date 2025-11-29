@@ -3,7 +3,7 @@ package cpu6502
 import chisel3._
 import chisel3.util._
 
-// 简单的内存模块
+// Module
 class Memory(size: Int = 65536) extends Module {
   val io = IO(new Bundle {
     val addr = Input(UInt(16.W))

@@ -3,7 +3,7 @@ package nes.core
 import chisel3._
 import chisel3.util._
 
-// Pulse 通道波形生成器
+// Pulse
 class PulseWaveform extends Module {
   val io = IO(new Bundle {
     val duty = Input(UInt(2.W))
@@ -36,7 +36,7 @@ class PulseWaveform extends Module {
   io.output := Mux(io.lengthActive && currentBit, io.envelopeVolume, 0.U)
 }
 
-// Triangle 通道波形生成器
+// Triangle
 class TriangleWaveform extends Module {
   val io = IO(new Bundle {
     val timer = Input(UInt(11.W))
@@ -67,7 +67,7 @@ class TriangleWaveform extends Module {
   io.output := Mux(io.lengthActive && io.linearActive, sequence(sequencePos), 0.U)
 }
 
-// Noise 通道波形生成器
+// Noise
 class NoiseWaveform extends Module {
   val io = IO(new Bundle {
     val mode = Input(Bool())

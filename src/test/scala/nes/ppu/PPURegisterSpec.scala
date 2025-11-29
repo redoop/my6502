@@ -6,8 +6,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import nes.PPURefactored
 
 /**
- * PPU 寄存器测试 - 完整覆盖
- * 参考 CPU 指令测试方式，测试 PPU 的 8 个寄存器
+// * PPU Registers -
+// *  CPU Instruction， PPU  8 Registers
  */
 class PPURegisterSpec extends AnyFlatSpec with ChiselScalatestTester {
   
@@ -168,12 +168,12 @@ class PPURegisterSpec extends AnyFlatSpec with ChiselScalatestTester {
   
   it should "read VBlank flag" in {
     test(new PPURefactored) { dut =>
-      // 简单验证 PPUSTATUS 可读
+      // PPUSTATUS
       dut.io.cpuAddr.poke(2.U)
       dut.io.cpuRead.poke(true.B)
       dut.clock.step()
       
-      // 初始状态应该是 0
+      // State 0
       dut.io.cpuDataOut.expect(0.U)
     }
   }

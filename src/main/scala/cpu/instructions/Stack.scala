@@ -4,14 +4,14 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// 栈操作指令: PHA, PHP, PLA, PLP
+// Instruction: PHA, PHP, PLA, PLP
 object StackInstructions {
   val pushOpcodes = Seq(0x48, 0x08)
   val pullOpcodes = Seq(0x68, 0x28)
   
   val opcodes = pushOpcodes ++ pullOpcodes
   
-  // PHA, PHP (单周期 push)
+  // PHA, PHP (Cycle push)
   def executePush(opcode: UInt, regs: Registers): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -37,7 +37,7 @@ object StackInstructions {
     result
   }
   
-  // PLA, PLP (多周期 pull)
+  // PLA, PLP (Cycle pull)
   def executePull(opcode: UInt, cycle: UInt, regs: Registers, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)

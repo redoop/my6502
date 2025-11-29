@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import cpu6502.core._
 
-// 逻辑指令: AND, ORA, EOR, BIT
+// Instruction: AND, ORA, EOR, BIT
 object LogicInstructions {
   val immediateOpcodes = Seq(0x29, 0x09, 0x49)
   val zeroPageOpcodes = Seq(0x24, 0x25, 0x05, 0x45)  // BIT, AND, ORA, EOR
@@ -19,7 +19,7 @@ object LogicInstructions {
                 absoluteOpcodes ++ absoluteXOpcodes ++ absoluteYOpcodes ++
                 indirectXOpcodes ++ indirectYOpcodes
   
-  // 立即寻址
+
   def executeImmediate(opcode: UInt, regs: Registers, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -50,7 +50,7 @@ object LogicInstructions {
     result
   }
   
-  // BIT 零页 - 多周期
+  // BIT  - Cycle
   def executeBIT(cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -88,7 +88,7 @@ object LogicInstructions {
     result
   }
   
-  // 通用逻辑操作
+
   private def doLogicOp(opcode: UInt, a: UInt, data: UInt): UInt = {
     MuxCase(a, Seq(
       (opcode === 0x29.U || opcode === 0x25.U || opcode === 0x35.U || opcode === 0x2D.U || 
@@ -100,7 +100,7 @@ object LogicInstructions {
     ))
   }
   
-  // 零页寻址 (AND, ORA, EOR)
+  // (AND, ORA, EOR)
   def executeZeroPage(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -138,7 +138,7 @@ object LogicInstructions {
     result
   }
   
-  // 零页 X 索引
+  // X
   def executeZeroPageX(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -176,7 +176,7 @@ object LogicInstructions {
     result
   }
   
-  // 绝对寻址
+
   def executeAbsolute(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -210,7 +210,7 @@ object LogicInstructions {
         result.memAddr := operand
         result.memRead := true.B
         
-        // BIT 指令特殊处理
+        // BIT InstructionProcess
         when(opcode === 0x2C.U) {
           newRegs.flagZ := (regs.a & memDataIn) === 0.U
           newRegs.flagN := memDataIn(7)
@@ -230,7 +230,7 @@ object LogicInstructions {
     result
   }
   
-  // 绝对索引 (X 或 Y)
+  // (X or Y)
   def executeAbsoluteIndexed(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -245,7 +245,7 @@ object LogicInstructions {
     result.memRead := false.B
     result.operand := operand
     
-    // 判断使用 X 还是 Y
+    // X  Y
     val useY = (opcode === 0x39.U) || (opcode === 0x19.U) || (opcode === 0x59.U)
     val index = Mux(useY, regs.y, regs.x)
     
@@ -279,7 +279,7 @@ object LogicInstructions {
     result
   }
   
-  // 间接 X 索引 (ind,X)
+  // X  (ind,X)
   def executeIndirectX(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -296,7 +296,7 @@ object LogicInstructions {
     
     switch(cycle) {
       is(0.U) {
-        // 读取零页地址
+        // ReadAddress
         result.memAddr := regs.pc
         result.memRead := true.B
         result.operand := (memDataIn + regs.x)(7, 0)
@@ -304,19 +304,19 @@ object LogicInstructions {
         result.regs := newRegs
       }
       is(1.U) {
-        // 读取间接地址低字节
+        // ReadAddress
         result.memAddr := operand(7, 0)
         result.memRead := true.B
         result.operand := Cat(operand(15, 8), memDataIn)
       }
       is(2.U) {
-        // 读取间接地址高字节
+        // ReadAddress
         result.memAddr := (operand(7, 0) + 1.U)(7, 0)
         result.memRead := true.B
         result.operand := Cat(memDataIn, operand(7, 0))
       }
       is(3.U) {
-        // 读取最终数据
+        // ReadData
         result.memAddr := operand
         result.memRead := true.B
         val res = doLogicOp(opcode, regs.a, memDataIn)
@@ -331,7 +331,7 @@ object LogicInstructions {
     result
   }
   
-  // 间接 Y 索引 (ind),Y
+  // Y  (ind),Y
   def executeIndirectY(opcode: UInt, cycle: UInt, regs: Registers, operand: UInt, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
@@ -348,7 +348,7 @@ object LogicInstructions {
     
     switch(cycle) {
       is(0.U) {
-        // 读取零页地址
+        // ReadAddress
         result.memAddr := regs.pc
         result.memRead := true.B
         result.operand := memDataIn
@@ -356,19 +356,19 @@ object LogicInstructions {
         result.regs := newRegs
       }
       is(1.U) {
-        // 读取间接地址低字节
+        // ReadAddress
         result.memAddr := operand(7, 0)
         result.memRead := true.B
         result.operand := Cat(operand(15, 8), memDataIn)
       }
       is(2.U) {
-        // 读取间接地址高字节
+        // ReadAddress
         result.memAddr := (operand(7, 0) + 1.U)(7, 0)
         result.memRead := true.B
         result.operand := Cat(memDataIn, operand(7, 0)) + regs.y
       }
       is(3.U) {
-        // 读取最终数据
+        // ReadData
         result.memAddr := operand
         result.memRead := true.B
         val res = doLogicOp(opcode, regs.a, memDataIn)

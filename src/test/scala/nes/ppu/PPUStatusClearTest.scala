@@ -18,15 +18,15 @@ class PPUStatusClearTest extends AnyFlatSpec with ChiselScalatestTester {
       
       println("=== VBlank Persistence Test ===")
       
-      // 运行到 VBlank
+      // to VBlank
       val cyclesTo241 = 241 * 341 + 1
       dut.clock.step(cyclesTo241)
       
-      // VBlank 应该被设置
+      // VBlank Set
       dut.io.vblank.expect(true.B)
       println("✓ VBlank set at scanline 241")
       
-      // 运行多个周期，VBlank 应该保持
+      // Cycle，VBlank
       for (i <- 1 to 10) {
         dut.clock.step(100)
         val vb = dut.io.vblank.peek().litValue
@@ -38,7 +38,7 @@ class PPUStatusClearTest extends AnyFlatSpec with ChiselScalatestTester {
       
       println("\n✓ VBlank persists without PPUSTATUS read")
       
-      // 现在读取 PPUSTATUS
+      // inRead PPUSTATUS
       println("\n读取 PPUSTATUS...")
       dut.io.cpuAddr.poke(2.U)
       dut.io.cpuRead.poke(true.B)
@@ -48,11 +48,11 @@ class PPUStatusClearTest extends AnyFlatSpec with ChiselScalatestTester {
       println(f"  PPUSTATUS = 0x$status%02x")
       assert((status & 0x80) != 0, "PPUSTATUS bit 7 should be set")
       
-      // 停止读取
+      // Read
       dut.io.cpuRead.poke(false.B)
       dut.clock.step(1)
       
-      // VBlank 应该被清除
+      // VBlank Clear
       val vbAfter = dut.io.vblank.peek().litValue
       println(f"  VBlank after read = $vbAfter")
       assert(vbAfter == 0, "VBlank should be cleared after PPUSTATUS read")
