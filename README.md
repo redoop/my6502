@@ -319,6 +319,26 @@ sbt "runMain nes.GenerateNESVerilog"
 - Verilator (for hardware simulation)
 - SDL2 (for graphics)
 
+### 🚀 5-Stage Testing & Build Guide
+
+**完整指南**: 📖 [docs/BUILD_AND_TEST_GUIDE.md](docs/BUILD_AND_TEST_GUIDE.md)
+
+自下而上的测试构建方法，确保每个阶段都能正常工作：
+
+1. **Stage 1**: 基础模块测试 (寄存器、内存)
+2. **Stage 2**: 指令集测试 (122+ tests)
+3. **Stage 3**: 子系统测试 (CPU、PPU、APU)
+4. **Stage 4**: NES 系统集成
+5. **Stage 5**: Verilator 硬件仿真
+
+```bash
+# 一键完整流程
+./scripts/tools.sh check      # 检查环境
+./scripts/test.sh all         # 运行所有测试
+./scripts/build.sh fast       # 编译仿真器
+./scripts/run.sh              # 运行游戏
+```
+
 ### Quick Commands
 
 ```bash
