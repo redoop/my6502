@@ -101,32 +101,34 @@
 
 ## Python 工具（4个）
 
-### analyze_opcodes.py
+位于 `python/` 目录：
+
+### rom_analyzer.py
 分析 ROM 文件的指令覆盖率
 
 ```bash
-python3 scripts/analyze_opcodes.py <rom文件>
+python3 scripts/python/rom_analyzer.py <rom文件>
 ```
 
-### analyze_vcd.py
+### vcd_analyzer.py
 分析 VCD 波形文件
 
 ```bash
-python3 scripts/analyze_vcd.py <vcd文件>
+python3 scripts/python/vcd_analyzer.py <vcd文件>
 ```
 
-### count_transistors.py
+### transistor_counter.py
 统计 Verilog 文件的晶体管数量
 
 ```bash
-python3 scripts/count_transistors.py <verilog文件>
+python3 scripts/python/transistor_counter.py <verilog文件>
 ```
 
-### analyze_execution.py
+### execution_tracer.py
 分析执行流程
 
 ```bash
-python3 scripts/analyze_execution.py <vcd文件>
+python3 scripts/python/execution_tracer.py <vcd文件>
 ```
 
 ## 快速开始
@@ -181,6 +183,8 @@ python3 scripts/analyze_execution.py <vcd文件>
 **工具相关** (整合为 tools.sh):
 - 项目管理、清理、统计等功能
 
-**Python 工具** (保留 4 个核心工具):
-- analyze_opcodes.py, analyze_vcd.py
-- count_transistors.py, analyze_execution.py
+**Python 工具** (重命名并移至 python/ 目录):
+- analyze_opcodes.py → rom_analyzer.py
+- analyze_vcd.py → vcd_analyzer.py
+- count_transistors.py → transistor_counter.py
+- analyze_execution.py → execution_tracer.py
