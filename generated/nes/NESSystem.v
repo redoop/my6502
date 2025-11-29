@@ -636,10 +636,10 @@ module CPU6502Core(
   wire  _GEN_1921 = _execResult_T_175 ? ~regs_flagZ : _GEN_1920; // @[Branch.scala 20:20 22:31]
   wire  execResult_result_takeBranch = _execResult_T_174 ? regs_flagZ : _GEN_1921; // @[Branch.scala 20:20 21:31]
   wire [7:0] execResult_result_offset = io_memDataIn; // @[Branch.scala 32:28]
-  wire [15:0] _execResult_result_newRegs_pc_T_90 = regs_pc + 16'h1; // @[Branch.scala 36:43]
+  wire [15:0] _execResult_result_newRegs_pc_T_84 = regs_pc + 16'h1; // @[Branch.scala 36:43]
   wire [15:0] _GEN_4229 = {{8{execResult_result_offset[7]}},execResult_result_offset}; // @[Branch.scala 36:50]
-  wire [15:0] _execResult_result_newRegs_pc_T_94 = $signed(_execResult_result_newRegs_pc_T_90) + $signed(_GEN_4229); // @[Branch.scala 36:60]
-  wire [15:0] execResult_result_newRegs_36_pc = execResult_result_takeBranch ? _execResult_result_newRegs_pc_T_94 :
+  wire [15:0] _execResult_result_newRegs_pc_T_88 = $signed(_execResult_result_newRegs_pc_T_84) + $signed(_GEN_4229); // @[Branch.scala 36:60]
+  wire [15:0] execResult_result_newRegs_36_pc = execResult_result_takeBranch ? _execResult_result_newRegs_pc_T_88 :
     _regs_pc_T_1; // @[Branch.scala 36:22]
   wire  _execResult_T_189 = 8'ha9 == opcode; // @[CPU6502Core.scala 226:20]
   wire  _execResult_T_190 = 8'ha2 == opcode; // @[CPU6502Core.scala 226:20]
@@ -951,9 +951,9 @@ module CPU6502Core(
   wire [2:0] execResult_result_result_50_nextCycle = _execResult_result_T_20 ? 3'h1 : _GEN_2675; // @[Jump.scala 117:19 124:26]
   wire [7:0] execResult_result_result_50_memData = _execResult_result_T_20 ? 8'h0 : _GEN_2676; // @[Jump.scala 117:19 112:20]
   wire  execResult_result_result_50_memWrite = _execResult_result_T_20 ? 1'h0 : _GEN_2677; // @[Jump.scala 117:19 113:21]
-  wire [15:0] _execResult_result_newRegs_pc_T_133 = resetVector + 16'h1; // @[Jump.scala 193:53]
+  wire [15:0] _execResult_result_newRegs_pc_T_127 = resetVector + 16'h1; // @[Jump.scala 193:53]
   wire [15:0] _GEN_2701 = _execResult_result_T_26 ? execResult_result_result_46_memAddr : 16'h0; // @[Jump.scala 175:19 169:20 190:24]
-  wire [15:0] _GEN_2704 = _execResult_result_T_26 ? _execResult_result_newRegs_pc_T_133 : regs_pc; // @[Jump.scala 164:13 175:19 193:20]
+  wire [15:0] _GEN_2704 = _execResult_result_T_26 ? _execResult_result_newRegs_pc_T_127 : regs_pc; // @[Jump.scala 164:13 175:19 193:20]
   wire [7:0] _GEN_2720 = _execResult_result_T_21 ? _execResult_result_newRegs_sp_T_3 : regs_sp; // @[Jump.scala 164:13 175:19 185:20]
   wire [7:0] execResult_result_newRegs_50_sp = _execResult_result_T_20 ? _execResult_result_newRegs_sp_T_3 : _GEN_2720; // @[Jump.scala 175:19 177:20]
   wire [15:0] _GEN_2734 = _execResult_result_T_21 ? regs_pc : _GEN_2704; // @[Jump.scala 164:13 175:19]
@@ -2139,7 +2139,7 @@ module CPU6502Core(
   wire [7:0] _GEN_3919 = 8'he8 == opcode | 8'hc8 == opcode | 8'hca == opcode | 8'h88 == opcode | 8'h1a == opcode | 8'h3a
      == opcode ? regs_sp : _GEN_3900; // @[CPU6502Core.scala 226:20 239:16]
   wire [15:0] _GEN_3920 = 8'he8 == opcode | 8'hc8 == opcode | 8'hca == opcode | 8'h88 == opcode | 8'h1a == opcode | 8'h3a
-     == opcode ? _regs_pc_T_1 : _GEN_3901; // @[CPU6502Core.scala 226:20 239:16]
+     == opcode ? regs_pc : _GEN_3901; // @[CPU6502Core.scala 226:20 239:16]
   wire  _GEN_3921 = 8'he8 == opcode | 8'hc8 == opcode | 8'hca == opcode | 8'h88 == opcode | 8'h1a == opcode | 8'h3a ==
     opcode ? regs_flagC : _GEN_3902; // @[CPU6502Core.scala 226:20 239:16]
   wire  _GEN_3922 = 8'he8 == opcode | 8'hc8 == opcode | 8'hca == opcode | 8'h88 == opcode | 8'h1a == opcode | 8'h3a ==
@@ -2175,7 +2175,7 @@ module CPU6502Core(
   wire [7:0] _GEN_3938 = 8'haa == opcode | 8'ha8 == opcode | 8'h8a == opcode | 8'h98 == opcode | 8'hba == opcode | 8'h9a
      == opcode ? execResult_result_newRegs_1_sp : _GEN_3919; // @[CPU6502Core.scala 226:20 234:16]
   wire [15:0] _GEN_3939 = 8'haa == opcode | 8'ha8 == opcode | 8'h8a == opcode | 8'h98 == opcode | 8'hba == opcode | 8'h9a
-     == opcode ? _regs_pc_T_1 : _GEN_3920; // @[CPU6502Core.scala 226:20 234:16]
+     == opcode ? regs_pc : _GEN_3920; // @[CPU6502Core.scala 226:20 234:16]
   wire  _GEN_3940 = 8'haa == opcode | 8'ha8 == opcode | 8'h8a == opcode | 8'h98 == opcode | 8'hba == opcode | 8'h9a ==
     opcode ? regs_flagC : _GEN_3921; // @[CPU6502Core.scala 226:20 234:16]
   wire  _GEN_3941 = 8'haa == opcode | 8'ha8 == opcode | 8'h8a == opcode | 8'h98 == opcode | 8'hba == opcode | 8'h9a ==
@@ -2211,7 +2211,7 @@ module CPU6502Core(
   wire [7:0] execResult_result_1_regs_sp = 8'h18 == opcode | 8'h38 == opcode | 8'hd8 == opcode | 8'hf8 == opcode | 8'h58
      == opcode | 8'h78 == opcode | 8'hb8 == opcode | 8'hea == opcode ? regs_sp : _GEN_3938; // @[CPU6502Core.scala 226:20 229:16]
   wire [15:0] execResult_result_1_regs_pc = 8'h18 == opcode | 8'h38 == opcode | 8'hd8 == opcode | 8'hf8 == opcode | 8'h58
-     == opcode | 8'h78 == opcode | 8'hb8 == opcode | 8'hea == opcode ? _regs_pc_T_1 : _GEN_3939; // @[CPU6502Core.scala 226:20 229:16]
+     == opcode | 8'h78 == opcode | 8'hb8 == opcode | 8'hea == opcode ? regs_pc : _GEN_3939; // @[CPU6502Core.scala 226:20 229:16]
   wire  execResult_result_1_regs_flagC = 8'h18 == opcode | 8'h38 == opcode | 8'hd8 == opcode | 8'hf8 == opcode | 8'h58
      == opcode | 8'h78 == opcode | 8'hb8 == opcode | 8'hea == opcode ? execResult_result_newRegs_flagC : _GEN_3940; // @[CPU6502Core.scala 226:20 229:16]
   wire  execResult_result_1_regs_flagZ = 8'h18 == opcode | 8'h38 == opcode | 8'hd8 == opcode | 8'hf8 == opcode | 8'h58
@@ -2508,7 +2508,7 @@ module CPU6502Core(
       end
     end
     if (reset) begin // @[CPU6502Core.scala 25:22]
-      state <= 3'h0; // @[CPU6502Core.scala 25:22]
+      state <= 3'h1; // @[CPU6502Core.scala 25:22]
     end else if (3'h0 == state) begin // @[CPU6502Core.scala 69:19]
       if (!(cycle == 3'h0)) begin // @[CPU6502Core.scala 72:31]
         if (!(cycle == 3'h1)) begin // @[CPU6502Core.scala 76:37]

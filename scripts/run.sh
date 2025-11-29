@@ -44,7 +44,7 @@ if [ ! -f "$ROM" ]; then
     exit 1
 fi
 
-if [ ! -f "build/verilator/VNESSystem" ]; then
+if [ ! -f "build/verilator/VNESSystemRefactored" ]; then
     echo "⚠️  仿真器未编译，正在编译..."
     ./scripts/build.sh fast
 fi
@@ -67,4 +67,4 @@ echo ""
 echo "按 Ctrl+C 退出"
 echo ""
 
-./build/verilator/VNESSystem "$ROM"
+./build/verilator/VNESSystemRefactored "$ROM"

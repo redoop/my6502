@@ -1,17 +1,15 @@
-// NES 系统 Verilator Testbench
-// 用于硬件级仿真 NES 模拟器
+// NES 系统 Verilator Testbench - 快速版本
+// 优化性能，跳过不必要的周期
 
 #include <verilated.h>
-#include <verilated_vcd_c.h>
-#include "VNESSystemv2.h"
+#include "VNESSystemRefactored.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <cstdint>
 #include <chrono>
 #include <iomanip>
-#include <map>
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 // NES 调色板 (RGB)
 const uint32_t NES_PALETTE[64] = {
@@ -27,7 +25,7 @@ const uint32_t NES_PALETTE[64] = {
 
 class NESEmulator {
 private:
-    VNESSystemv2* dut;
+    VNESSystemRefactored* dut;
     uint64_t cycle_count;
     
     // ROM 数据
@@ -44,8 +42,11 @@ private:
     uint8_t controller1;
     uint8_t controller2;
     
+    // 性能优化：采样渲染
+    int render_skip;
+    
 public:
-    NESEmulator(VNESSystemv2* dut_ptr) : dut(dut_ptr), cycle_count(0) {
+    NESEmulator(VNESSystemRefactored* dut_ptr) : dut(dut_ptr), cycle_count(0), render_skip(0) {
         controller1 = 0;
         controller2 = 0;
         
@@ -56,7 +57,7 @@ public:
         }
         
         window = SDL_CreateWindow(
-            "NES Verilator 仿真",
+            "NES Verilator 仿真 (快速模式)",
             SDL_WINDOWPOS_CENTERED,
             SDL_WINDOWPOS_CENTERED,
             256 * 3, 240 * 3,
@@ -86,7 +87,7 @@ public:
             exit(1);
         }
         
-        std::cout << "✅ SDL 初始化完成" << std::endl;
+        std::cout << "✅ SDL 初始化完成 (快速模式)" << std::endl;
     }
     
     ~NESEmulator() {
@@ -141,20 +142,16 @@ public:
         std::cout << "⬆️  加载 ROM 到硬件..." << std::endl;
         
         // 加载 PRG ROM
-        // 对于大于 32KB 的 ROM，加载最后 32KB (包含 reset vector)
         size_t prg_offset = 0;
         if (prg_rom.size() > 32768) {
             prg_offset = prg_rom.size() - 32768;
-            std::cout << "   ⚠️  ROM 大于 32KB，加载最后 32KB (偏移: 0x" << std::hex << prg_offset << std::dec << ")" << std::endl;
         }
         
-
-        
-        dut->io_romLoadPRG = 1;
+        // PRG ROM loading
         for (size_t i = 0; i < 32768 && (prg_offset + i) < prg_rom.size(); i++) {
-            dut->io_romLoadEn = 1;
-            dut->io_romLoadAddr = i;
-            dut->io_romLoadData = prg_rom[prg_offset + i];
+            dut->io_prgLoadEn = 1;
+            dut->io_prgLoadAddr = i;
+            dut->io_prgLoadData = prg_rom[prg_offset + i];
             tick();
             
             if (i % 4096 == 0) {
@@ -165,11 +162,10 @@ public:
         
         // 加载 CHR ROM
         if (!chr_rom.empty()) {
-            dut->io_romLoadPRG = 0;
             for (size_t i = 0; i < chr_rom.size() && i < 8192; i++) {
-                dut->io_romLoadEn = 1;
-                dut->io_romLoadAddr = i;
-                dut->io_romLoadData = chr_rom[i];
+                dut->io_chrLoadEn = 1;
+                dut->io_chrLoadAddr = i;
+                dut->io_chrLoadData = chr_rom[i];
                 tick();
                 
                 if (i % 2048 == 0) {
@@ -179,31 +175,18 @@ public:
             std::cout << "\r   CHR: 100%" << std::endl;
         }
         
-        dut->io_romLoadEn = 0;
+        dut->io_prgLoadEn = 0;
+        dut->io_chrLoadEn = 0;
         std::cout << "✅ ROM 加载完成" << std::endl;
-        
-        // 检查中断向量
-        std::cout << "   检查 ROM 内容:" << std::endl;
-        size_t vec_offset = prg_rom.size() - 6;  // 最后 6 字节包含中断向量
-        
-        // NMI 向量 (0xFFFA-0xFFFB)
-        uint16_t nmi_vec = prg_rom[vec_offset] | (prg_rom[vec_offset + 1] << 8);
-        std::cout << "   NMI 向量 (0xFFFA-0xFFFB) = 0x" << std::hex << nmi_vec << std::dec << std::endl;
-        
-        // Reset 向量 (0xFFFC-0xFFFD)
-        uint16_t reset_vec = prg_rom[vec_offset + 2] | (prg_rom[vec_offset + 3] << 8);
-        std::cout << "   Reset 向量 (0xFFFC-0xFFFD) = 0x" << std::hex << reset_vec << std::dec << std::endl;
     }
     
-    void tick(VerilatedVcdC* tfp = nullptr) {
+    void tick() {
         dut->clock = 0;
         dut->eval();
-        if (tfp) tfp->dump(cycle_count * 2);
         cycle_count++;
         
         dut->clock = 1;
         dut->eval();
-        if (tfp) tfp->dump(cycle_count * 2 + 1);
     }
     
     void handleInput() {
@@ -256,11 +239,12 @@ public:
     }
     
     void updateDisplay() {
+        // 只在可见区域采样像素
         uint16_t x = dut->io_pixelX;
         uint16_t y = dut->io_pixelY;
-        uint8_t color = dut->io_pixelColor & 0x3F;
         
         if (x < 256 && y < 240) {
+            uint8_t color = dut->io_pixelColor & 0x3F;
             framebuffer[y * 256 + x] = NES_PALETTE[color];
         }
         
@@ -279,150 +263,87 @@ public:
     }
     
     void run() {
-        std::cout << "🎮 开始仿真..." << std::endl;
+        std::cout << "🎮 开始仿真 (快速模式)..." << std::endl;
         std::cout << "   控制: 方向键移动, Z=A, X=B, Enter=Start, RShift=Select" << std::endl;
-        std::cout << "   提示: 游戏启动后会自动按 Start 键" << std::endl;
+        std::cout << "   ⚡ 使用批量处理加速仿真" << std::endl;
         
         uint64_t frame_count = 0;
-        uint64_t total_frames = 0;
         auto start_time = std::chrono::high_resolution_clock::now();
         auto last_report_time = start_time;
+        auto last_input_time = start_time;
         bool last_vblank = false;
-        bool auto_start_pressed = false;
-        
-        // 性能优化：批量处理周期
-        const int BATCH_SIZE = 1000;  // 每批处理 1000 个周期
-        int batch_counter = 0;
         
         while (true) {
-            // 每批次只处理一次输入
-            if (batch_counter == 0) {
+            // 每 16ms 处理一次输入（约 60Hz）
+            auto now = std::chrono::high_resolution_clock::now();
+            auto input_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_input_time).count();
+            
+            if (input_elapsed >= 16) {
                 handleInput();
+                last_input_time = now;
             }
             
-            // 在第 120 帧自动按 Start 键
-            if (!auto_start_pressed && total_frames >= 120) {
-                controller1 |= 0x08;
-                dut->io_controller1 = controller1;
-                std::cout << "\n🎮 自动按下 Start 键..." << std::endl;
-                auto_start_pressed = true;
-            }
-            if (auto_start_pressed && total_frames >= 125) {
-                controller1 &= ~0x08;
-                dut->io_controller1 = controller1;
-            }
-            
-            // 检测渲染启用
-            static bool rendering_enabled_logged = false;
-            if (!rendering_enabled_logged && dut->io_rendering) {
-                std::cout << "\n✅ 渲染已启用！" << std::endl;
-                rendering_enabled_logged = true;
-            }
-            
-            tick();
-            updateDisplay();
-            
-            batch_counter++;
-            if (batch_counter >= BATCH_SIZE) {
-                batch_counter = 0;
-            }
-            
-            // 检测 VBlank 上升沿来计数帧
-            bool vblank = dut->io_vblank;
-            if (vblank && !last_vblank) {
-                frame_count++;
-                total_frames++;
+            // 批量执行多个周期
+            for (int i = 0; i < 100; i++) {
+                tick();
+                updateDisplay();
                 
-                // 每 3 秒报告一次状态（降低频率）
-                auto now = std::chrono::high_resolution_clock::now();
-                auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_report_time).count();
-                
-                if (elapsed >= 3000) {
-                    double fps = static_cast<double>(frame_count) * 1000.0 / elapsed;
-                    uint16_t pc = dut->io_debug_regPC;
-                    uint8_t a = dut->io_debug_regA;
-                    uint8_t x = dut->io_debug_regX;
-                    uint8_t y = dut->io_debug_regY;
-                    uint8_t sp = dut->io_debug_regSP;
-                    
-                    // 每 30 秒报告一次详细调试信息（大幅降低频率）
-                    static auto last_debug_time = now;
-                    auto debug_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_debug_time).count();
-                    
-                    if (debug_elapsed >= 30000) {
-                        std::cout << "\n=== 调试信息 ===" << std::endl;
-                        std::cout << "  总帧数: " << total_frames << std::endl;
-                        std::cout << "  CPU: PC=0x" << std::hex << pc << " A=0x" << (int)a 
-                                  << " X=0x" << (int)x << " Y=0x" << (int)y << std::dec << std::endl;
-                        std::cout << "  Rendering: " << (dut->io_rendering ? "ON" : "OFF") << std::endl;
-                        
-                        // 简化的 Framebuffer 统计
-                        int non_zero_pixels = 0;
-                        for (int i = 0; i < 256 * 240; i++) {
-                            if (framebuffer[i] != 0) non_zero_pixels++;
-                        }
-                        std::cout << "  非零像素: " << non_zero_pixels << " / " << (256 * 240) << std::endl;
-                        std::cout << "===================" << std::endl;
-                        
-                        last_debug_time = now;
-                    }
-                    
-                    std::cout << "\r帧: " << total_frames 
-                              << " | FPS: " << std::fixed << std::setprecision(1) << fps 
-                              << " | PC: 0x" << std::hex << pc 
-                              << " | A: 0x" << (int)a
-                              << " | X: 0x" << (int)x
-                              << " | Y: 0x" << (int)y
-                              << " | SP: 0x" << (int)sp << std::dec
-                              << "     " << std::flush;
-                    
-                    frame_count = 0;
-                    last_report_time = now;
+                // 检测 VBlank 上升沿来计数帧
+                bool vblank = dut->io_vblank;
+                if (vblank && !last_vblank) {
+                    frame_count++;
                 }
+                last_vblank = vblank;
             }
-            last_vblank = vblank;
+            
+            // 每秒报告一次状态
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_report_time).count();
+            
+            if (elapsed >= 1000) {
+                double fps = static_cast<double>(frame_count) * 1000.0 / elapsed;
+                uint16_t pc = dut->io_debug_cpuPC;
+                uint8_t a = dut->io_debug_cpuA;
+                uint8_t x = dut->io_debug_cpuX;
+                uint8_t y = dut->io_debug_cpuY;
+                
+                std::cout << "\r帧: " << frame_count 
+                          << " | FPS: " << std::fixed << std::setprecision(1) << fps 
+                          << " | PC: 0x" << std::hex << pc 
+                          << " | A: 0x" << (int)a
+                          << " | X: 0x" << (int)x
+                          << " | Y: 0x" << (int)y << std::dec
+                          << "     " << std::flush;
+                
+                frame_count = 0;
+                last_report_time = now;
+            }
         }
     }
 };
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::cerr << "用法: " << argv[0] << " <rom文件> [--trace]" << std::endl;
+        std::cerr << "用法: " << argv[0] << " <rom文件>" << std::endl;
         return 1;
     }
     
-    bool enable_trace = false;
-    if (argc >= 3 && std::string(argv[2]) == "--trace") {
-        enable_trace = true;
-    }
-    
-    std::cout << "🚀 NES Verilator 仿真器" << std::endl;
-    std::cout << "========================" << std::endl;
+    std::cout << "🚀 NES Verilator 仿真器 (快速模式)" << std::endl;
+    std::cout << "====================================" << std::endl;
     
     Verilated::commandArgs(argc, argv);
     
-    VNESSystemv2* dut = new VNESSystemv2;
-    
-    // 启用波形追踪
-    VerilatedVcdC* tfp = nullptr;
-    if (enable_trace) {
-        Verilated::traceEverOn(true);
-        tfp = new VerilatedVcdC;
-        dut->trace(tfp, 99);
-        tfp->open("nes_trace.vcd");
-        std::cout << "📊 VCD 追踪已启用: nes_trace.vcd" << std::endl;
-    }
-    
+    VNESSystemRefactored* dut = new VNESSystemRefactored;
     NESEmulator emulator(dut);
     
     // 在 reset 期间加载 ROM
     std::cout << "🔄 保持 Reset 状态加载 ROM..." << std::endl;
     dut->reset = 1;
-    dut->io_romLoadEn = 0;
+    dut->io_prgLoadEn = 0;
+    dut->io_chrLoadEn = 0;
     dut->io_controller1 = 0;
     dut->io_controller2 = 0;
     
-    // 加载 ROM（在 reset 期间）
+    // 加载 ROM
     if (!emulator.loadROM(argv[1])) {
         return 1;
     }
@@ -435,35 +356,22 @@ int main(int argc, char** argv) {
         dut->eval();
     }
     
-    // 释放 reset，让 CPU 从 reset vector 启动
+    // 释放 reset
     dut->reset = 0;
-    dut->io_romLoadEn = 0;
+    dut->io_prgLoadEn = 0;
+    dut->io_chrLoadEn = 0;
     
     std::cout << "🔄 释放 Reset，CPU 启动中..." << std::endl;
-    std::cout << "   等待 CPU 完成 reset 序列（约 7 个周期）..." << std::endl;
     
-    // CPU reset 序列需要约 7 个周期：
-    // - 读取 reset vector 低字节 (0xFFFC)
-    // - 读取 reset vector 高字节 (0xFFFD)
-    // - 设置 PC
-    // 给更多周期确保完成
+    // CPU reset 序列
     for (int i = 0; i < 20; i++) {
         dut->clock = 0;
         dut->eval();
         dut->clock = 1;
         dut->eval();
-        
-        // 调试：显示前几个周期的状态
-        if (i < 15) {
-            std::cout << "   周期 " << i 
-                      << ": state=" << (int)dut->io_debug_state 
-                      << " cycle=" << (int)dut->io_debug_cycle
-                      << " PC=0x" << std::hex << dut->io_debug_regPC << std::dec 
-                      << std::endl;
-        }
     }
     
-    std::cout << "✅ CPU 已启动，PC = 0x" << std::hex << dut->io_debug_regPC << std::dec << std::endl;
+    std::cout << "✅ CPU 已启动，PC = 0x" << std::hex << dut->io_debug_cpuPC << std::dec << std::endl;
     
     emulator.run();
     
