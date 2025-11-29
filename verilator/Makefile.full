@@ -1,0 +1,20 @@
+SRC = ../generated/nes/NESSystem.v
+TB = nes_full_tb.cpp
+ROM = ../games/Donkey-Kong.nes
+
+VERILATOR = verilator
+VFLAGS = -Wall -Wno-fatal -Wno-WIDTH -Wno-UNUSED -Wno-UNDRIVEN -Wno-CASEINCOMPLETE
+VFLAGS += --cc --exe --build -j 0 --top-module NESSystem
+VFLAGS += -CFLAGS "-std=c++11 -O2 $(shell sdl2-config --cflags)"
+VFLAGS += -LDFLAGS "$(shell sdl2-config --libs)"
+
+all: sim
+
+sim: $(SRC) $(TB)
+	$(VERILATOR) $(VFLAGS) $(SRC) $(TB) -o Vnes_full
+	./obj_dir/Vnes_full $(ROM)
+
+clean:
+	rm -rf obj_dir
+
+.PHONY: all sim clean

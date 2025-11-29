@@ -1,0 +1,23 @@
+RTL_DIR = ../src/main/rtl
+SRC = $(RTL_DIR)/nes_system.sv
+TB = nes_gui_tb.cpp
+ROM = ../games/Super-Mario-Bros.nes
+
+VERILATOR = verilator
+VFLAGS = -Wall -Wno-fatal -Wno-MULTIDRIVEN -Wno-LATCH -Wno-UNUSEDSIGNAL
+VFLAGS += -Wno-UNDRIVEN -Wno-WIDTHTRUNC -Wno-WIDTHEXPAND -Wno-CASEOVERLAP
+VFLAGS += -Wno-CASEINCOMPLETE -Wno-DECLFILENAME -Wno-IMPLICITSTATIC
+VFLAGS += --cc --exe --build -j 0 --top-module nes_system
+VFLAGS += -CFLAGS "-std=c++11 -O2 $(shell sdl2-config --cflags)"
+VFLAGS += -LDFLAGS "$(shell sdl2-config --libs)"
+
+all: sim
+
+sim: $(SRC) $(TB)
+	$(VERILATOR) $(VFLAGS) $(SRC) $(TB) -o Vnes_gui
+	./obj_dir/Vnes_gui $(ROM)
+
+clean:
+	rm -rf obj_dir
+
+.PHONY: all sim clean

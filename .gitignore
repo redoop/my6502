@@ -30,3 +30,4 @@ test_run_dir/
 .DS_Store
 Thumbs.db
 nes_trace.vcd
+verilator/obj_dir/

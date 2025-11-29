@@ -1,0 +1,19 @@
+RTL_DIR = ../src/main/rtl
+SRC = $(RTL_DIR)/nes_system.sv
+TB = nes_tb.cpp
+
+VERILATOR = verilator
+VFLAGS = -Wall -Wno-fatal --cc --exe --build -j 0
+VFLAGS += --top-module nes_system
+VFLAGS += -CFLAGS "-std=c++11"
+
+all: sim
+
+sim: $(SRC) $(TB)
+	$(VERILATOR) $(VFLAGS) $(SRC) $(TB)
+	./obj_dir/Vnes_system
+
+clean:
+	rm -rf obj_dir
+
+.PHONY: all sim clean

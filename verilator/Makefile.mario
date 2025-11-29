@@ -1,0 +1,20 @@
+RTL_DIR = ../src/main/rtl
+SRC = $(RTL_DIR)/nes_system.sv
+TB = nes_mario_tb.cpp
+ROM = ../games/Super-Mario-Bros.nes
+
+VERILATOR = verilator
+VFLAGS = -Wall -Wno-fatal -Wno-MULTIDRIVEN --cc --exe --build -j 0
+VFLAGS += --top-module nes_system
+VFLAGS += -CFLAGS "-std=c++11 -O2"
+
+all: sim
+
+sim: $(SRC) $(TB)
+	$(VERILATOR) $(VFLAGS) $(SRC) $(TB) -o Vnes_mario
+	./obj_dir/Vnes_mario $(ROM)
+
+clean:
+	rm -rf obj_dir
+
+.PHONY: all sim clean
