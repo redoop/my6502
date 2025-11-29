@@ -99,11 +99,11 @@ class NESSystemRefactored(enableDebug: Boolean = false) extends Module {
   mmc3.io.cpuRead := cpu.io.memRead && isPrgRom
   mmc3.io.ppuAddr := 0.U
   
-  // PRG ROM read through MMC3
+  // ROM read through MMC3
   val prgData = prgRom.read(mmc3.io.prgAddr)
   mmc3.io.prgData := prgData
   
-  // Memory ready: Always ready
+  // Always ready - MMC3 has internal register
   cpu.io.memReady := true.B
   
   // Memory ready logic: Always ready (use async ROM)

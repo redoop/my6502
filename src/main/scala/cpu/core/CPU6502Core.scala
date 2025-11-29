@@ -75,29 +75,39 @@ class CPU6502Core extends Module {
             io.memRead := true.B
             cycle := 1.U
           }.elsewhen(cycle === 1.U) {
-            // WaitCycleDataReady
+            // Wait for MMC3
             io.memAddr := 0xFFFC.U
             io.memRead := true.B
             cycle := 2.U
           }.elsewhen(cycle === 2.U) {
-            // Read
+            // Wait for ROM
+            io.memAddr := 0xFFFC.U
+            io.memRead := true.B
+            cycle := 3.U
+          }.elsewhen(cycle === 3.U) {
+            // Read low byte
             io.memAddr := 0xFFFC.U
             io.memRead := true.B
             operand := io.memDataIn
             printf("[CPU Reset] Read $FFFC = 0x%x (low byte)\n", io.memDataIn)
-            cycle := 3.U
-          }.elsewhen(cycle === 3.U) {
-            // ReadAddress
-            io.memAddr := 0xFFFD.U
-            io.memRead := true.B
             cycle := 4.U
           }.elsewhen(cycle === 4.U) {
-            // WaitCycleDataReady
+            // Read high byte address
             io.memAddr := 0xFFFD.U
             io.memRead := true.B
             cycle := 5.U
+          }.elsewhen(cycle === 5.U) {
+            // Wait for MMC3
+            io.memAddr := 0xFFFD.U
+            io.memRead := true.B
+            cycle := 6.U
+          }.elsewhen(cycle === 6.U) {
+            // Wait for ROM
+            io.memAddr := 0xFFFD.U
+            io.memRead := true.B
+            cycle := 7.U
           }.otherwise {
-            // cycle=5: Complete reset and Fetch
+            // cycle=7: Complete reset
             io.memAddr := 0xFFFD.U
             io.memRead := true.B
             val resetVector = Cat(io.memDataIn, operand(7, 0))
@@ -117,24 +127,30 @@ class CPU6502Core extends Module {
             cycle := 0.U
             state := sNMI
           }.otherwise {
-            // Fetch with memReady support
+            // Fetch with extra cycles for ROM delay
             when(cycle === 0.U) {
               // Cycle 0: Issue read request
               io.memAddr := regs.pc
               io.memRead := true.B
-              when(io.memReady) {
-                cycle := 1.U
-              }
-            }.otherwise {
-              // Cycle 1: Read data and execute
+              cycle := 1.U
+            }.elsewhen(cycle === 1.U) {
+              // Cycle 1: Wait for ROM (MMC3 address calc)
               io.memAddr := regs.pc
               io.memRead := true.B
-              when(io.memReady) {
-                opcode := io.memDataIn
-                regs.pc := regs.pc + 1.U
-                cycle := 0.U
-                state := sExecute
-              }
+              cycle := 2.U
+            }.elsewhen(cycle === 2.U) {
+              // Cycle 2: Wait for ROM (SyncReadMem)
+              io.memAddr := regs.pc
+              io.memRead := true.B
+              cycle := 3.U
+            }.otherwise {
+              // Cycle 3: Read data and execute
+              io.memAddr := regs.pc
+              io.memRead := true.B
+              opcode := io.memDataIn
+              regs.pc := regs.pc + 1.U
+              cycle := 0.U
+              state := sExecute
             }
           }
         }

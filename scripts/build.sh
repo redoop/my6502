@@ -49,7 +49,7 @@ fi
 # 设置编译选项
 VERILATOR_FLAGS="--cc --exe --build -Wno-WIDTH -Wno-UNUSED -Wno-UNDRIVEN -Wno-CASEINCOMPLETE"
 VERILATOR_FLAGS="$VERILATOR_FLAGS -Wno-UNOPTFLAT"  # Ignore combinational loop warnings
-VERILATOR_FLAGS="$VERILATOR_FLAGS --converge-limit 1000"  # Increase convergence limit for MMC3
+VERILATOR_FLAGS="$VERILATOR_FLAGS --converge-limit 10000"  # Increase convergence limit for MMC3
 VERILATOR_FLAGS="$VERILATOR_FLAGS --top-module NESSystemRefactored"
 
 case "$MODE" in

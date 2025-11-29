@@ -285,8 +285,8 @@ public:
                     printf("   [MEM READ] Addr=0x%04X Data=0x%02X (PPU Reg)\n", memAddr, memDataIn);
                 }
                 
-                // 检测 PC 是否卡死
-                if (pc == last_pc) {
+                // 检测 PC 是否卡死 (但在 reset 期间跳过)
+                if (pc == last_pc && state != 0) {  // state=0 is Reset
                     stuck_count++;
                     
                     // 如果在等待 VBlank，允许更长时间
@@ -562,6 +562,7 @@ int main(int argc, char** argv) {
     dut->io_chrLoadEn = 0;
     
     std::cout << "🔄 释放 Reset，CPU 启动中..." << std::endl;
+    std::cout << "   Reset signal = " << (int)dut->reset << std::endl;
     
     // CPU reset 序列 - 需要足够周期完成 Reset Vector 读取
     for (int i = 0; i < 50; i++) {
@@ -569,6 +570,13 @@ int main(int argc, char** argv) {
         dut->eval();
         dut->clock = 1;
         dut->eval();
+        
+        if (i < 10 || i % 10 == 0) {
+            std::cout << "   Cycle " << i << ": State=" << (int)dut->io_debug_cpuState 
+                      << " Cycle=" << (int)dut->io_debug_cpuCycle
+                      << " PC=0x" << std::hex << dut->io_debug_cpuPC << std::dec
+                      << " Reset=" << (int)dut->reset << std::endl;
+        }
     }
     
     std::cout << "✅ CPU 已启动，PC = 0x" << std::hex << dut->io_debug_cpuPC << std::dec << std::endl;

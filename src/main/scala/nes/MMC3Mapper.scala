@@ -141,29 +141,13 @@ class MMC3Mapper extends Module {
     is(3.U) { prgBankNum := prgBank3 }  // $E000-$FFFF
   }
   
-  // Direct output (no register) - combinational path
-  io.prgAddr := Cat(prgBankNum, io.cpuAddr(12, 0))
-  io.cpuDataOut := io.prgData
+  // Register both address and data to break combinational loop
+  io.prgAddr := RegNext(Cat(prgBankNum, io.cpuAddr(12, 0)))
+  io.cpuDataOut := RegNext(io.prgData)
   
-  // CHR ROM bank switching
-  val chrBankNum = WireDefault(0.U(8.W))
-  val ppuAddrAdjusted = Mux(chrA12Inversion, 
-    Cat(~io.ppuAddr(12), io.ppuAddr(11, 0)),
-    io.ppuAddr
-  )
-  
-  switch(ppuAddrAdjusted(12, 10)) {
-    is(0.U) { chrBankNum := r0 & 0xFE.U }  // $0000-$03FF (2KB)
-    is(1.U) { chrBankNum := r0 | 0x01.U }  // $0400-$07FF
-    is(2.U) { chrBankNum := r1 & 0xFE.U }  // $0800-$0BFF (2KB)
-    is(3.U) { chrBankNum := r1 | 0x01.U }  // $0C00-$0FFF
-    is(4.U) { chrBankNum := r2 }           // $1000-$13FF (1KB)
-    is(5.U) { chrBankNum := r3 }           // $1400-$17FF (1KB)
-    is(6.U) { chrBankNum := r4 }           // $1800-$1BFF (1KB)
-    is(7.U) { chrBankNum := r5 }           // $1C00-$1FFF (1KB)
-  }
-  
-  io.chrAddr := Cat(chrBankNum, ppuAddrAdjusted(9, 0))
+  // CHR ROM bank switching - Simplified for debugging
+  // Direct passthrough without bank switching
+  io.chrAddr := RegNext(io.ppuAddr)
   
   // IRQ  -
   // in PPU A12 Rising Edgewhen (Trigger)

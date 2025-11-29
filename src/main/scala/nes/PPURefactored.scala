@@ -120,8 +120,8 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
   
   io.nmiOut := nmiTrigger
   
-  // CHR ROM (8KB)
-  val chrRom = SyncReadMem(8192, UInt(8.W))
+  // CHR ROM (8KB) - Use Mem (async) to avoid combinational loops
+  val chrRom = Mem(8192, UInt(8.W))
   when(io.chrLoadEn) {
     chrRom.write(io.chrLoadAddr, io.chrLoadData)
   }
@@ -134,8 +134,8 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
     0x08.U, 0x3A.U, 0x00.U, 0x02.U, 0x00.U, 0x20.U, 0x2C.U, 0x08.U
   )))
   
-  // RAM (2KB)
-  val nametableRam = SyncReadMem(2048, UInt(8.W))
+  // RAM (2KB) - Use Mem (async) to avoid combinational loops
+  val nametableRam = Mem(2048, UInt(8.W))
   
   // Nametable Write ( PPUDATA $2007)
   when(io.cpuWrite && io.cpuAddr === 7.U) {  // PPUDATA
