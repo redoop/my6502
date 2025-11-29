@@ -7,7 +7,7 @@ ROM="${2:-games/Donkey-Kong.nes}"
 case "$MODE" in
     opcodes)
         echo "🔍 分析 ROM 指令..."
-        python3 scripts/analyze_opcodes.py "$ROM"
+        python3 scripts/python/rom_analyzer.py "$ROM"
         ;;
     
     vcd)
@@ -17,12 +17,12 @@ case "$MODE" in
             echo "请先运行: ./scripts/build.sh trace && ./scripts/run.sh"
             exit 1
         fi
-        python3 scripts/analyze_vcd.py nes_trace.vcd
+        python3 scripts/python/vcd_analyzer.py nes_trace.vcd
         ;;
     
     transistors)
         echo "🔍 分析晶体管数量..."
-        python3 scripts/count_transistors.py generated/nes/NESSystem.v
+        python3 scripts/python/transistor_counter.py generated/nes/NESSystem.v
         ;;
     
     execution)
@@ -31,7 +31,7 @@ case "$MODE" in
             echo "❌ VCD 文件不存在"
             exit 1
         fi
-        python3 scripts/analyze_execution.py nes_trace.vcd
+        python3 scripts/python/execution_tracer.py nes_trace.vcd
         ;;
     
     monitor)
