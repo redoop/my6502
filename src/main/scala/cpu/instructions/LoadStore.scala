@@ -21,29 +21,43 @@ object LoadStoreInstructions {
                 indirectXOpcodes ++ indirectYOpcodes
   
   // 立即寻址 (LDA, LDX, LDY)
-  def executeImmediate(opcode: UInt, regs: Registers, memDataIn: UInt): ExecutionResult = {
+  def executeImmediate(opcode: UInt, cycle: UInt, regs: Registers, memDataIn: UInt): ExecutionResult = {
     val result = Wire(new ExecutionResult)
     val newRegs = Wire(new Registers)
     newRegs := regs
     
-    switch(opcode) {
-      is(0xA9.U) { newRegs.a := memDataIn }  // LDA
-      is(0xA2.U) { newRegs.x := memDataIn }  // LDX
-      is(0xA0.U) { newRegs.y := memDataIn }  // LDY
-    }
-    
-    newRegs.flagN := memDataIn(7)
-    newRegs.flagZ := memDataIn === 0.U
-    newRegs.pc := regs.pc + 1.U
-    
-    result.done := true.B
+    // 默认值 - 必须初始化所有字段
+    result.done := false.B
     result.nextCycle := 0.U
-    result.regs := newRegs
-    result.memAddr := regs.pc
+    result.regs := regs
+    result.memAddr := 0.U
     result.memData := 0.U
     result.memWrite := false.B
-    result.memRead := true.B
+    result.memRead := false.B
     result.operand := 0.U
+    
+    when(cycle === 0.U) {
+      // Cycle 0: 读取立即数
+      result.memAddr := regs.pc
+      result.memRead := true.B
+      result.nextCycle := 1.U
+    }.otherwise {
+      // Cycle 1: 执行指令
+      switch(opcode) {
+        is(0xA9.U) { newRegs.a := memDataIn }  // LDA
+        is(0xA2.U) { newRegs.x := memDataIn }  // LDX
+        is(0xA0.U) { newRegs.y := memDataIn }  // LDY
+      }
+      
+      newRegs.flagN := memDataIn(7)
+      newRegs.flagZ := memDataIn === 0.U
+      newRegs.pc := regs.pc + 1.U
+      
+      result.done := true.B
+      result.regs := newRegs
+      result.memAddr := regs.pc
+    }
+    
     result
   }
   

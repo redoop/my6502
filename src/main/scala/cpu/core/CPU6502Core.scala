@@ -22,7 +22,7 @@ class CPU6502Core extends Module {
   
   // CPU 状态机
   val sReset :: sFetch :: sExecute :: sNMI :: sDone :: Nil = Enum(5)
-  val state = RegInit(sFetch)  // 默认从 Fetch 开始，只有显式 reset 才进入 sReset
+  val state = RegInit(sReset)  // 从 Reset 开始，读取 Reset 向量
   
   val opcode  = RegInit(0.U(8.W))
   val operand = RegInit(0.U(16.W))
@@ -113,16 +113,27 @@ class CPU6502Core extends Module {
             cycle := 0.U
             state := sNMI
           }.otherwise {
-            io.memAddr := regs.pc
-            io.memRead := true.B
-            opcode := io.memDataIn
-            regs.pc := regs.pc + 1.U
-            cycle := 0.U
-            state := sExecute
+            // Fetch 需要 2 个周期来处理 SyncReadMem 的延迟
+            when(cycle === 0.U) {
+              // 周期 0: 发出读请求
+              io.memAddr := regs.pc
+              io.memRead := true.B
+              cycle := 1.U
+            }.otherwise {
+              // 周期 1: 读取数据并进入 Execute
+              io.memAddr := regs.pc
+              io.memRead := true.B
+              opcode := io.memDataIn
+              regs.pc := regs.pc + 1.U
+              cycle := 0.U
+              printf("[Fetch→Execute] opcode=0x%x PC=0x%x\n", io.memDataIn, regs.pc)
+              state := sExecute
+            }
           }
         }
 
         is(sExecute) {
+          printf("[Execute] opcode=0x%x cycle=%d\n", opcode, cycle)
           // 根据 opcode 分发到对应指令模块
           execResult := dispatchInstruction(opcode, cycle, regs, operand, io.memDataIn)
           
@@ -403,7 +414,8 @@ class CPU6502Core extends Module {
       
       // ========== LoadStore 立即寻址 ==========
       is(0xA9.U, 0xA2.U, 0xA0.U) {
-        result := LoadStoreInstructions.executeImmediate(opcode, regs, memDataIn)
+        printf("[Dispatch] LDA/LDX/LDY immediate: opcode=0x%x cycle=%d\n", opcode, cycle)
+        result := LoadStoreInstructions.executeImmediate(opcode, cycle, regs, memDataIn)
       }
       
       // ========== LoadStore 零页 ==========

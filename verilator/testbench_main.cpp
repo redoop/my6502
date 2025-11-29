@@ -181,12 +181,65 @@ public:
     }
     
     void tick() {
+        // 更新控制器状态（每个 tick 都更新）
+        dut->io_controller1 = controller1;
+        dut->io_controller2 = controller2;
+        
         dut->clock = 0;
         dut->eval();
         cycle_count++;
         
         dut->clock = 1;
         dut->eval();
+        
+        // 监控 PPUCTRL 写入 (每次变化时打印)
+        static uint8_t last_ppuctrl = 0;
+        uint8_t ppuctrl = dut->io_debug_ppuCtrl;
+        if (ppuctrl != last_ppuctrl) {
+            printf("\n🎨 PPUCTRL 变化: 0x%02X -> 0x%02X (Cycle %llu, PC=0x%04X)\n",
+                   last_ppuctrl, ppuctrl, (unsigned long long)cycle_count, dut->io_debug_cpuPC);
+            last_ppuctrl = ppuctrl;
+        }
+        
+        // Debug: 每 10000 个周期打印一次 CPU 状态
+        static uint64_t last_debug_cycle = 0;
+        static uint16_t last_pc = 0;
+        static int stuck_count = 0;
+        
+        if (cycle_count - last_debug_cycle >= 10000) {
+            uint16_t pc = dut->io_debug_cpuPC;
+            uint8_t a = dut->io_debug_cpuA;
+            uint8_t x = dut->io_debug_cpuX;
+            uint8_t y = dut->io_debug_cpuY;
+            bool vblank = dut->io_vblank;
+            bool nmi = dut->io_debug_nmi;
+            uint8_t state = dut->io_debug_cpuState;
+            uint8_t cycle = dut->io_debug_cpuCycle;
+            uint8_t opcode = dut->io_debug_cpuOpcode;
+            
+            const char* state_names[] = {"Reset", "Fetch", "Execute", "NMI", "Done"};
+            const char* state_name = (state < 5) ? state_names[state] : "Unknown";
+            
+            printf("\n[Cycle %llu] PC=0x%04X A=0x%02X X=0x%02X Y=0x%02X State=%s(%d) Cycle=%d Opcode=0x%02X VBlank=%d NMI=%d PPUCTRL=0x%02X\n",
+                   (unsigned long long)cycle_count, pc, a, x, y, state_name, state, cycle, opcode, vblank, nmi, ppuctrl);
+            
+            // 检测 PC 是否卡死
+            if (pc == last_pc) {
+                stuck_count++;
+                printf("⚠️  CPU 卡死！PC 没有变化 (连续 %d 次)\n", stuck_count);
+                
+                if (stuck_count >= 3) {
+                    printf("\n🔴 CPU 完全卡死在 State=%s, Cycle=%d, Opcode=0x%02X\n", state_name, cycle, opcode);
+                    printf("   这可能是指令未实现或状态机错误\n");
+                    exit(1);
+                }
+            } else {
+                stuck_count = 0;
+            }
+            
+            last_pc = pc;
+            last_debug_cycle = cycle_count;
+        }
     }
     
     void handleInput() {
@@ -236,12 +289,45 @@ public:
         
         dut->io_controller1 = controller1;
         dut->io_controller2 = controller2;
+        
+        // Debug: 显示控制器状态（当有按键时）
+        static uint8_t last_controller1 = 0;
+        if (controller1 != last_controller1) {
+            printf("\n🎮 Controller1: 0x%02X ", controller1);
+            if (controller1 & 0x01) printf("A ");
+            if (controller1 & 0x02) printf("B ");
+            if (controller1 & 0x04) printf("Select ");
+            if (controller1 & 0x08) printf("Start ");
+            if (controller1 & 0x10) printf("Up ");
+            if (controller1 & 0x20) printf("Down ");
+            if (controller1 & 0x40) printf("Left ");
+            if (controller1 & 0x80) printf("Right ");
+            printf("\n");
+            last_controller1 = controller1;
+        }
     }
     
     void updateDisplay() {
         // 只在可见区域采样像素
         uint16_t x = dut->io_pixelX;
         uint16_t y = dut->io_pixelY;
+        
+        // Debug: 监控 PPU 状态（每秒一次）
+        static uint64_t last_debug_time = 0;
+        static uint16_t last_pixelX = 0;
+        static uint16_t last_pixelY = 0;
+        
+        if (cycle_count % 1000000 == 0) {
+            printf("\n📺 PPU Status: pixelX=%d pixelY=%d vblank=%d\n", 
+                   x, y, dut->io_vblank);
+            
+            // 检查 PPU 是否在运行
+            if (x == last_pixelX && y == last_pixelY) {
+                printf("⚠️  PPU 可能没有运行！像素位置没有变化\n");
+            }
+            last_pixelX = x;
+            last_pixelY = y;
+        }
         
         if (x < 256 && y < 240) {
             uint8_t color = dut->io_pixelColor & 0x3F;

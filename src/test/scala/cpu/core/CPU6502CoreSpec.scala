@@ -7,8 +7,17 @@ import org.scalatest.flatspec.AnyFlatSpec
 class CPU6502CoreSpec extends AnyFlatSpec with ChiselScalatestTester {
   behavior of "CPU6502Core Integration"
 
+  // Helper: Wait for Reset sequence (6 cycles)
+  def waitForReset(dut: CPU6502Core, resetVector: Int = 0x0000): Unit = {
+    dut.io.memDataIn.poke((resetVector & 0xFF).U)
+    dut.clock.step(3)
+    dut.io.memDataIn.poke(((resetVector >> 8) & 0xFF).U)
+    dut.clock.step(3)
+  }
+
   it should "execute NOP instruction" in {
     test(new CPU6502Core) { dut =>
+      waitForReset(dut)
       // Fetch NOP (0xEA)
       dut.io.memDataIn.poke(0xEA.U)
       dut.clock.step()
@@ -23,6 +32,7 @@ class CPU6502CoreSpec extends AnyFlatSpec with ChiselScalatestTester {
 
   it should "execute LDA immediate" in {
     test(new CPU6502Core) { dut =>
+      waitForReset(dut)
       // Fetch LDA #$42
       dut.io.memDataIn.poke(0xA9.U)
       dut.clock.step()
@@ -40,6 +50,7 @@ class CPU6502CoreSpec extends AnyFlatSpec with ChiselScalatestTester {
 
   it should "execute INX instruction" in {
     test(new CPU6502Core) { dut =>
+      waitForReset(dut)
       // Fetch INX (0xE8)
       dut.io.memDataIn.poke(0xE8.U)
       dut.clock.step()
@@ -54,6 +65,7 @@ class CPU6502CoreSpec extends AnyFlatSpec with ChiselScalatestTester {
 
   it should "execute TAX instruction" in {
     test(new CPU6502Core) { dut =>
+      waitForReset(dut)
       // First load A with LDA #$55
       dut.io.memDataIn.poke(0xA9.U)
       dut.clock.step()
@@ -73,6 +85,7 @@ class CPU6502CoreSpec extends AnyFlatSpec with ChiselScalatestTester {
 
   it should "execute CLC instruction" in {
     test(new CPU6502Core) { dut =>
+      waitForReset(dut)
       // Fetch CLC (0x18)
       dut.io.memDataIn.poke(0x18.U)
       dut.clock.step()
@@ -87,7 +100,8 @@ class CPU6502CoreSpec extends AnyFlatSpec with ChiselScalatestTester {
 
   it should "update PC correctly" in {
     test(new CPU6502Core) { dut =>
-      // Initial PC should be 0
+      waitForReset(dut)
+      // PC should be 0 after reset
       dut.io.debug.regPC.expect(0.U)
       
       // Fetch NOP
@@ -107,6 +121,7 @@ class CPU6502CoreSpec extends AnyFlatSpec with ChiselScalatestTester {
 
   it should "execute simple program: LDA #$10, INX, TAX" in {
     test(new CPU6502Core) { dut =>
+      waitForReset(dut)
       // LDA #$10
       dut.io.memDataIn.poke(0xA9.U)
       dut.clock.step()
