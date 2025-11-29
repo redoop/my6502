@@ -55,12 +55,53 @@ logic [7:0]  palette[0:31];    // Palette RAM
 
 // Initialize VRAM with test pattern
 initial begin
-    for (int i = 0; i < 2048; i++) begin
-        vram[i] = i[7:0];  // Simple pattern
+    // Fill nametable with tile pattern
+    for (int i = 0; i < 960; i++) begin
+        vram[i] = (i[4:0] + i[9:5]) & 8'hFF;
     end
-    for (int i = 0; i < 256; i++) begin
-        oam[i] = 8'hFF;  // Hide all sprites initially
+    // Fill attribute table
+    for (int i = 960; i < 1024; i++) begin
+        vram[i] = 8'hE4;
     end
+    
+    // Initialize test sprites
+    // Sprite 0 - at (64, 64)
+    oam[0] = 8'd64;   // Y position
+    oam[1] = 8'h01;   // Tile index
+    oam[2] = 8'h00;   // Attributes (palette 0)
+    oam[3] = 8'd64;   // X position
+    
+    // Sprite 1 - at (64, 96)
+    oam[4] = 8'd64;
+    oam[5] = 8'h02;
+    oam[6] = 8'h01;   // Palette 1
+    oam[7] = 8'd96;
+    
+    // Sprite 2 - at (96, 64)
+    oam[8] = 8'd96;
+    oam[9] = 8'h03;
+    oam[10] = 8'h02;  // Palette 2
+    oam[11] = 8'd64;
+    
+    // Hide remaining sprites
+    for (int i = 12; i < 256; i++) begin
+        oam[i] = 8'hFF;
+    end
+    
+    // Initialize palette
+    palette[0] = 8'h0F;  // Universal background
+    
+    // Background palettes (0-3)
+    palette[1] = 8'h30;  palette[2] = 8'h10;  palette[3] = 8'h00;
+    palette[5] = 8'h16;  palette[6] = 8'h26;  palette[7] = 8'h06;
+    palette[9] = 8'h11;  palette[10] = 8'h21; palette[11] = 8'h01;
+    palette[13] = 8'h27; palette[14] = 8'h28; palette[15] = 8'h17;
+    
+    // Sprite palettes (4-7)
+    palette[17] = 8'h30; palette[18] = 8'h27; palette[19] = 8'h16; // Palette 4 (white/orange/red)
+    palette[21] = 8'h11; palette[22] = 8'h21; palette[23] = 8'h31; // Palette 5 (blue/cyan/light)
+    palette[25] = 8'h1A; palette[26] = 8'h2A; palette[27] = 8'h3A; // Palette 6 (green)
+    palette[29] = 8'h28; palette[30] = 8'h38; palette[31] = 8'h18; // Palette 7 (yellow)
 end
 
 // PPU registers
@@ -136,11 +177,6 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
         ppuaddr <= 0;
         ppuaddr_latch <= 0;
         dma_active <= 0;
-        // Initialize palette with default NES colors
-        palette[0] <= 8'h0F; // Black background
-        palette[1] <= 8'h00;
-        palette[2] <= 8'h10;
-        palette[3] <= 8'h20;
     end else if (!cpu_rw) begin
         casez (cpu_addr)
             16'b0001????????????: ram[cpu_addr[10:0]] <= cpu_data_out;
@@ -268,189 +304,207 @@ assign video_hsync = (dot >= 280 && dot < 304);
 assign video_vsync = (scanline >= 243 && scanline < 246);
 assign video_de = (scanline < 240) && (dot < 256);
 
-// PPU rendering pipeline
+// PPU rendering - with sprite support
 logic [7:0] tile_index;
-logic [7:0] pattern_low, pattern_high;
-logic [1:0] bg_pixel, sprite_pixel;
-logic [4:0] bg_palette, sprite_palette;
-logic [5:0] color_index;
+logic [7:0] attr_byte;
+logic [1:0] attr_bits;
+logic [7:0] pattern_lo_reg, pattern_hi_reg;
+logic [1:0] pixel_value;
+logic [4:0] bg_palette_idx;
 logic [4:0] tile_x, tile_y;
-logic [9:0] nt_addr;
-logic [2:0] fine_x, fine_y;
-logic [13:0] pattern_addr_low, pattern_addr_high;
-logic sprite_priority, sprite_found;
+logic [9:0] attr_addr;
+logic [13:0] chr_addr_out;
+
+// Sprite rendering
+logic [7:0] sprite_y, sprite_tile, sprite_attr, sprite_x;
+logic [7:0] sprite_pattern_lo, sprite_pattern_hi;
+logic [1:0] sprite_pixel;
+logic [4:0] sprite_palette_idx;
+logic sprite_active;
+logic [5:0] sprite_idx;
+
+// Cache pattern data
+always_ff @(posedge ppu_clk) begin
+    if (scanline < 240) begin
+        if (dot[2:0] == 3'd5) begin
+            pattern_lo_reg <= chr_rom_data;
+        end else if (dot[2:0] == 3'd7) begin
+            pattern_hi_reg <= chr_rom_data;
+        end
+    end
+end
+
+// Sprite evaluation - check all 64 sprites
+always_comb begin
+    sprite_active = 0;
+    sprite_pixel = 0;
+    sprite_palette_idx = 0;
+    sprite_pattern_lo = 0;
+    sprite_pattern_hi = 0;
+    
+    // Scan sprites (simplified - check first 8)
+    for (int i = 0; i < 8; i++) begin
+        sprite_y = oam[i * 4 + 0];
+        sprite_tile = oam[i * 4 + 1];
+        sprite_attr = oam[i * 4 + 2];
+        sprite_x = oam[i * 4 + 3];
+        
+        // Check if sprite is on current scanline
+        if (scanline >= sprite_y && scanline < sprite_y + 8) begin
+            // Check if sprite is at current X position
+            if (dot >= sprite_x && dot < sprite_x + 8) begin
+                sprite_active = 1;
+                
+                // Get sprite pattern (simplified - use same as background)
+                sprite_pattern_lo = chr_rom_data;
+                sprite_pattern_hi = chr_rom_data;
+                
+                // Extract pixel
+                sprite_pixel = {sprite_pattern_hi[7-(dot-sprite_x)], 
+                               sprite_pattern_lo[7-(dot-sprite_x)]};
+                
+                // Sprite palette (4-7)
+                if (sprite_pixel != 0) begin
+                    sprite_palette_idx = {1'b1, sprite_attr[1:0], sprite_pixel};
+                end
+                
+                break;  // Use first sprite found
+            end
+        end
+    end
+end
 
 // Background rendering
-always_ff @(posedge ppu_clk) begin
-    if (scanline < 240 && dot < 256 && (ppumask[3] || ppumask[4])) begin
-        // Calculate tile coordinates
-        tile_x = (dot[7:3] + ppuscroll_x[7:3]) & 5'h1F;
-        tile_y = (scanline[7:3] + ppuscroll_y[7:3]) & 5'h1F;
-        nt_addr = {tile_y, tile_x};
-        
-        // Fetch tile index
-        tile_index = vram[nt_addr];
-        
-        // Calculate pattern address
-        fine_y = scanline[2:0];
-        pattern_addr_low = {ppuctrl[4], tile_index, 1'b0, fine_y};
-        pattern_addr_high = {ppuctrl[4], tile_index, 1'b1, fine_y};
-        
-        // Fetch both pattern planes from CHR ROM
-        pattern_low = chr_rom_data;
-        pattern_high = chr_rom_data;
-        
-        // Get pixel
-        fine_x = dot[2:0];
-        bg_pixel = {pattern_high[7-fine_x], pattern_low[7-fine_x]};
-        
-        if (bg_pixel == 0) begin
-            bg_palette = 5'h00;
-        end else begin
-            // Use attribute table for palette selection
-            bg_palette = {2'b00, 2'b00, bg_pixel};
-        end
-    end else begin
-        bg_pixel = 0;
-        bg_palette = 5'h00;
-    end
-end
-
-// Sprite rendering (simplified - check first 8 sprites)
-logic [7:0] sprite_y, sprite_tile, sprite_attr, sprite_x;
-logic [2:0] sprite_fine_y, sprite_fine_x;
-logic [13:0] sprite_pattern_addr;
-logic [7:0] sprite_pattern_low;
-
-always_ff @(posedge ppu_clk) begin
-    sprite_found = 0;
-    sprite_pixel = 0;
-    sprite_palette = 0;
-    sprite_priority = 0;
-    
-    if (scanline < 240 && dot < 256 && rendering) begin
-        for (int i = 0; i < 8; i++) begin
-            sprite_y = oam[i*4];
-            sprite_tile = oam[i*4 + 1];
-            sprite_attr = oam[i*4 + 2];
-            sprite_x = oam[i*4 + 3];
-            
-            // Check if sprite is on current scanline
-            if (scanline >= sprite_y && scanline < sprite_y + 8) begin
-                // Check if sprite is at current dot
-                if (dot >= sprite_x && dot < sprite_x + 8) begin
-                    sprite_fine_y = scanline - sprite_y;
-                    sprite_fine_x = dot - sprite_x;
-                    
-                    // Flip if needed
-                    if (sprite_attr[7]) sprite_fine_y = 7 - sprite_fine_y;
-                    if (sprite_attr[6]) sprite_fine_x = 7 - sprite_fine_x;
-                    
-                    // Fetch sprite pattern
-                    sprite_pattern_addr = {ppuctrl[3], sprite_tile, 1'b0, sprite_fine_y};
-                    sprite_pattern_low = chr_rom_data;
-                    
-                    sprite_pixel = {sprite_pattern_low[7-sprite_fine_x], sprite_pattern_low[7-sprite_fine_x]};
-                    
-                    if (sprite_pixel != 0 && !sprite_found) begin
-                        sprite_found = 1;
-                        sprite_palette = {1'b1, sprite_attr[1:0], sprite_pixel};
-                        sprite_priority = sprite_attr[5];
-                    end
-                end
-            end
-        end
-    end
-end
-
-// Pixel multiplexer
 always_comb begin
     if (scanline < 240 && dot < 256) begin
-        // Priority: sprite behind background, or sprite in front
-        if (sprite_found && (sprite_pixel != 0)) begin
-            if (bg_pixel == 0 || !sprite_priority) begin
-                color_index = palette[sprite_palette][5:0];
-            end else begin
-                color_index = palette[bg_palette][5:0];
-            end
-        end else if (bg_pixel != 0) begin
-            color_index = palette[bg_palette][5:0];
+        tile_x = dot[7:3];
+        tile_y = scanline[7:3];
+        
+        tile_index = vram[{tile_y, tile_x}];
+        
+        attr_addr = 10'h3C0 | {tile_y[4:2], tile_x[4:2]};
+        attr_byte = vram[attr_addr];
+        
+        case ({tile_y[1], tile_x[1]})
+            2'b00: attr_bits = attr_byte[1:0];
+            2'b01: attr_bits = attr_byte[3:2];
+            2'b10: attr_bits = attr_byte[5:4];
+            2'b11: attr_bits = attr_byte[7:6];
+        endcase
+        
+        if (dot[2:0] == 3'd5) begin
+            chr_addr_out = {ppuctrl[4], tile_index, 1'b0, scanline[2:0]};
+        end else if (dot[2:0] == 3'd7) begin
+            chr_addr_out = {ppuctrl[4], tile_index, 1'b1, scanline[2:0]};
         end else begin
-            color_index = palette[0][5:0];  // Background color
+            chr_addr_out = {ppuctrl[4], tile_index, 1'b0, scanline[2:0]};
+        end
+        
+        pixel_value = {pattern_hi_reg[7-dot[2:0]], pattern_lo_reg[7-dot[2:0]]};
+        
+        if (pixel_value == 0) begin
+            bg_palette_idx = 5'h00;
+        end else begin
+            bg_palette_idx = {1'b0, attr_bits, pixel_value};
         end
     end else begin
-        color_index = 6'h0F;  // Black during blanking
+        chr_addr_out = ppuaddr[13:0];
+        bg_palette_idx = 5'h00;
     end
 end
 
-// NES palette to RGB
+// NES palette lookup - with sprite support
+logic [23:0] nes_color;
+logic [4:0] final_palette_idx;
+
 always_comb begin
-    case (color_index)
-        6'h00: {video_r, video_g, video_b} = 24'h545454;
-        6'h01: {video_r, video_g, video_b} = 24'h001E74;
-        6'h02: {video_r, video_g, video_b} = 24'h081090;
-        6'h03: {video_r, video_g, video_b} = 24'h200A68;
-        6'h04: {video_r, video_g, video_b} = 24'h440044;
-        6'h05: {video_r, video_g, video_b} = 24'h5C0014;
-        6'h06: {video_r, video_g, video_b} = 24'h540400;
-        6'h07: {video_r, video_g, video_b} = 24'h3C1800;
-        6'h08: {video_r, video_g, video_b} = 24'h202A00;
-        6'h09: {video_r, video_g, video_b} = 24'h083A00;
-        6'h0A: {video_r, video_g, video_b} = 24'h004000;
-        6'h0B: {video_r, video_g, video_b} = 24'h003C00;
-        6'h0C: {video_r, video_g, video_b} = 24'h00323C;
-        6'h0D: {video_r, video_g, video_b} = 24'h000000;
-        6'h0E: {video_r, video_g, video_b} = 24'h000000;
-        6'h0F: {video_r, video_g, video_b} = 24'h000000;
-        6'h10: {video_r, video_g, video_b} = 24'h989698;
-        6'h11: {video_r, video_g, video_b} = 24'h084DB4;
-        6'h12: {video_r, video_g, video_b} = 24'h3030EC;
-        6'h13: {video_r, video_g, video_b} = 24'h5C1EE4;
-        6'h14: {video_r, video_g, video_b} = 24'h8814B0;
-        6'h15: {video_r, video_g, video_b} = 24'hA01464;
-        6'h16: {video_r, video_g, video_b} = 24'h982220;
-        6'h17: {video_r, video_g, video_b} = 24'h783C00;
-        6'h18: {video_r, video_g, video_b} = 24'h545A00;
-        6'h19: {video_r, video_g, video_b} = 24'h287200;
-        6'h1A: {video_r, video_g, video_b} = 24'h087C00;
-        6'h1B: {video_r, video_g, video_b} = 24'h007628;
-        6'h1C: {video_r, video_g, video_b} = 24'h006678;
-        6'h1D: {video_r, video_g, video_b} = 24'h000000;
-        6'h1E: {video_r, video_g, video_b} = 24'h000000;
-        6'h1F: {video_r, video_g, video_b} = 24'h000000;
-        6'h20: {video_r, video_g, video_b} = 24'hECEEEC;
-        6'h21: {video_r, video_g, video_b} = 24'h4C9AEC;
-        6'h22: {video_r, video_g, video_b} = 24'h787CEC;
-        6'h23: {video_r, video_g, video_b} = 24'hB062EC;
-        6'h24: {video_r, video_g, video_b} = 24'hE454EC;
-        6'h25: {video_r, video_g, video_b} = 24'hEC58B4;
-        6'h26: {video_r, video_g, video_b} = 24'hEC6A64;
-        6'h27: {video_r, video_g, video_b} = 24'hD48820;
-        6'h28: {video_r, video_g, video_b} = 24'hA0AA00;
-        6'h29: {video_r, video_g, video_b} = 24'h74C400;
-        6'h2A: {video_r, video_g, video_b} = 24'h4CD020;
-        6'h2B: {video_r, video_g, video_b} = 24'h38CC6C;
-        6'h2C: {video_r, video_g, video_b} = 24'h38B4CC;
-        6'h2D: {video_r, video_g, video_b} = 24'h3C3C3C;
-        6'h2E: {video_r, video_g, video_b} = 24'h000000;
-        6'h2F: {video_r, video_g, video_b} = 24'h000000;
-        6'h30: {video_r, video_g, video_b} = 24'hECEEEC;
-        6'h31: {video_r, video_g, video_b} = 24'hA8CCEC;
-        6'h32: {video_r, video_g, video_b} = 24'hBCBCEC;
-        6'h33: {video_r, video_g, video_b} = 24'hD4B2EC;
-        6'h34: {video_r, video_g, video_b} = 24'hECAEEC;
-        6'h35: {video_r, video_g, video_b} = 24'hECAED4;
-        6'h36: {video_r, video_g, video_b} = 24'hECB4B0;
-        6'h37: {video_r, video_g, video_b} = 24'hE4C490;
-        6'h38: {video_r, video_g, video_b} = 24'hCCD278;
-        6'h39: {video_r, video_g, video_b} = 24'hB4DE78;
-        6'h3A: {video_r, video_g, video_b} = 24'hA8E290;
-        6'h3B: {video_r, video_g, video_b} = 24'h98E2B4;
-        6'h3C: {video_r, video_g, video_b} = 24'hA0D6E4;
-        6'h3D: {video_r, video_g, video_b} = 24'hA0A2A0;
-        6'h3E: {video_r, video_g, video_b} = 24'h000000;
-        6'h3F: {video_r, video_g, video_b} = 24'h000000;
+    // Sprite has priority over background (if not transparent)
+    if (sprite_active && sprite_pixel != 0) begin
+        final_palette_idx = sprite_palette_idx;
+    end else begin
+        final_palette_idx = bg_palette_idx;
+    end
+    
+    // Use palette index directly as NES color
+    case (final_palette_idx[5:0])
+        6'h00: nes_color = 24'h545454;
+        6'h01: nes_color = 24'h001E74;
+        6'h02: nes_color = 24'h081090;
+        6'h03: nes_color = 24'h300088;
+        6'h04: nes_color = 24'h440064;
+        6'h05: nes_color = 24'h5C0030;
+        6'h06: nes_color = 24'h540400;
+        6'h07: nes_color = 24'h3C1800;
+        6'h08: nes_color = 24'h202A00;
+        6'h09: nes_color = 24'h083A00;
+        6'h0A: nes_color = 24'h004000;
+        6'h0B: nes_color = 24'h003C22;
+        6'h0C: nes_color = 24'h00325D;
+        6'h0D: nes_color = 24'h000000;
+        6'h0E: nes_color = 24'h000000;
+        6'h0F: nes_color = 24'h000000;
+        6'h10: nes_color = 24'h989698;
+        6'h11: nes_color = 24'h084CC4;
+        6'h12: nes_color = 24'h3032EC;
+        6'h13: nes_color = 24'h5C1EE4;
+        6'h14: nes_color = 24'h8814B0;
+        6'h15: nes_color = 24'hA01464;
+        6'h16: nes_color = 24'h982220;
+        6'h17: nes_color = 24'h783C00;
+        6'h18: nes_color = 24'h545A00;
+        6'h19: nes_color = 24'h287200;
+        6'h1A: nes_color = 24'h087C00;
+        6'h1B: nes_color = 24'h007628;
+        6'h1C: nes_color = 24'h006678;
+        6'h1D: nes_color = 24'h000000;
+        6'h1E: nes_color = 24'h000000;
+        6'h1F: nes_color = 24'h000000;
+        6'h20: nes_color = 24'hECEEEC;
+        6'h21: nes_color = 24'h4C9AEC;
+        6'h22: nes_color = 24'h787CEC;
+        6'h23: nes_color = 24'hB062EC;
+        6'h24: nes_color = 24'hE454EC;
+        6'h25: nes_color = 24'hEC58B4;
+        6'h26: nes_color = 24'hEC6A64;
+        6'h27: nes_color = 24'hD48820;
+        6'h28: nes_color = 24'hA0AA00;
+        6'h29: nes_color = 24'h74C400;
+        6'h2A: nes_color = 24'h4CD020;
+        6'h2B: nes_color = 24'h38CC6C;
+        6'h2C: nes_color = 24'h38B4CC;
+        6'h2D: nes_color = 24'h3C3C3C;
+        6'h2E: nes_color = 24'h000000;
+        6'h2F: nes_color = 24'h000000;
+        6'h30: nes_color = 24'hECEEEC;
+        6'h31: nes_color = 24'hA8CCEC;
+        6'h32: nes_color = 24'hBCBCEC;
+        6'h33: nes_color = 24'hD4B2EC;
+        6'h34: nes_color = 24'hECAEEC;
+        6'h35: nes_color = 24'hECAED4;
+        6'h36: nes_color = 24'hECB4B0;
+        6'h37: nes_color = 24'hE4C490;
+        6'h38: nes_color = 24'hCCD278;
+        6'h39: nes_color = 24'hB4DE78;
+        6'h3A: nes_color = 24'hA8E290;
+        6'h3B: nes_color = 24'h98E2B4;
+        6'h3C: nes_color = 24'hA0D6E4;
+        6'h3D: nes_color = 24'hA0A2A0;
+        6'h3E: nes_color = 24'h000000;
+        6'h3F: nes_color = 24'h000000;
     endcase
+end
+
+// Video output
+always_comb begin
+    if (scanline < 240 && dot < 256) begin
+        video_r = nes_color[23:16];
+        video_g = nes_color[15:8];
+        video_b = nes_color[7:0];
+    end else begin
+        video_r = 8'h00;
+        video_g = 8'h00;
+        video_b = 8'h00;
+    end
 end
 
 //=============================================================================
@@ -466,7 +520,6 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
         pulse1_out <= 0;
     end else begin
         audio_counter <= audio_counter + 1;
-        // 440Hz square wave: toggle every 2034 cycles (1.79MHz / 440Hz / 2)
         if (audio_counter >= 2034) begin
             audio_counter <= 0;
             pulse1_out <= ~pulse1_out[15] ? 16'h2000 : 16'h0000;
@@ -474,7 +527,6 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
     end
 end
 
-// Output audio
 assign audio_l = pulse1_out;
 assign audio_r = pulse1_out;
 
@@ -482,16 +534,14 @@ assign audio_r = pulse1_out;
 // Cartridge Interface (Mapper 0 - NROM)
 //=============================================================================
 always_comb begin
-    // PRG ROM mapping (16KB or 32KB)
     if (cpu_addr >= 16'h8000) begin
-        // Map to PRG ROM, with mirroring for 16KB ROMs
-        prg_rom_addr = cpu_addr[14:0] & 15'h3FFF;  // Mirror if 16KB
+        prg_rom_addr = cpu_addr[13:0];
     end else begin
-        prg_rom_addr = 15'h0000;
+        prg_rom_addr = 14'h0000;
     end
 end
 
-assign chr_rom_addr = ppuaddr[13:0];
+assign chr_rom_addr = chr_addr_out;
 
 endmodule
 
@@ -529,6 +579,10 @@ logic [7:0] opcode, operand, alu_result;
 logic [15:0] ea;  // Effective address
 logic [2:0] cycle_count;
 logic [15:0] reset_vector;
+
+// Temporary variables for ALU operations
+logic [8:0] temp_sum, temp_diff;
+logic [7:0] temp_result;
 
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -603,133 +657,119 @@ always_ff @(posedge clk or negedge rst_n) begin
                     
                     // ADC
                     8'h69: begin
-                        logic [8:0] sum;
-                        sum = A + operand + C;
-                        C <= sum[8];
-                        A <= sum[7:0];
-                        Z <= (sum[7:0] == 0);
-                        N <= sum[7];
-                        V <= (A[7] == operand[7]) && (A[7] != sum[7]);
+                        temp_sum = A + operand + C;
+                        C <= temp_sum[8];
+                        A <= temp_sum[7:0];
+                        Z <= (temp_sum[7:0] == 0);
+                        N <= temp_sum[7];
+                        V <= (A[7] == operand[7]) && (A[7] != temp_sum[7]);
                     end
                     
                     // SBC
                     8'hE9: begin
-                        logic [8:0] diff;
-                        diff = A - operand - !C;
-                        C <= !diff[8];
-                        A <= diff[7:0];
-                        Z <= (diff[7:0] == 0);
-                        N <= diff[7];
+                        temp_diff = A - operand - !C;
+                        C <= !temp_diff[8];
+                        A <= temp_diff[7:0];
+                        Z <= (temp_diff[7:0] == 0);
+                        N <= temp_diff[7];
                     end
                     
                     // AND
                     8'h29: begin
-                        logic [7:0] result;
-                        result = A & operand;
-                        A <= result;
-                        Z <= (result == 0);
-                        N <= result[7];
+                        temp_result = A & operand;
+                        A <= temp_result;
+                        Z <= (temp_result == 0);
+                        N <= temp_result[7];
                     end
                     
                     // ORA
                     8'h09: begin
-                        logic [7:0] result;
-                        result = A | operand;
-                        A <= result;
-                        Z <= (result == 0);
-                        N <= result[7];
+                        temp_result = A | operand;
+                        A <= temp_result;
+                        Z <= (temp_result == 0);
+                        N <= temp_result[7];
                     end
                     
                     // EOR
                     8'h49: begin
-                        logic [7:0] result;
-                        result = A ^ operand;
-                        A <= result;
-                        Z <= (result == 0);
-                        N <= result[7];
+                        temp_result = A ^ operand;
+                        A <= temp_result;
+                        Z <= (temp_result == 0);
+                        N <= temp_result[7];
                     end
                     
                     // CMP
                     8'hC9: begin
-                        logic [7:0] result;
-                        result = A - operand;
+                        temp_result = A - operand;
                         C <= (A >= operand);
                         Z <= (A == operand);
-                        N <= result[7];
+                        N <= temp_result[7];
                     end
                     
                     // CPX
                     8'hE0: begin
-                        logic [7:0] result;
-                        result = X - operand;
+                        temp_result = X - operand;
                         C <= (X >= operand);
                         Z <= (X == operand);
-                        N <= result[7];
+                        N <= temp_result[7];
                     end
                     
                     // CPY
                     8'hC0: begin
-                        logic [7:0] result;
-                        result = Y - operand;
+                        temp_result = Y - operand;
                         C <= (Y >= operand);
                         Z <= (Y == operand);
-                        N <= result[7];
+                        N <= temp_result[7];
                     end
                     
                     // INC
                     8'hE6: begin
-                        logic [7:0] result;
                         addr <= {8'h00, operand};
-                        result = data_in + 1;
-                        alu_result <= result;
-                        Z <= (result == 0);
-                        N <= result[7];
+                        temp_result = data_in + 1;
+                        alu_result <= temp_result;
+                        Z <= (temp_result == 0);
+                        N <= temp_result[7];
                     end
                     
                     // DEC
                     8'hC6: begin
-                        logic [7:0] result;
                         addr <= {8'h00, operand};
-                        result = data_in - 1;
-                        alu_result <= result;
-                        Z <= (result == 0);
-                        N <= result[7];
+                        temp_result = data_in - 1;
+                        alu_result <= temp_result;
+                        Z <= (temp_result == 0);
+                        N <= temp_result[7];
                     end
                     
                     // INX
                     8'hE8: begin
-                        logic [7:0] result;
-                        result = X + 1;
-                        X <= result;
-                        Z <= (result == 0);
-                        N <= result[7];
+                        temp_result = X + 1;
+                        X <= temp_result;
+                        Z <= (temp_result == 0);
+                        N <= temp_result[7];
                     end
                     
                     // INY
                     8'hC8: begin
-                        logic [7:0] result;
-                        result = Y + 1;
-                        Y <= result;
-                        Z <= (result == 0);
-                        N <= result[7];
+                        temp_result = Y + 1;
+                        Y <= temp_result;
+                        Z <= (temp_result == 0);
+                        N <= temp_result[7];
                     end
                     
                     // DEX
                     8'hCA: begin
-                        logic [7:0] result;
-                        result = X - 1;
-                        X <= result;
-                        Z <= (result == 0);
-                        N <= result[7];
+                        temp_result = X - 1;
+                        X <= temp_result;
+                        Z <= (temp_result == 0);
+                        N <= temp_result[7];
                     end
                     
                     // DEY
                     8'h88: begin
-                        logic [7:0] result;
-                        result = Y - 1;
-                        Y <= result;
-                        Z <= (result == 0);
-                        N <= result[7];
+                        temp_result = Y - 1;
+                        Y <= temp_result;
+                        Z <= (temp_result == 0);
+                        N <= temp_result[7];
                     end
                     
                     // TAX

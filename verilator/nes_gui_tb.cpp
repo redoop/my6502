@@ -120,13 +120,14 @@ int main(int argc, char** argv) {
         
         top->controller1 = controller;
         
-        // Run simulation for one frame (~30K cycles)
+        // Run simulation (fast mode)
         for (int i = 0; i < 30000; i++) {
             if (cycle == 10) top->rst_n = 1;
             
             // Provide ROM data
-            top->prg_rom_data = (top->prg_rom_addr < prg_rom.size()) ? 
-                prg_rom[top->prg_rom_addr] : 0xFF;
+            uint16_t prg_addr = top->prg_rom_addr & 0x3FFF;
+            top->prg_rom_data = (prg_addr < prg_rom.size()) ? 
+                prg_rom[prg_addr] : 0xFF;
             top->chr_rom_data = (top->chr_rom_addr < chr_rom.size()) ? 
                 chr_rom[top->chr_rom_addr] : 0;
             
@@ -136,19 +137,16 @@ int main(int argc, char** argv) {
             top->clk = 1;
             top->eval();
             
-            // Capture pixel
-            if (top->video_de) {
-                int x = (cycle / 3) % 256;
-                int y = (cycle / 3) / 341;
-                if (x < 256 && y < 240) {
-                    pixels[y * 256 + x] = (top->video_r << 16) | 
-                                          (top->video_g << 8) | 
-                                          top->video_b;
-                }
+            // Capture pixels (simple mapping)
+            int px = i % 256;
+            int py = (i / 256) % 240;
+            if (px < 256 && py < 240) {
+                pixels[py * 256 + px] = (top->video_r << 16) | 
+                                        (top->video_g << 8) | top->video_b;
             }
             
-            // Capture audio (every ~40 cycles = 44.1kHz)
-            if (cycle % 40 == 0 && audio_pos < 2046) {
+            // Capture audio
+            if (i % 40 == 0 && audio_pos < 2046) {
                 audio_buffer[audio_pos++] = top->audio_l;
                 audio_buffer[audio_pos++] = top->audio_r;
             }
@@ -171,22 +169,11 @@ int main(int argc, char** argv) {
         frame++;
         if (frame % 60 == 0) {
             std::cout << "Frame " << frame 
-                      << " Cycle " << cycle
                       << " PRG=0x" << std::hex << (int)top->prg_rom_addr 
-                      << " CHR=0x" << (int)top->chr_rom_addr
-                      << std::dec;
-            if (controller) {
-                std::cout << " Input:";
-                if (controller & 0x80) std::cout << "R";
-                if (controller & 0x40) std::cout << "L";
-                if (controller & 0x20) std::cout << "D";
-                if (controller & 0x10) std::cout << "U";
-                if (controller & 0x08) std::cout << "S";
-                if (controller & 0x04) std::cout << "s";
-                if (controller & 0x02) std::cout << "B";
-                if (controller & 0x01) std::cout << "A";
-            }
-            std::cout << std::endl;
+                      << " CHR=0x" << (int)top->chr_rom_addr << std::dec
+                      << " Video:" << (int)top->video_r << "," 
+                      << (int)top->video_g << "," << (int)top->video_b
+                      << std::endl;
         }
         
         SDL_Delay(16); // ~60 FPS
