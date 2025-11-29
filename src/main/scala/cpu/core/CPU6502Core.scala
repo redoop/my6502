@@ -83,6 +83,7 @@ class CPU6502Core extends Module {
             io.memAddr := 0xFFFC.U
             io.memRead := true.B
             operand := io.memDataIn
+            printf("[CPU Reset] Read $FFFC = 0x%x (low byte)\n", io.memDataIn)
             cycle := 3.U
           }.elsewhen(cycle === 3.U) {
             // 读取高字节地址
@@ -99,6 +100,8 @@ class CPU6502Core extends Module {
             io.memAddr := 0xFFFD.U
             io.memRead := true.B
             val resetVector = Cat(io.memDataIn, operand(7, 0))
+            printf("[CPU Reset] Read $FFFD = 0x%x (high byte), Reset Vector = 0x%x\n", 
+                   io.memDataIn, resetVector)
             regs.pc := resetVector
             regs.sp := 0xFD.U
             regs.flagI := true.B
@@ -113,27 +116,28 @@ class CPU6502Core extends Module {
             cycle := 0.U
             state := sNMI
           }.otherwise {
-            // Fetch 需要 2 个周期来处理 SyncReadMem 的延迟
+            // Fetch 需要 3 个周期: 读取 opcode + 预读下一个字节
             when(cycle === 0.U) {
               // 周期 0: 发出读请求
               io.memAddr := regs.pc
               io.memRead := true.B
               cycle := 1.U
-            }.otherwise {
-              // 周期 1: 读取数据并进入 Execute
-              io.memAddr := regs.pc
-              io.memRead := true.B
+            }.elsewhen(cycle === 1.U) {
+              // 周期 1: 读取 opcode，发出下一个字节的读请求
               opcode := io.memDataIn
               regs.pc := regs.pc + 1.U
+              io.memAddr := regs.pc
+              io.memRead := true.B
+              cycle := 2.U
+            }.otherwise {
+              // 周期 2: 下一个字节已准备好，进入 Execute
               cycle := 0.U
-              printf("[Fetch→Execute] opcode=0x%x PC=0x%x\n", io.memDataIn, regs.pc)
               state := sExecute
             }
           }
         }
 
         is(sExecute) {
-          printf("[Execute] opcode=0x%x cycle=%d\n", opcode, cycle)
           // 根据 opcode 分发到对应指令模块
           execResult := dispatchInstruction(opcode, cycle, regs, operand, io.memDataIn)
           
@@ -414,7 +418,6 @@ class CPU6502Core extends Module {
       
       // ========== LoadStore 立即寻址 ==========
       is(0xA9.U, 0xA2.U, 0xA0.U) {
-        printf("[Dispatch] LDA/LDX/LDY immediate: opcode=0x%x cycle=%d\n", opcode, cycle)
         result := LoadStoreInstructions.executeImmediate(opcode, cycle, regs, memDataIn)
       }
       

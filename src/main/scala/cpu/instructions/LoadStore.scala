@@ -26,38 +26,25 @@ object LoadStoreInstructions {
     val newRegs = Wire(new Registers)
     newRegs := regs
     
-    // 默认值 - 必须初始化所有字段
-    result.done := false.B
+    // Fetch 已经预读了立即数，直接使用 memDataIn
+    switch(opcode) {
+      is(0xA9.U) { newRegs.a := memDataIn }  // LDA
+      is(0xA2.U) { newRegs.x := memDataIn }  // LDX
+      is(0xA0.U) { newRegs.y := memDataIn }  // LDY
+    }
+    
+    newRegs.flagN := memDataIn(7)
+    newRegs.flagZ := memDataIn === 0.U
+    newRegs.pc := regs.pc + 1.U
+    
+    result.done := true.B
     result.nextCycle := 0.U
-    result.regs := regs
-    result.memAddr := 0.U
+    result.regs := newRegs
+    result.memAddr := regs.pc
     result.memData := 0.U
     result.memWrite := false.B
     result.memRead := false.B
     result.operand := 0.U
-    
-    when(cycle === 0.U) {
-      // Cycle 0: 读取立即数
-      result.memAddr := regs.pc
-      result.memRead := true.B
-      result.nextCycle := 1.U
-    }.otherwise {
-      // Cycle 1: 执行指令
-      switch(opcode) {
-        is(0xA9.U) { newRegs.a := memDataIn }  // LDA
-        is(0xA2.U) { newRegs.x := memDataIn }  // LDX
-        is(0xA0.U) { newRegs.y := memDataIn }  // LDY
-      }
-      
-      newRegs.flagN := memDataIn(7)
-      newRegs.flagZ := memDataIn === 0.U
-      newRegs.pc := regs.pc + 1.U
-      
-      result.done := true.B
-      result.regs := newRegs
-      result.memAddr := regs.pc
-    }
-    
     result
   }
   
@@ -239,19 +226,50 @@ object LoadStoreInstructions {
         newRegs.pc := regs.pc + 1.U
         result.regs := newRegs
         result.nextCycle := 1.U
+        when(opcode === 0x8D.U) {
+          printf("[STA abs] Cycle 0: Read low byte = 0x%x from PC=0x%x\n", memDataIn, regs.pc)
+        }
       }
       is(1.U) {
         result.memAddr := regs.pc
         result.memRead := true.B
-        result.operand := Cat(memDataIn, operand(7, 0))
+        result.operand := operand  // 保持低字节
         newRegs.pc := regs.pc + 1.U
         result.regs := newRegs
         result.nextCycle := 2.U
+        when(opcode === 0x8D.U) {
+          printf("[STA abs] Cycle 1: Request high byte from PC=0x%x\n", regs.pc)
+        }
       }
       is(2.U) {
+        // Cycle 2: 读取高字节并组装地址
+        result.memAddr := regs.pc
+        result.memRead := false.B
+        result.operand := Cat(memDataIn, operand(7, 0))
+        result.nextCycle := 3.U
+        when(opcode === 0x8D.U) {
+          printf("[STA abs] Cycle 2: Read high byte = 0x%x, Address = 0x%x\n", 
+                 memDataIn, Cat(memDataIn, operand(7, 0)))
+        }
+      }
+      is(3.U) {
+        // Cycle 3: 发出读/写请求
         result.memAddr := operand
         when(isLoadA || isLoadX || isLoadY) {
           result.memRead := true.B
+        }.otherwise {
+          result.memWrite := true.B
+          result.memData := MuxCase(regs.a, Seq(
+            (opcode === 0x8E.U) -> regs.x,
+            (opcode === 0x8C.U) -> regs.y
+          ))
+        }
+        result.nextCycle := 4.U
+      }
+      is(4.U) {
+        // Cycle 4: 完成
+        result.memAddr := operand
+        when(isLoadA || isLoadX || isLoadY) {
           when(isLoadA) {
             newRegs.a := memDataIn
           }.elsewhen(isLoadX) {
@@ -261,13 +279,6 @@ object LoadStoreInstructions {
           }
           newRegs.flagN := memDataIn(7)
           newRegs.flagZ := memDataIn === 0.U
-        }.otherwise {
-          result.memWrite := true.B
-          // 根据 opcode 选择要存储的寄存器
-          result.memData := MuxCase(regs.a, Seq(
-            (opcode === 0x8E.U) -> regs.x,
-            (opcode === 0x8C.U) -> regs.y
-          ))
         }
         result.regs := newRegs
         result.done := true.B

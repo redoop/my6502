@@ -9,7 +9,7 @@ import cpu6502.CPU6502Refactored
  * 参考 CPU6502Refactored 的模块化设计
  * 整合 CPU + PPU + APU + Memory
  */
-class NESSystemRefactored extends Module {
+class NESSystemRefactored(enableDebug: Boolean = false) extends Module {
   val io = IO(new Bundle {
     // 视频输出
     val pixelX = Output(UInt(9.W))
@@ -47,6 +47,9 @@ class NESSystemRefactored extends Module {
       val cpuState = UInt(3.W)  // CPU 状态机状态
       val cpuCycle = UInt(3.W)  // CPU 周期计数
       val cpuOpcode = UInt(8.W) // 当前指令
+      val cpuMemAddr = UInt(16.W) // CPU 内存地址
+      val cpuMemDataIn = UInt(8.W) // CPU 读取的数据
+      val cpuMemRead = Bool() // CPU 读取信号
     })
   })
   
@@ -54,7 +57,7 @@ class NESSystemRefactored extends Module {
   val cpu = Module(new CPU6502Refactored)
   
   // PPU
-  val ppu = Module(new PPURefactored)
+  val ppu = Module(new PPURefactored(enableDebug))
   
   // APU - 暂时禁用，等待完整实现
   // val apu = Module(new APURefactored)
@@ -70,6 +73,9 @@ class NESSystemRefactored extends Module {
   
   // 内存映射
   val cpuAddr = cpu.io.memAddr
+  when(cpuAddr >= 0x2000.U && cpuAddr <= 0x2010.U) {
+    printf("[NES] cpuAddr=$%x memRead=%d\n", cpuAddr, cpu.io.memRead)
+  }
   val isRam = cpuAddr < 0x2000.U
   val isPpuReg = cpuAddr >= 0x2000.U && cpuAddr < 0x4000.U
   val isApuReg = cpuAddr >= 0x4000.U && cpuAddr < 0x4018.U
@@ -123,9 +129,23 @@ class NESSystemRefactored extends Module {
     isPrgRom -> prgData
   ))
   
+  // Debug: CPU 读取 PPU
+  when(isPpuReg) {
+    printf("[NES] isPpuReg=true: addr=$%x data=0x%x\n", cpuAddr, ppuData)
+  }
+  when(cpuAddr >= 0x2000.U && cpuAddr < 0x4000.U) {
+    printf("[NES] PPU addr range: addr=$%x isPpuReg=%d\n", cpuAddr, isPpuReg)
+  }
+  
   // CPU 写入
   when(cpu.io.memWrite) {
+    printf("[CPU Write] Addr=$%x Data=0x%x isRam=%d isPpuReg=%d\n", 
+           cpuAddr, cpu.io.memDataOut, isRam, isPpuReg)
     when(isRam) {
+      // 监控 $0200-$020F 写入
+      when(cpuAddr >= 0x0200.U && cpuAddr < 0x0210.U) {
+        printf("[RAM Write] Addr=$%x Data=0x%x PC=0x%x\n", cpuAddr, cpu.io.memDataOut, cpu.io.debug.regPC)
+      }
       ram.write(cpuAddr(10, 0), cpu.io.memDataOut)
     }
   }
@@ -138,7 +158,12 @@ class NESSystemRefactored extends Module {
   
   // Debug: PPU 写入监控
   when(cpu.io.memWrite && isPpuReg) {
-    printf("[PPU Write] Addr=$%x RegAddr=%d Data=0x%x\n", cpuAddr, cpuAddr(2, 0), cpu.io.memDataOut)
+    printf("[PPU Write] Addr=$%x RegAddr=%d Data=0x%x cpuWrite=%d isPpuReg=%d\n", 
+           cpuAddr, cpuAddr(2, 0), cpu.io.memDataOut, cpu.io.memWrite, isPpuReg)
+  }
+  when(cpu.io.memRead && isPpuReg) {
+    printf("[PPU Read] Addr=$%x RegAddr=%d cpuRead=%d ppuData=0x%x\n", 
+           cpuAddr, cpuAddr(2, 0), cpu.io.memRead, ppuData)
   }
   ppu.io.oamDmaAddr := 0.U
   ppu.io.oamDmaData := 0.U
@@ -172,6 +197,9 @@ class NESSystemRefactored extends Module {
   io.debug.cpuState := cpu.io.debug.state
   io.debug.cpuCycle := cpu.io.debug.cycle
   io.debug.cpuOpcode := cpu.io.debug.opcode
+  io.debug.cpuMemAddr := cpu.io.memAddr
+  io.debug.cpuMemDataIn := cpu.io.memDataIn
+  io.debug.cpuMemRead := cpu.io.memRead
   io.debug.ppuCtrl := ppu.io.debug.ppuCtrl
   io.debug.ppuMask := ppu.io.debug.ppuMask
   io.debug.vblank := ppu.io.vblank

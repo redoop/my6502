@@ -1,0 +1,90 @@
+{
+  "sales": [
+    {
+      "month": "2025-11",
+      "sales": 100000.0,
+      "growth": "15.0%"
+    },
+    {
+      "month": "2025-12",
+      "sales": 115000.0,
+      "growth": "15.0%"
+    },
+    {
+      "month": "2026-01",
+      "sales": 132250.0,
+      "growth": "15.0%"
+    },
+    {
+      "month": "2026-02",
+      "sales": 152087.5,
+      "growth": "15.0%"
+    },
+    {
+      "month": "2026-03",
+      "sales": 174900.62,
+      "growth": "15.0%"
+    },
+    {
+      "month": "2026-04",
+      "sales": 201135.72,
+      "growth": "15.0%"
+    }
+  ],
+  "payments": [
+    {
+      "month": "2025-11",
+      "total_sales": 100000.0,
+      "payments": {
+        "immediate": 30000.0,
+        "30days": 50000.0,
+        "60days": 20000.0
+      }
+    },
+    {
+      "month": "2025-12",
+      "total_sales": 115000.0,
+      "payments": {
+        "immediate": 34500.0,
+        "30days": 57500.0,
+        "60days": 23000.0
+      }
+    },
+    {
+      "month": "2026-01",
+      "total_sales": 132250.0,
+      "payments": {
+        "immediate": 39675.0,
+        "30days": 66125.0,
+        "60days": 26450.0
+      }
+    },
+    {
+      "month": "2026-02",
+      "total_sales": 152087.5,
+      "payments": {
+        "immediate": 45626.25,
+        "30days": 76043.75,
+        "60days": 30417.5
+      }
+    },
+    {
+      "month": "2026-03",
+      "total_sales": 174900.62,
+      "payments": {
+        "immediate": 52470.19,
+        "30days": 87450.31,
+        "60days": 34980.12
+      }
+    },
+    {
+      "month": "2026-04",
+      "total_sales": 201135.72,
+      "payments": {
+        "immediate": 60340.72,
+        "30days": 100567.86,
+        "60days": 40227.14
+      }
+    }
+  ]
+}

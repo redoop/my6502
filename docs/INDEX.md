@@ -1,11 +1,25 @@
 # 📚 NES 模拟器文档索引
 
-**最后更新**: 2025-11-28  
-**版本**: v0.8.0
+**最后更新**: 2025-11-29  
+**版本**: v0.7.1
 
-## 🎯 核心文档（10 个）
+---
 
-本项目文档已整理为 10 个核心文档，涵盖项目的所有方面。
+## 🚀 快速开始
+
+### 新手必读
+1. **[快速开始指南](QUICK_START.md)** ⭐ 5 分钟上手
+2. **[项目概述](01_PROJECT_OVERVIEW.md)** - 了解项目
+3. **[游戏兼容性报告](GAME_COMPATIBILITY_REPORT.md)** - 查看测试结果
+
+### 开发者必读
+1. **[开发指南](02_DEVELOPMENT_GUIDE.md)** - 开发环境设置
+2. **[测试指南](03_TESTING_GUIDE.md)** - 运行和编写测试
+3. **[贡献指南](../CONTRIBUTING.md)** - 如何贡献代码
+
+---
+
+## 📖 核心文档（10 个）
 
 ### 1. [项目概述](01_PROJECT_OVERVIEW.md) ⭐ 从这里开始
 
@@ -48,6 +62,327 @@
 - 性能测试
 - 调试测试失败
 - 持续集成
+
+**适合**: 测试人员、QA
+
+---
+
+### 4. [Verilator 指南](04_VERILATOR_GUIDE.md)
+
+**内容**:
+- Verilator 简介
+- 环境配置
+- 编译和运行
+- 性能优化
+- VCD 波形分析
+- 调试技巧
+
+**适合**: 硬件仿真、调试
+
+---
+
+### 5. [PPU 系统](05_PPU_SYSTEM.md)
+
+**内容**:
+- PPU 架构
+- 渲染管线
+- 寄存器详解
+- 背景渲染
+- 精灵渲染
+- Sprite 0 Hit
+- 调试方法
+
+**适合**: PPU 开发、图形
+
+---
+
+### 6. [CPU 实现](06_CPU_IMPLEMENTATION.md)
+
+**内容**:
+- CPU 架构
+- 指令集详解
+- 寻址模式
+- 状态机设计
+- 中断处理
+- 性能分析
+
+**适合**: CPU 开发、指令
+
+---
+
+### 7. [游戏兼容性](07_GAME_COMPATIBILITY.md)
+
+**内容**:
+- 游戏测试方法
+- 兼容性报告
+- 已知问题
+- Mapper 支持
+- 调试游戏问题
+
+**适合**: 游戏测试、兼容性
+
+---
+
+### 8. [调试指南](08_DEBUG_GUIDE.md)
+
+**内容**:
+- 调试工具
+- 日志分析
+- VCD 波形
+- 常见问题
+- 调试技巧
+
+**适合**: 调试、问题排查
+
+---
+
+### 9. [发布说明](09_RELEASE_NOTES.md)
+
+**内容**:
+- 版本历史
+- 变更日志
+- 已知问题
+- 升级指南
+
+**适合**: 了解版本变化
+
+---
+
+### 10. [快速参考](10_QUICK_REFERENCE.md) ⭐ 速查表
+
+**内容**:
+- 常用命令
+- 快捷键
+- 寄存器映射
+- 内存映射
+- 指令速查
+
+**适合**: 日常开发参考
+
+---
+
+## 📋 补充文档
+
+### 新增文档 (v0.7.1)
+
+#### [快速开始指南](QUICK_START.md) ⭐ 新！
+5 分钟快速上手，包含：
+- 3 步快速运行
+- 控制方式
+- 常用命令
+- 常见问题
+
+#### [游戏兼容性报告](GAME_COMPATIBILITY_REPORT.md) ⭐ 新！
+完整的测试报告，包含：
+- 3 款游戏测试结果
+- 已修复的问题详解
+- 当前问题分析
+- 系统组件评分
+
+#### [更新日志](../CHANGELOG.md) ⭐ 新！
+详细的版本历史，包含：
+- v0.7.1 关键修复
+- 每个版本的变更
+- 问题修复详情
+- 新功能说明
+
+#### [贡献指南](../CONTRIBUTING.md) ⭐ 新！
+如何贡献代码，包含：
+- 贡献流程
+- 代码规范
+- Commit 规范
+- PR 模板
+
+#### [故障排除指南](TROUBLESHOOTING.md) ⭐ 新！
+常见问题解决，包含：
+- 编译问题
+- 运行问题
+- 测试问题
+- 性能问题
+- 已知问题
+
+---
+
+### 参考文档
+
+#### [完整架构](ARCHITECTURE.md)
+- 系统架构详解
+- 模块交互
+- 数据流
+
+#### [技术细节](archive/TECHNICAL_DETAILS.md)
+- 实现细节
+- 优化技巧
+- 性能分析
+
+---
+
+## 📊 测试和报告
+
+### 测试文档
+- [测试指南](03_TESTING_GUIDE.md) - 如何测试
+- [游戏兼容性](07_GAME_COMPATIBILITY.md) - 游戏测试
+- [游戏兼容性报告](GAME_COMPATIBILITY_REPORT.md) - 详细结果
+
+### 调试文档
+- [调试指南](08_DEBUG_GUIDE.md) - 调试方法
+- [故障排除](TROUBLESHOOTING.md) - 常见问题
+- [CPU 修复总结](logs/cpu_fix_summary.md) - 最新修复
+
+---
+
+## 🔗 外部资源
+
+### 6502 相关
+- [6502 指令集](http://www.6502.org/tutorials/6502opcodes.html)
+- [Visual 6502](http://www.visual6502.org/)
+- [6502 编程手册](http://archive.6502.org/books/mcs6500_family_programming_manual.pdf)
+
+### NES 相关
+- [NESDev Wiki](https://www.nesdev.org/wiki/)
+- [NES 参考指南](https://www.nesdev.org/NESDoc.pdf)
+
+### Chisel 相关
+- [Chisel 文档](https://www.chisel-lang.org/)
+- [Chisel Bootcamp](https://github.com/freechipsproject/chisel-bootcamp)
+
+---
+
+## 📁 文档组织
+
+```
+docs/
+├── INDEX.md                          # 本文件
+├── QUICK_START.md                    # 快速开始 ⭐ 新！
+├── GAME_COMPATIBILITY_REPORT.md      # 游戏兼容性报告 ⭐ 新！
+├── TROUBLESHOOTING.md                # 故障排除 ⭐ 新！
+├── 01_PROJECT_OVERVIEW.md            # 项目概述
+├── 02_DEVELOPMENT_GUIDE.md           # 开发指南
+├── 03_TESTING_GUIDE.md               # 测试指南
+├── 04_VERILATOR_GUIDE.md             # Verilator 指南
+├── 05_PPU_SYSTEM.md                  # PPU 系统
+├── 06_CPU_IMPLEMENTATION.md          # CPU 实现
+├── 07_GAME_COMPATIBILITY.md          # 游戏兼容性
+├── 08_DEBUG_GUIDE.md                 # 调试指南
+├── 09_RELEASE_NOTES.md               # 发布说明
+├── 10_QUICK_REFERENCE.md             # 快速参考
+├── ARCHITECTURE.md                   # 完整架构
+├── logs/                             # 调试日志
+│   ├── cpu_fix_summary.md           # CPU 修复总结
+│   ├── cpu_deadlock_analysis.md     # 问题分析
+│   └── session_summary_2025-11-29.md # 工作总结
+└── archive/                          # 历史文档
+    └── (64 个历史文档)
+```
+
+---
+
+## 🎯 文档导航
+
+### 按角色
+
+**新手用户**:
+1. [快速开始](QUICK_START.md)
+2. [项目概述](01_PROJECT_OVERVIEW.md)
+3. [游戏兼容性报告](GAME_COMPATIBILITY_REPORT.md)
+
+**开发者**:
+1. [开发指南](02_DEVELOPMENT_GUIDE.md)
+2. [CPU 实现](06_CPU_IMPLEMENTATION.md)
+3. [测试指南](03_TESTING_GUIDE.md)
+
+**贡献者**:
+1. [贡献指南](../CONTRIBUTING.md)
+2. [代码规范](02_DEVELOPMENT_GUIDE.md#代码规范)
+3. [测试指南](03_TESTING_GUIDE.md)
+
+**调试人员**:
+1. [调试指南](08_DEBUG_GUIDE.md)
+2. [故障排除](TROUBLESHOOTING.md)
+3. [Verilator 指南](04_VERILATOR_GUIDE.md)
+
+---
+
+### 按任务
+
+**运行游戏**:
+1. [快速开始](QUICK_START.md)
+2. [故障排除](TROUBLESHOOTING.md)
+3. [游戏兼容性](07_GAME_COMPATIBILITY.md)
+
+**开发新功能**:
+1. [开发指南](02_DEVELOPMENT_GUIDE.md)
+2. [CPU 实现](06_CPU_IMPLEMENTATION.md)
+3. [测试指南](03_TESTING_GUIDE.md)
+
+**修复 Bug**:
+1. [调试指南](08_DEBUG_GUIDE.md)
+2. [故障排除](TROUBLESHOOTING.md)
+3. [CPU 修复总结](logs/cpu_fix_summary.md)
+
+**测试游戏**:
+1. [游戏兼容性](07_GAME_COMPATIBILITY.md)
+2. [测试指南](03_TESTING_GUIDE.md)
+3. [游戏兼容性报告](GAME_COMPATIBILITY_REPORT.md)
+
+---
+
+## 📝 文档更新
+
+### 最近更新 (v0.7.1 - 2025-11-29)
+
+- ✨ 新增 [快速开始指南](QUICK_START.md)
+- ✨ 新增 [游戏兼容性报告](GAME_COMPATIBILITY_REPORT.md)
+- ✨ 新增 [更新日志](../CHANGELOG.md)
+- ✨ 新增 [贡献指南](../CONTRIBUTING.md)
+- ✨ 新增 [故障排除指南](TROUBLESHOOTING.md)
+- 🔄 更新 [项目概述](01_PROJECT_OVERVIEW.md) - 添加最新状态
+- 🔄 更新 [README](../README.md) - 添加游戏兼容性表格
+
+---
+
+## 🔍 搜索文档
+
+### 按关键词
+
+- **CPU**: [CPU 实现](06_CPU_IMPLEMENTATION.md), [CPU 修复](logs/cpu_fix_summary.md)
+- **PPU**: [PPU 系统](05_PPU_SYSTEM.md)
+- **游戏**: [游戏兼容性](07_GAME_COMPATIBILITY.md), [游戏报告](GAME_COMPATIBILITY_REPORT.md)
+- **测试**: [测试指南](03_TESTING_GUIDE.md)
+- **调试**: [调试指南](08_DEBUG_GUIDE.md), [故障排除](TROUBLESHOOTING.md)
+- **开发**: [开发指南](02_DEVELOPMENT_GUIDE.md)
+- **贡献**: [贡献指南](../CONTRIBUTING.md)
+
+---
+
+## 💡 建议阅读顺序
+
+### 第一次使用
+1. [快速开始](QUICK_START.md) - 5 分钟
+2. [项目概述](01_PROJECT_OVERVIEW.md) - 10 分钟
+3. [游戏兼容性报告](GAME_COMPATIBILITY_REPORT.md) - 5 分钟
+
+### 开始开发
+1. [开发指南](02_DEVELOPMENT_GUIDE.md) - 30 分钟
+2. [CPU 实现](06_CPU_IMPLEMENTATION.md) - 20 分钟
+3. [测试指南](03_TESTING_GUIDE.md) - 15 分钟
+
+### 深入理解
+1. [完整架构](ARCHITECTURE.md) - 1 小时
+2. [PPU 系统](05_PPU_SYSTEM.md) - 30 分钟
+3. [Verilator 指南](04_VERILATOR_GUIDE.md) - 20 分钟
+
+---
+
+## 📞 获取帮助
+
+- 📖 查看 [故障排除指南](TROUBLESHOOTING.md)
+- 🐛 提交 [Issue](https://github.com/redoop/my6502/issues)
+- 💬 参与 [讨论](https://github.com/redoop/my6502/discussions)
+
+---
+
+**准备好了吗？** 从 [快速开始](QUICK_START.md) 开始吧！ 🚀
 
 **适合**: 测试人员、QA
 
@@ -350,3 +685,54 @@ docs/
 **维护者**: NES 开发团队
 
 🎮 Happy Coding! 🎵
+
+---
+
+## 📂 文档目录结构
+
+### 核心文档 (根目录)
+```
+docs/
+├── 01_PROJECT_OVERVIEW.md      # 项目概述
+├── 02_DEVELOPMENT_GUIDE.md     # 开发指南
+├── 03_TESTING_GUIDE.md         # 测试指南
+├── 04_VERILATOR_GUIDE.md       # Verilator 指南
+├── 05_PPU_SYSTEM.md            # PPU 系统
+├── 06_CPU_IMPLEMENTATION.md    # CPU 实现
+├── 07_GAME_COMPATIBILITY.md    # 游戏兼容性
+├── 08_DEBUG_GUIDE.md           # 调试指南
+├── 09_RELEASE_NOTES.md         # 发布说明
+├── 10_QUICK_REFERENCE.md       # 快速参考
+├── INDEX.md                    # 本文件
+├── README.md                   # 文档说明
+├── ARCHITECTURE.md             # 完整架构
+└── STRUCTURE.md                # 文档结构说明
+```
+
+### 子目录分类
+```
+docs/
+├── guides/          # 指南类 (3个)
+│   ├── BUILD_AND_TEST_GUIDE.md
+│   ├── TROUBLESHOOTING.md
+│   └── QUICK_START.md
+├── testing/         # 测试相关 (8个)
+│   ├── PPU_APU_TEST_*.md
+│   ├── CPU_INSTRUCTION_TEST_*.md
+│   └── test_results_*.md
+├── reports/         # 报告类 (5个)
+│   ├── GAME_COMPATIBILITY_REPORT.md
+│   ├── TEST_REPORT_*.md
+│   └── SESSION_SUMMARY_*.md
+├── checklists/      # 检查清单 (2个)
+│   ├── GAME_COMPATIBILITY_CHECKLIST.md
+│   └── NES_TEST_MILESTONE_P0.md
+├── logs/            # 日志和分析 (10+个)
+│   ├── cpu_*.md
+│   ├── nmi_*.md
+│   └── session_*.md
+└── archive/         # 历史文档 (64个)
+```
+
+**详细说明**: 查看 [STRUCTURE.md](STRUCTURE.md)
+

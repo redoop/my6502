@@ -100,12 +100,40 @@ The 6502 processor was widely used in numerous classic computers and game consol
 5. **Nostalgia**: Popular choice for retro computing and game development
 
 ## Project Status
-- ✅ Compilation successful
-- ✅ All tests passing (100+/100+)
-- ✅ Modular refactoring complete
-- ✅ NES System v2 complete (80% overall)
-- ✅ Verilog generation successful
-- ✅ Using Aliyun mirror for faster builds
+
+**Version**: v0.7.1 | **Last Update**: 2025-11-29 | **Test Pass Rate**: 122+/122+ (100%)
+
+### 🎯 Current Status
+- ✅ **CPU**: 98% - All instructions working, 2 critical bugs fixed
+- ⚠️ **PPU**: 70% - Rendering works, register write issue
+- ✅ **Memory**: 98% - ROM mirroring fixed
+- ✅ **Mappers**: 97% - Mapper 0/4 supported
+- ✅ **Controllers**: 100% - All inputs working
+- **Overall**: 53% game compatibility
+
+### 🔧 Recent Fixes (v0.7.1)
+- ✅ **Critical**: Fixed CPU Fetch state memory delay (CPU was reading wrong opcodes)
+- ✅ **Critical**: Fixed PRG ROM mirroring for 16KB ROMs (Reset Vector now correct)
+- ✅ Enhanced debugging output (CPU state, cycle, opcode monitoring)
+
+### ⚠️ Known Issues
+- 🐛 PPU register write not working ([#4](https://github.com/redoop/my6502/issues/4))
+  - Blocks NMI interrupt from triggering
+  - Prevents games from starting main loop
+
+### 📊 Game Compatibility
+| Game | Mapper | Status | Compatibility |
+|------|--------|--------|---------------|
+| Donkey Kong | 0 | ⚠️ CPU runs | 60% |
+| Super Mario Bros | 4 | ⚠️ CPU runs | 50% |
+| Super Contra X | 4 | ⚠️ CPU runs | 50% |
+
+**Full Report**: [Game Compatibility Report](docs/GAME_COMPATIBILITY_REPORT.md)
+
+### 📝 Documentation
+- 📖 [Changelog](CHANGELOG.md) - Detailed version history
+- 📊 [Game Compatibility Report](docs/GAME_COMPATIBILITY_REPORT.md) - Test results
+- 🔧 [CPU Fix Summary](docs/logs/cpu_fix_summary.md) - Recent fixes
 
 ### 📚 Documentation
 
