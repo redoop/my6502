@@ -60,24 +60,23 @@ class NESSystemRefactored(enableDebug: Boolean = false) extends Module {
   // CPU
   val cpu = Module(new CPU6502Refactored)
   
-  // PPU
-  val ppu = Module(new PPURefactored(enableDebug))
+  // PPU - Use simplified version to avoid combinational loops
+  val ppu = Module(new PPUSimple)
   
   // APU - whenDisable，Wait
   // val apu = Module(new APURefactored)
   
-  // PRG ROM - 512KB for Mapper 4 only
-  // Use Mem (async) for Verilator compatibility
+  // PRG ROM - 512KB, use async Mem
   val prgRom = Mem(524288, UInt(8.W))
   
   when(io.prgLoadEn) {
     prgRom.write(io.prgLoadAddr, io.prgLoadData)
   }
   
-  // MMC3 Mapper (Mapper 4)
-  val mmc3 = Module(new MMC3Mapper)
+  // Simple Mapper (no bank switching)
+  val mmc3 = Module(new SimpleMapper)
   
-  // RAM (2KB)
+  // RAM (2KB) - Use async Mem for fast access
   val ram = Mem(2048, UInt(8.W))
   
 
@@ -99,14 +98,11 @@ class NESSystemRefactored(enableDebug: Boolean = false) extends Module {
   mmc3.io.cpuRead := cpu.io.memRead && isPrgRom
   mmc3.io.ppuAddr := 0.U
   
-  // ROM read through MMC3
+  // ROM read through MMC3 (MMC3 already has internal pipeline)
   val prgData = prgRom.read(mmc3.io.prgAddr)
   mmc3.io.prgData := prgData
   
-  // Always ready - MMC3 has internal register
-  cpu.io.memReady := true.B
-  
-  // Memory ready logic: Always ready (use async ROM)
+  // CPU needs to wait for SyncReadMem latency
   cpu.io.memReady := true.B
   
   // Control strobe
@@ -143,16 +139,18 @@ class NESSystemRefactored(enableDebug: Boolean = false) extends Module {
   // val isControllerReg = RegNext(isController)
   // val isPrgRomReg = RegNext(isPrgRom)
   
-  // CPU Read
+  // CPU Read - Add register to break combinational loop
   val ramData = ram.read(cpuAddr(10, 0))
   val ppuData = ppu.io.cpuDataOut
   
-  cpu.io.memDataIn := MuxCase(0.U, Seq(
+  val cpuDataMux = MuxCase(0.U, Seq(
     isRam -> ramData,
     isPpuReg -> ppuData,
     isController -> controllerData,
     isPrgRom -> mmc3.io.cpuDataOut
   ))
+  
+  cpu.io.memDataIn := RegNext(cpuDataMux)
   
   // Debug: CPU Read PPU
   when(isPpuReg) {

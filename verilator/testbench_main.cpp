@@ -228,8 +228,8 @@ public:
         if (tfp && g_trace_enabled) tfp->dump(cycle_count * 2 + 1);
 #endif
         
-        // 监控所有内存读取 (前 100000 周期)
-        if (cycle_count < 100000) {
+        // 监控所有内存读取 (前 100000 周期，但跳过 ROM 加载期间)
+        if (cycle_count < 100000 && dut->reset == 0) {
             uint16_t memAddr = dut->io_debug_cpuMemAddr;
             uint8_t memDataIn = dut->io_debug_cpuMemDataIn;
             bool memRead = dut->io_debug_cpuMemRead;

@@ -69,50 +69,42 @@ class CPU6502Core extends Module {
     // ExecuteState Machine
     switch(state) {
         is(sReset) {
-          // Reset Sequence: Read Reset Vector ($FFFC-$FFFD)
+          // Reset with 9 cycles for data pipeline
           when(cycle === 0.U) {
             io.memAddr := 0xFFFC.U
             io.memRead := true.B
             cycle := 1.U
           }.elsewhen(cycle === 1.U) {
-            // Wait for MMC3
             io.memAddr := 0xFFFC.U
             io.memRead := true.B
             cycle := 2.U
           }.elsewhen(cycle === 2.U) {
-            // Wait for ROM
             io.memAddr := 0xFFFC.U
             io.memRead := true.B
             cycle := 3.U
           }.elsewhen(cycle === 3.U) {
-            // Read low byte
             io.memAddr := 0xFFFC.U
             io.memRead := true.B
             operand := io.memDataIn
-            printf("[CPU Reset] Read $FFFC = 0x%x (low byte)\n", io.memDataIn)
+            printf("[CPU Reset] Read $FFFC = 0x%x\n", io.memDataIn)
             cycle := 4.U
           }.elsewhen(cycle === 4.U) {
-            // Read high byte address
             io.memAddr := 0xFFFD.U
             io.memRead := true.B
             cycle := 5.U
           }.elsewhen(cycle === 5.U) {
-            // Wait for MMC3
             io.memAddr := 0xFFFD.U
             io.memRead := true.B
             cycle := 6.U
           }.elsewhen(cycle === 6.U) {
-            // Wait for ROM
             io.memAddr := 0xFFFD.U
             io.memRead := true.B
             cycle := 7.U
           }.otherwise {
-            // cycle=7: Complete reset
             io.memAddr := 0xFFFD.U
             io.memRead := true.B
             val resetVector = Cat(io.memDataIn, operand(7, 0))
-            printf("[CPU Reset] Read $FFFD = 0x%x (high byte), Reset Vector = 0x%x\n", 
-                   io.memDataIn, resetVector)
+            printf("[CPU Reset] Read $FFFD = 0x%x, Vector = 0x%x\n", io.memDataIn, resetVector)
             regs.pc := resetVector
             regs.sp := 0xFD.U
             regs.flagI := true.B
@@ -127,24 +119,20 @@ class CPU6502Core extends Module {
             cycle := 0.U
             state := sNMI
           }.otherwise {
-            // Fetch with extra cycles for ROM delay
+            // Fetch with 4 cycles for data pipeline
             when(cycle === 0.U) {
-              // Cycle 0: Issue read request
               io.memAddr := regs.pc
               io.memRead := true.B
               cycle := 1.U
             }.elsewhen(cycle === 1.U) {
-              // Cycle 1: Wait for ROM (MMC3 address calc)
               io.memAddr := regs.pc
               io.memRead := true.B
               cycle := 2.U
             }.elsewhen(cycle === 2.U) {
-              // Cycle 2: Wait for ROM (SyncReadMem)
               io.memAddr := regs.pc
               io.memRead := true.B
               cycle := 3.U
             }.otherwise {
-              // Cycle 3: Read data and execute
               io.memAddr := regs.pc
               io.memRead := true.B
               opcode := io.memDataIn

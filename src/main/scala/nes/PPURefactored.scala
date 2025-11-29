@@ -69,19 +69,22 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
   }
   
 
-  when(pixel === 340.U) {
-    pixel := 0.U
-    when(scanline === 261.U) {
-      scanline := 0.U
-      printf("[PPU] Frame complete, reset to scanline 0\n")
-    }.otherwise {
-      scanline := scanline + 1.U
-      when(scanline === 240.U) {
-        printf("[PPU] Entering VBlank region, next scanline=241\n")
+  when(!io.chrLoadEn) {
+    // Only advance counters when not loading CHR ROM
+    when(pixel === 340.U) {
+      pixel := 0.U
+      when(scanline === 261.U) {
+        scanline := 0.U
+        printf("[PPU] Frame complete, reset to scanline 0\n")
+      }.otherwise {
+        scanline := scanline + 1.U
+        when(scanline === 240.U) {
+          printf("[PPU] Entering VBlank region, next scanline=241\n")
+        }
       }
+    }.otherwise {
+      pixel := pixel + 1.U
     }
-  }.otherwise {
-    pixel := pixel + 1.U
   }
   
   // VBlank Control - in pixel 0 Set， pixel 1 when
@@ -120,7 +123,7 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
   
   io.nmiOut := nmiTrigger
   
-  // CHR ROM (8KB) - Use Mem (async) to avoid combinational loops
+  // CHR ROM (8KB) - Use async Mem for fast rendering
   val chrRom = Mem(8192, UInt(8.W))
   when(io.chrLoadEn) {
     chrRom.write(io.chrLoadAddr, io.chrLoadData)
@@ -134,7 +137,7 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
     0x08.U, 0x3A.U, 0x00.U, 0x02.U, 0x00.U, 0x20.U, 0x2C.U, 0x08.U
   )))
   
-  // RAM (2KB) - Use Mem (async) to avoid combinational loops
+  // Nametable RAM (2KB) - Use async Mem for fast rendering
   val nametableRam = Mem(2048, UInt(8.W))
   
   // Nametable Write ( PPUDATA $2007)
@@ -170,28 +173,28 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
   
 
   val nametableBase = Cat(regs.ppuCtrl(1, 0), 0.U(10.W))
-  val tileX = (pixel + scrollX) >> 3
-  val tileY = (scanline + scrollY) >> 3
-  val tileAddr = nametableBase + (tileY << 5) + tileX
-  val tileIndex = nametableRam.read(tileAddr(10, 0))
+  val tileX = RegNext((pixel + scrollX) >> 3)
+  val tileY = RegNext((scanline + scrollY) >> 3)
+  val tileAddr = RegNext(nametableBase + (tileY << 5) + tileX)
+  val tileIndex = RegNext(nametableRam.read(tileAddr(10, 0)))
   
   val patternBase = Mux(regs.ppuCtrl(4), 0x1000.U, 0x0000.U)
-  val fineY = (scanline + scrollY)(2, 0)
-  val patternAddr = patternBase + (tileIndex << 4) + fineY
-  val patternLow = chrRom.read(patternAddr)
-  val patternHigh = chrRom.read(patternAddr + 8.U)
+  val fineY = RegNext((scanline + scrollY)(2, 0))
+  val patternAddr = RegNext(patternBase + (tileIndex << 4) + fineY)
+  val patternLow = RegNext(chrRom.read(patternAddr))
+  val patternHigh = RegNext(chrRom.read(patternAddr + 8.U))
   
-  val fineX = (pixel + scrollX)(2, 0)
-  val bitPos = 7.U - fineX
-  val pixelBit = ((patternHigh >> bitPos)(0) << 1) | ((patternLow >> bitPos)(0))
+  val fineX = RegNext((pixel + scrollX)(2, 0))
+  val bitPos = RegNext(7.U - fineX)
+  val pixelBit = RegNext(((patternHigh >> bitPos)(0) << 1) | ((patternLow >> bitPos)(0)))
   
-  val attrAddr = nametableBase + 0x3C0.U + ((tileY >> 2) << 3) + (tileX >> 2)
-  val attrByte = nametableRam.read(attrAddr(10, 0))
-  val attrShift = ((tileY(1) << 2) | (tileX(1) << 1))
-  val paletteIdx = (attrByte >> attrShift)(1, 0)
+  val attrAddr = RegNext(nametableBase + 0x3C0.U + ((tileY >> 2) << 3) + (tileX >> 2))
+  val attrByte = RegNext(nametableRam.read(attrAddr(10, 0)))
+  val attrShift = RegNext(((tileY(1) << 2) | (tileX(1) << 1)))
+  val paletteIdx = RegNext((attrByte >> attrShift)(1, 0))
   
-  val bgPaletteAddr = (paletteIdx << 2) | pixelBit
-  val bgColor = Mux(pixelBit === 0.U, paletteRam(0), paletteRam(bgPaletteAddr))
+  val bgPaletteAddr = RegNext((paletteIdx << 2) | pixelBit)
+  val bgColor = RegNext(Mux(pixelBit === 0.U, paletteRam(0), paletteRam(bgPaletteAddr)))
   
 
   val spriteY = oam(0)
@@ -200,23 +203,23 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
   val spriteX = oam(3)
   val spriteSize = Mux(regs.ppuCtrl(5), 16.U, 8.U)
   
-  val inSpriteX = pixel >= spriteX && pixel < (spriteX + 8.U)
-  val inSpriteY = scanline >= spriteY && scanline < (spriteY + spriteSize)
-  val spriteActive = inSpriteX && inSpriteY
+  val inSpriteX = RegNext(pixel >= spriteX && pixel < (spriteX + 8.U))
+  val inSpriteY = RegNext(scanline >= spriteY && scanline < (spriteY + spriteSize))
+  val spriteActive = RegNext(inSpriteX && inSpriteY)
   
-  val spriteFineX = pixel - spriteX
-  val spriteFineY = scanline - spriteY
+  val spriteFineX = RegNext(pixel - spriteX)
+  val spriteFineY = RegNext(scanline - spriteY)
   val spritePatternBase = Mux(regs.ppuCtrl(3), 0x1000.U, 0x0000.U)
-  val spritePatternAddr = spritePatternBase + (spriteTile << 4) + spriteFineY
-  val spritePatternLow = chrRom.read(spritePatternAddr)
-  val spritePatternHigh = chrRom.read(spritePatternAddr + 8.U)
+  val spritePatternAddr = RegNext(spritePatternBase + (spriteTile << 4) + spriteFineY)
+  val spritePatternLow = RegNext(chrRom.read(spritePatternAddr))
+  val spritePatternHigh = RegNext(chrRom.read(spritePatternAddr + 8.U))
   
-  val spriteBitPos = 7.U - spriteFineX
-  val spritePixelBit = ((spritePatternHigh >> spriteBitPos)(0) << 1) | ((spritePatternLow >> spriteBitPos)(0))
-  val spritePaletteIdx = spriteAttr(1, 0)
-  val spritePaletteAddr = 0x10.U + (spritePaletteIdx << 2) | spritePixelBit
-  val spriteColor = paletteRam(spritePaletteAddr)
-  val spritePriority = spriteAttr(5)
+  val spriteBitPos = RegNext(7.U - spriteFineX)
+  val spritePixelBit = RegNext(((spritePatternHigh >> spriteBitPos)(0) << 1) | ((spritePatternLow >> spriteBitPos)(0)))
+  val spritePaletteIdx = RegNext(spriteAttr(1, 0))
+  val spritePaletteAddr = RegNext(0x10.U + (spritePaletteIdx << 2) | spritePixelBit)
+  val spriteColor = RegNext(paletteRam(spritePaletteAddr))
+  val spritePriority = RegNext(spriteAttr(5))
   
   // Sprite 0 Hit
   when(spriteActive && spritePixelBit =/= 0.U && pixelBit =/= 0.U && pixel =/= 255.U) {
@@ -249,7 +252,10 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
   val bgPaletteAddrReg = (paletteIdxReg << 2) | pixelBitReg
   val bgColorReg = Mux(pixelBitReg === 0.U, paletteRam(0), paletteRam(bgPaletteAddrReg))
   
-  when(isRendering) {
+  when(reset.asBool) {
+    // Disable rendering during reset to avoid combinational loops
+    finalColor := 0.U
+  }.elsewhen(isRendering) {
     finalColor := paletteRam(0)
     when(pixelBitReg =/= 0.U) {
       // Address： +
