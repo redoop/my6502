@@ -97,11 +97,30 @@ class PPURefactored extends Module {
     chrRom.write(io.chrLoadAddr, io.chrLoadData)
   }
   
-  // 调色板 RAM (32 bytes)
-  val paletteRam = RegInit(VecInit(Seq.fill(32)(0.U(8.W))))
+  // 调色板 RAM (32 bytes) - 初始化为默认 NES 调色板
+  val paletteRam = RegInit(VecInit(Seq(
+    0x09.U, 0x01.U, 0x00.U, 0x01.U, 0x00.U, 0x02.U, 0x02.U, 0x0D.U,
+    0x08.U, 0x10.U, 0x08.U, 0x24.U, 0x00.U, 0x00.U, 0x04.U, 0x2C.U,
+    0x09.U, 0x01.U, 0x34.U, 0x03.U, 0x00.U, 0x04.U, 0x00.U, 0x14.U,
+    0x08.U, 0x3A.U, 0x00.U, 0x02.U, 0x00.U, 0x20.U, 0x2C.U, 0x08.U
+  )))
   
   // 名称表 RAM (2KB)
   val nametableRam = SyncReadMem(2048, UInt(8.W))
+  
+  // 调色板和 Nametable 写入逻辑 (通过 PPUDATA $2007)
+  when(io.cpuWrite && io.cpuAddr === 7.U) {  // PPUDATA
+    val ppuAddr = regs.ppuAddr
+    when(ppuAddr >= 0x3F00.U && ppuAddr <= 0x3FFF.U) {
+      // 调色板区域
+      val paletteAddr = ppuAddr(4, 0)
+      paletteRam(paletteAddr) := io.cpuDataIn
+    }.elsewhen(ppuAddr >= 0x2000.U && ppuAddr < 0x3F00.U) {
+      // Nametable 区域
+      val ntAddr = ppuAddr(10, 0)
+      nametableRam.write(ntAddr, io.cpuDataIn)
+    }
+  }
   
   // OAM (256 bytes)
   val oam = RegInit(VecInit(Seq.fill(256)(0.U(8.W))))
@@ -180,17 +199,35 @@ class PPURefactored extends Module {
   val showBg = bgEnable && (!hideLeft || showLeftBg)
   val showSprite = spriteEnable && (!hideLeft || showLeftSprite)
   
-  val finalColor = WireDefault(paletteRam(0))
+  val finalColor = RegInit(0.U(8.W))
+  
+  // 背景渲染管道 - 缓存读取的数据
+  val tileIndexReg = RegNext(tileIndex)
+  val patternLowReg = RegNext(patternLow)
+  val patternHighReg = RegNext(patternHigh)
+  val attrByteReg = RegNext(attrByte)
+  
+  // 使用缓存的数据计算像素
+  val fineXReg = RegNext(fineX)
+  val bitPosReg = 7.U - fineXReg
+  val pixelBitReg = ((patternHighReg >> bitPosReg)(0) << 1) | ((patternLowReg >> bitPosReg)(0))
+  
+  val tileXReg = RegNext(tileX)
+  val tileYReg = RegNext(tileY)
+  val attrShiftReg = ((tileYReg(1) << 2) | (tileXReg(1) << 1))
+  val paletteIdxReg = (attrByteReg >> attrShiftReg)(1, 0)
+  
+  val bgPaletteAddrReg = (paletteIdxReg << 2) | pixelBitReg
+  val bgColorReg = Mux(pixelBitReg === 0.U, paletteRam(0), paletteRam(bgPaletteAddrReg))
+  
   when(isRendering) {
-    when(showSprite && spriteActive && spritePixelBit =/= 0.U) {
-      when(!showBg || pixelBit === 0.U || !spritePriority) {
-        finalColor := spriteColor
-      }.otherwise {
-        finalColor := bgColor
-      }
-    }.elsewhen(showBg && pixelBit =/= 0.U) {
-      finalColor := bgColor
+    finalColor := paletteRam(0)  // 默认背景色
+    when(pixelBitReg =/= 0.U) {
+      // 使用正确的调色板地址：基址 + 像素值
+      finalColor := bgColorReg
     }
+  }.otherwise {
+    finalColor := paletteRam(0)
   }
   
   // 输出
@@ -198,6 +235,9 @@ class PPURefactored extends Module {
   io.pixelY := scanline
   io.pixelColor := finalColor(5, 0)
   io.vblank := vblankFlag
+  
+  // 防止优化
+  dontTouch(finalColor)
   
   // 调试输出
   io.debug.ppuCtrl := regs.ppuCtrl
