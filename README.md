@@ -316,29 +316,61 @@ sbt "runMain nes.GenerateNESVerilog"
 
 - Java 8 or higher
 - SBT (Scala Build Tool)
+- Verilator (for hardware simulation)
+- SDL2 (for graphics)
 
-### Build and Test
+### Quick Commands
 
 ```bash
-# Compile project
-sbt compile
+# Check environment
+./scripts/tools.sh check
 
-# Run all tests (78 test cases, all passing)
-sbt test
+# Build simulator
+./scripts/build.sh fast
 
-# Run specific tests
-sbt "testOnly cpu6502.instructions.FlagInstructionsSpec"
-sbt "testOnly cpu6502.core.CPU6502CoreSpec"
+# Run tests
+./scripts/test.sh quick
 
-# Generate Verilog (both versions)
-sbt "runMain cpu6502.GenerateBoth"
+# Play game
+./scripts/run.sh games/Donkey-Kong.nes
 
-# Generate original only
-sbt "runMain cpu6502.GenerateCPU6502"
-
-# Generate refactored only
-sbt "runMain cpu6502.GenerateCPU6502Refactored"
+# Debug
+./scripts/debug.sh opcodes games/Donkey-Kong.nes
 ```
+
+### Detailed Usage
+
+```bash
+# Build (4 modes)
+./scripts/build.sh              # normal
+./scripts/build.sh fast         # fast (no trace)
+./scripts/build.sh trace        # with VCD trace
+./scripts/build.sh optimized    # optimized + trace
+
+# Test (4 types)
+./scripts/test.sh               # all tests
+./scripts/test.sh unit          # unit tests only
+./scripts/test.sh integration   # integration tests
+./scripts/test.sh quick         # quick tests
+
+# Run games
+./scripts/run.sh                           # Donkey Kong (default)
+./scripts/run.sh games/Super-Mario.nes     # Super Mario
+
+# Debug tools
+./scripts/debug.sh opcodes <rom>    # analyze opcodes
+./scripts/debug.sh vcd              # analyze VCD
+./scripts/debug.sh monitor pc       # monitor PC
+./scripts/debug.sh transistors      # count transistors
+
+# Project tools
+./scripts/tools.sh clean      # clean build
+./scripts/tools.sh generate   # generate Verilog
+./scripts/tools.sh stats      # project stats
+./scripts/tools.sh rom        # ROM info
+```
+
+See [scripts/README.md](scripts/README.md) for complete documentation.
 
 ### Generated Verilog Information
 
