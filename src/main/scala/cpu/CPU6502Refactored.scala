@@ -12,6 +12,7 @@ class CPU6502Refactored extends Module {
     val memDataIn  = Input(UInt(8.W))
     val memWrite   = Output(Bool())
     val memRead    = Output(Bool())
+    val memReady   = Input(Bool())   // Memory ready signal (for multi-cycle access)
     val debug      = Output(new DebugBundle)
     val reset      = Input(Bool())  // Reset Signal
     val nmi        = Input(Bool())  // NMI Interrupt Signal
@@ -24,6 +25,7 @@ class CPU6502Refactored extends Module {
   core.io.memDataIn := io.memDataIn
   io.memWrite   := core.io.memWrite
   io.memRead    := core.io.memRead
+  core.io.memReady := io.memReady
   io.debug      := core.io.debug
   core.io.reset := io.reset
   core.io.nmi   := io.nmi

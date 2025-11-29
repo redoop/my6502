@@ -220,40 +220,38 @@ object LoadStoreInstructions {
     
     switch(cycle) {
       is(0.U) {
+        // Cycle 0: Request low byte (don't read yet)
         result.memAddr := regs.pc
         result.memRead := true.B
-        result.operand := memDataIn
         newRegs.pc := regs.pc + 1.U
         result.regs := newRegs
         result.nextCycle := 1.U
-        when(opcode === 0x8D.U) {
-          printf("[STA abs] Cycle 0: Read low byte = 0x%x from PC=0x%x\n", memDataIn, regs.pc)
-        }
       }
       is(1.U) {
+        // Cycle 1: Read low byte, request high byte
+        result.memAddr := regs.pc
+        result.memRead := true.B
+        result.operand := memDataIn
+        result.nextCycle := 2.U
+      }
+      is(2.U) {
+        // Cycle 2: Keep address stable for high byte
         result.memAddr := regs.pc
         result.memRead := true.B
         result.operand := operand
         newRegs.pc := regs.pc + 1.U
         result.regs := newRegs
-        result.nextCycle := 2.U
-        when(opcode === 0x8D.U) {
-          printf("[STA abs] Cycle 1: Request high byte from PC=0x%x\n", regs.pc)
-        }
+        result.nextCycle := 3.U
       }
-      is(2.U) {
-        // Cycle 2: ReadandAddress
+      is(3.U) {
+        // Cycle 3: Read high byte and assemble address
         result.memAddr := regs.pc
         result.memRead := false.B
         result.operand := Cat(memDataIn, operand(7, 0))
-        result.nextCycle := 3.U
-        when(opcode === 0x8D.U) {
-          printf("[STA abs] Cycle 2: Read high byte = 0x%x, Address = 0x%x\n", 
-                 memDataIn, Cat(memDataIn, operand(7, 0)))
-        }
+        result.nextCycle := 4.U
       }
-      is(3.U) {
-        // Cycle 3: /
+      is(4.U) {
+        // Cycle 4: Issue read/write request
         result.memAddr := operand
         when(isLoadA || isLoadX || isLoadY) {
           result.memRead := true.B
@@ -264,14 +262,17 @@ object LoadStoreInstructions {
             (opcode === 0x8C.U) -> regs.y
           ))
         }
-        result.nextCycle := 4.U
+        result.nextCycle := 5.U
       }
-      is(4.U) {
-        // Cycle 4: Complete
+      is(5.U) {
+        // Cycle 5: Complete
         result.memAddr := operand
         when(isLoadA || isLoadX || isLoadY) {
           when(isLoadA) {
             newRegs.a := memDataIn
+            when(operand === 0x2002.U) {
+              printf("[LDA $2002] data=0x%x\n", memDataIn)
+            }
           }.elsewhen(isLoadX) {
             newRegs.x := memDataIn
           }.otherwise {

@@ -12,6 +12,7 @@ class CPU6502Core extends Module {
     val memDataIn  = Input(UInt(8.W))
     val memWrite   = Output(Bool())
     val memRead    = Output(Bool())
+    val memReady   = Input(Bool())   // Memory ready signal
     val debug      = Output(new DebugBundle)
     val reset      = Input(Bool())  // Reset Signal
     val nmi        = Input(Bool())  // NMI Interrupt Signal
@@ -26,7 +27,7 @@ class CPU6502Core extends Module {
   
   val opcode  = RegInit(0.U(8.W))
   val operand = RegInit(0.U(16.W))
-  val cycle   = RegInit(0.U(3.W))
+  val cycle   = RegInit(0.U(4.W))  // 4 bits to support NMI (9 cycles)
   
   // NMI Edge Detection
   val nmiLast = RegInit(false.B)
@@ -116,20 +117,24 @@ class CPU6502Core extends Module {
             cycle := 0.U
             state := sNMI
           }.otherwise {
-            // Fetch  2 CycleProcess SyncReadMem
+            // Fetch with memReady support
             when(cycle === 0.U) {
-              // Cycle 0:
+              // Cycle 0: Issue read request
               io.memAddr := regs.pc
               io.memRead := true.B
-              cycle := 1.U
+              when(io.memReady) {
+                cycle := 1.U
+              }
             }.otherwise {
-              // Cycle 1: ReadDataand Execute (Address)
+              // Cycle 1: Read data and execute
               io.memAddr := regs.pc
               io.memRead := true.B
-              opcode := io.memDataIn
-              regs.pc := regs.pc + 1.U
-              cycle := 0.U
-              state := sExecute
+              when(io.memReady) {
+                opcode := io.memDataIn
+                regs.pc := regs.pc + 1.U
+                cycle := 0.U
+                state := sExecute
+              }
             }
           }
         }
@@ -158,6 +163,7 @@ class CPU6502Core extends Module {
 
         is(sNMI) {
           // NMI Process (9 Cycle)
+          printf("[NMI State] cycle=%d\n", cycle)
           when(cycle === 0.U) {
             // Cycle 1:
             cycle := 1.U
@@ -205,8 +211,10 @@ class CPU6502Core extends Module {
             io.memAddr := 0xFFFB.U
             io.memRead := true.B
             cycle := 8.U
+            printf("[NMI] Setting cycle to 8\n")
           }.otherwise {  // cycle === 8
             // Cycle 9: SaveVectorandSet PC
+            printf("[NMI] Cycle 8: completing, vector=0x%x\n", Cat(io.memDataIn, operand(7, 0)))
             val nmiVector = Cat(io.memDataIn, operand(7, 0))
             regs.pc := nmiVector
             regs.flagI := true.B  // SetFlag

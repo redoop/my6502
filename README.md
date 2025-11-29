@@ -163,7 +163,11 @@ The 6502 processor was widely used in numerous classic computers and game consol
 
 A complete NES (Nintendo Entertainment System) built on the 6502 CPU.
 
-**🎮 Game Status**: ✅ **Donkey Kong is playable!** See [docs/GAME_STATUS.md](docs/GAME_STATUS.md) for details.
+**🎮 Game Status**: ✅ **Donkey Kong is playable!** See [docs/GAME_COMPATIBILITY_REPORT.md](docs/GAME_COMPATIBILITY_REPORT.md) for details.
+
+**Supported Mappers**:
+- ✅ Mapper 0 (NROM) - Fully working
+- ❌ Mapper 4 (MMC3) - Not yet implemented (causes Verilator crash)
 
 **✨ v3 Updates (2025-11-27):**
 - ✅ **PPUv3** - Integrated rendering pipeline with full game support ⭐ New!

@@ -22,11 +22,14 @@ class NESSystemRefactored(enableDebug: Boolean = false) extends Module {
     
     // ROM Interface
     val prgLoadEn = Input(Bool())
-    val prgLoadAddr = Input(UInt(16.W))
+    val prgLoadAddr = Input(UInt(19.W))  // 512KB
     val prgLoadData = Input(UInt(8.W))
     val chrLoadEn = Input(Bool())
     val chrLoadAddr = Input(UInt(13.W))
     val chrLoadData = Input(UInt(8.W))
+    
+    // Mapper selection
+    val mapperNum = Input(UInt(8.W))
     
     // ControlInterface
     val controller1 = Input(UInt(8.W))
@@ -54,6 +57,7 @@ class NESSystemRefactored(enableDebug: Boolean = false) extends Module {
   })
   
   // CPU
+  // CPU
   val cpu = Module(new CPU6502Refactored)
   
   // PPU
@@ -62,25 +66,48 @@ class NESSystemRefactored(enableDebug: Boolean = false) extends Module {
   // APU - whenDisable，Wait
   // val apu = Module(new APURefactored)
   
-  // PRG ROM (32KB)
-  val prgRom = SyncReadMem(32768, UInt(8.W))
+  // PRG ROM - 512KB for Mapper 4 only
+  // Use Mem (async) for Verilator compatibility
+  val prgRom = Mem(524288, UInt(8.W))
+  
   when(io.prgLoadEn) {
     prgRom.write(io.prgLoadAddr, io.prgLoadData)
   }
   
+  // MMC3 Mapper (Mapper 4)
+  val mmc3 = Module(new MMC3Mapper)
+  
   // RAM (2KB)
-  val ram = SyncReadMem(2048, UInt(8.W))
+  val ram = Mem(2048, UInt(8.W))
   
 
   val cpuAddr = cpu.io.memAddr
   when(cpuAddr >= 0x2000.U && cpuAddr <= 0x2010.U) {
     printf("[NES] cpuAddr=$%x memRead=%d\n", cpuAddr, cpu.io.memRead)
   }
+  
   val isRam = cpuAddr < 0x2000.U
   val isPpuReg = cpuAddr >= 0x2000.U && cpuAddr < 0x4000.U
   val isApuReg = cpuAddr >= 0x4000.U && cpuAddr < 0x4018.U
   val isController = cpuAddr === 0x4016.U || cpuAddr === 0x4017.U
   val isPrgRom = cpuAddr >= 0x8000.U
+  
+  // MMC3 Mapper connections
+  mmc3.io.cpuAddr := cpuAddr
+  mmc3.io.cpuDataIn := cpu.io.memDataOut
+  mmc3.io.cpuWrite := cpu.io.memWrite && isPrgRom
+  mmc3.io.cpuRead := cpu.io.memRead && isPrgRom
+  mmc3.io.ppuAddr := 0.U
+  
+  // PRG ROM read through MMC3
+  val prgData = prgRom.read(mmc3.io.prgAddr)
+  mmc3.io.prgData := prgData
+  
+  // Memory ready: Always ready
+  cpu.io.memReady := true.B
+  
+  // Memory ready logic: Always ready (use async ROM)
+  cpu.io.memReady := true.B
   
   // Control strobe
   val controller1Shift = RegInit(0.U(8.W))
@@ -110,23 +137,21 @@ class NESSystemRefactored(enableDebug: Boolean = false) extends Module {
   
   val controllerData = Mux(cpuAddr(0), controller2Data, controller1Data)
   
+  // Register control signals to match memory delay
+  // val isRamReg = RegNext(isRam)
+  // val isPpuRegReg = RegNext(isPpuReg)
+  // val isControllerReg = RegNext(isController)
+  // val isPrgRomReg = RegNext(isPrgRom)
+  
   // CPU Read
   val ramData = ram.read(cpuAddr(10, 0))
   val ppuData = ppu.io.cpuDataOut
-  // val apuData = apu.io.cpuDataOut
-  
-  // PRG ROM Read - Support 16KB
-  // 16KB ROM: $8000-$BFFF  $C000-$FFFF to $0000-$3FFF
-  // 32KB ROM: $8000-$FFFF to $0000-$7FFF
-  val prgAddr = Mux(cpuAddr(14), cpuAddr(13, 0), cpuAddr(13, 0))  // bit 13-0 (14  = 16KB)
-  val prgData = prgRom.read(prgAddr)
   
   cpu.io.memDataIn := MuxCase(0.U, Seq(
     isRam -> ramData,
     isPpuReg -> ppuData,
-    // isApuReg -> apuData,
     isController -> controllerData,
-    isPrgRom -> prgData
+    isPrgRom -> mmc3.io.cpuDataOut
   ))
   
   // Debug: CPU Read PPU
@@ -136,7 +161,6 @@ class NESSystemRefactored(enableDebug: Boolean = false) extends Module {
   when(cpuAddr >= 0x2000.U && cpuAddr < 0x4000.U) {
     printf("[NES] PPU addr range: addr=$%x isPpuReg=%d\n", cpuAddr, isPpuReg)
   }
-  
   // CPU Write
   when(cpu.io.memWrite) {
     printf("[CPU Write] Addr=$%x Data=0x%x isRam=%d isPpuReg=%d\n", 
@@ -171,6 +195,9 @@ class NESSystemRefactored(enableDebug: Boolean = false) extends Module {
   ppu.io.chrLoadEn := io.chrLoadEn
   ppu.io.chrLoadAddr := io.chrLoadAddr
   ppu.io.chrLoadData := io.chrLoadData
+  
+  // Connect MMC3 CHR interface (not used yet, but must be connected)
+  mmc3.io.chrData := 0.U
   
   // APU  - whenDisable
   // apu.io.cpuAddr := cpuAddr(7, 0)

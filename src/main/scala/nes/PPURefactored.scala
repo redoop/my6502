@@ -98,6 +98,11 @@ class PPURefactored(enableDebug: Boolean = false) extends Module {
     printf("[PPU] VBlank END at scanline=261 pixel=0\n")
   }
   
+  // Debug: print scanline every 60 scanlines
+  when(pixel === 0.U && (scanline === 0.U || scanline === 60.U || scanline === 120.U || scanline === 180.U || scanline === 240.U)) {
+    printf("[PPU] scanline=%d\n", scanline)
+  }
+  
   // NMI  - in pixel 1 Trigger（when vblankFlag Set）
   val nmiEnable = regs.ppuCtrl(7)
   val nmiTrigger = RegInit(false.B)

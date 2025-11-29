@@ -170,6 +170,9 @@ public:
     void loadROMToHardware() {
         if (!g_quiet_mode) std::cout << "⬆️  加载 ROM 到硬件..." << std::endl;
         
+        // Set mapper number
+        dut->io_mapperNum = mapper_num;
+        
         // 加载所有 PRG ROM
         size_t prg_load_size = std::min(prg_rom.size(), (size_t)524288);
         

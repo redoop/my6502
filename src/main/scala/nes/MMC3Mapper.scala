@@ -141,6 +141,7 @@ class MMC3Mapper extends Module {
     is(3.U) { prgBankNum := prgBank3 }  // $E000-$FFFF
   }
   
+  // Direct output (no register) - combinational path
   io.prgAddr := Cat(prgBankNum, io.cpuAddr(12, 0))
   io.cpuDataOut := io.prgData
   

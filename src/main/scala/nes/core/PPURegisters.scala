@@ -74,6 +74,10 @@ class PPURegisterControl(enableDebug: Boolean = false) extends Module {
     7.U -> regs.ppuData     // $2007
   ))
   
+  when(io.cpuRead && io.cpuAddr === 2.U) {
+    printf("[PPU Regs] Output PPUSTATUS: vblank=%d output=0x%x\n", regs.vblank, Cat(regs.vblank, regs.sprite0Hit, regs.spriteOverflow, 0.U(5.W)))
+  }
+  
   // Write
   when(io.cpuWrite) {
     switch(io.cpuAddr) {
@@ -127,12 +131,12 @@ class PPURegisterControl(enableDebug: Boolean = false) extends Module {
   // StateUpdate - ：Set > Clear > Clear
   when(io.setVBlank) {
     regs.vblank := true.B
+    clearVBlankNext := false.B  // Don't clear if just set
     if (enableDebug) {
       printf("[PPU Regs] setVBlank triggered, vblank=%d\n", true.B)
     }
   }.elsewhen(clearVBlankNext) {
     regs.vblank := false.B
-    clearVBlankNext := false.B  // ClearFlag
     if (enableDebug) {
       printf("[PPU Regs] clearVBlankNext executed, vblank cleared\n")
     }
@@ -141,6 +145,11 @@ class PPURegisterControl(enableDebug: Boolean = false) extends Module {
     if (enableDebug) {
       printf("[PPU Regs] clearVBlank triggered, vblank=%d\n", false.B)
     }
+  }
+  
+  // Reset clear flags after they've been processed
+  when(clearVBlankNext) {
+    clearVBlankNext := false.B
   }
   
   // Clear addr/scroll latch
