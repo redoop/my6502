@@ -11,8 +11,14 @@
 #include <iomanip>
 #include <SDL.h>
 
+// VCD 追踪支持
+#if VM_TRACE
+#include <verilated_vcd_c.h>
+#endif
+
 // 全局静默模式标志
 bool g_quiet_mode = false;
+bool g_trace_enabled = false;
 
 // NES 调色板 (RGB)
 const uint32_t NES_PALETTE[64] = {
@@ -27,9 +33,15 @@ const uint32_t NES_PALETTE[64] = {
 };
 
 class NESEmulator {
-private:
+public:
     VNESSystemRefactored* dut;
     uint64_t cycle_count;
+    uint8_t mapper_num;
+    
+private:
+#if VM_TRACE
+    VerilatedVcdC* tfp;
+#endif
     
     // ROM 数据
     std::vector<uint8_t> prg_rom;
@@ -49,7 +61,14 @@ private:
     int render_skip;
     
 public:
-    NESEmulator(VNESSystemRefactored* dut_ptr) : dut(dut_ptr), cycle_count(0), render_skip(0) {
+    NESEmulator(VNESSystemRefactored* dut_ptr
+#if VM_TRACE
+                , VerilatedVcdC* tfp_ptr = nullptr
+#endif
+    ) : dut(dut_ptr), cycle_count(0), render_skip(0) {
+#if VM_TRACE
+        tfp = tfp_ptr;
+#endif
         controller1 = 0;
         controller2 = 0;
         
@@ -121,11 +140,13 @@ public:
         
         int prg_size = header[4] * 16384;
         int chr_size = header[5] * 8192;
+        mapper_num = ((header[7] & 0xF0) | (header[6] >> 4));
         
         if (!g_quiet_mode) {
             std::cout << "📦 加载 ROM:" << std::endl;
             std::cout << "   PRG ROM: " << prg_size << " 字节" << std::endl;
             std::cout << "   CHR ROM: " << chr_size << " 字节" << std::endl;
+            std::cout << "   Mapper: " << (int)mapper_num << std::endl;
         }
         
         // 读取 PRG ROM
@@ -149,35 +170,33 @@ public:
     void loadROMToHardware() {
         if (!g_quiet_mode) std::cout << "⬆️  加载 ROM 到硬件..." << std::endl;
         
-        // 加载 PRG ROM
-        size_t prg_offset = 0;
-        if (prg_rom.size() > 32768) {
-            prg_offset = prg_rom.size() - 32768;
-        }
+        // 加载所有 PRG ROM
+        size_t prg_load_size = std::min(prg_rom.size(), (size_t)524288);
         
         // PRG ROM loading
-        for (size_t i = 0; i < 32768 && (prg_offset + i) < prg_rom.size(); i++) {
+        for (size_t i = 0; i < prg_load_size; i++) {
             dut->io_prgLoadEn = 1;
             dut->io_prgLoadAddr = i;
-            dut->io_prgLoadData = prg_rom[prg_offset + i];
+            dut->io_prgLoadData = prg_rom[i];
             tick();
             
-            if (!g_quiet_mode && i % 4096 == 0) {
-                std::cout << "\r   PRG: " << (i * 100 / 32768) << "%" << std::flush;
+            if (!g_quiet_mode && i % 16384 == 0) {
+                std::cout << "\r   PRG: " << (i * 100 / prg_load_size) << "%" << std::flush;
             }
         }
         if (!g_quiet_mode) std::cout << "\r   PRG: 100%" << std::endl;
         
         // 加载 CHR ROM
         if (!chr_rom.empty()) {
-            for (size_t i = 0; i < chr_rom.size() && i < 8192; i++) {
+            size_t chr_load_size = std::min(chr_rom.size(), (size_t)262144);
+            for (size_t i = 0; i < chr_load_size; i++) {
                 dut->io_chrLoadEn = 1;
                 dut->io_chrLoadAddr = i;
                 dut->io_chrLoadData = chr_rom[i];
                 tick();
                 
-                if (!g_quiet_mode && i % 2048 == 0) {
-                    std::cout << "\r   CHR: " << (i * 100 / std::min(chr_rom.size(), (size_t)8192)) << "%" << std::flush;
+                if (!g_quiet_mode && i % 8192 == 0) {
+                    std::cout << "\r   CHR: " << (i * 100 / chr_load_size) << "%" << std::flush;
                 }
             }
             if (!g_quiet_mode) std::cout << "\r   CHR: 100%" << std::endl;
@@ -195,10 +214,16 @@ public:
         
         dut->clock = 0;
         dut->eval();
+#if VM_TRACE
+        if (tfp && g_trace_enabled) tfp->dump(cycle_count * 2);
+#endif
         cycle_count++;
         
         dut->clock = 1;
         dut->eval();
+#if VM_TRACE
+        if (tfp && g_trace_enabled) tfp->dump(cycle_count * 2 + 1);
+#endif
         
         // 监控所有内存读取 (前 100000 周期)
         if (cycle_count < 100000) {
@@ -401,6 +426,8 @@ public:
         auto last_report_time = start_time;
         auto last_input_time = start_time;
         bool last_vblank = false;
+        bool last_nmi = false;
+        uint64_t nmi_count = 0;
         
         while (true) {
             // 每 16ms 处理一次输入（约 60Hz）
@@ -423,6 +450,17 @@ public:
                     frame_count++;
                 }
                 last_vblank = vblank;
+                
+                // 检测 NMI 上升沿
+                bool nmi = dut->io_debug_nmi;
+                if (nmi && !last_nmi) {
+                    nmi_count++;
+                    if (nmi_count <= 5) {
+                        std::cout << "\n[NMI] Triggered at cycle " << cycle_count 
+                                  << ", PC=0x" << std::hex << dut->io_debug_cpuPC << std::dec << std::endl;
+                    }
+                }
+                last_nmi = nmi;
             }
             
             // 每秒报告一次状态
@@ -437,6 +475,7 @@ public:
                 
                 std::cout << "\r帧: " << frame_count 
                           << " | FPS: " << std::fixed << std::setprecision(1) << fps 
+                          << " | NMI: " << nmi_count
                           << " | PC: 0x" << std::hex << pc 
                           << " | A: 0x" << (int)a
                           << " | X: 0x" << (int)x
@@ -444,6 +483,7 @@ public:
                           << "     " << std::flush;
                 
                 frame_count = 0;
+                nmi_count = 0;
                 last_report_time = now;
             }
         }
@@ -452,26 +492,45 @@ public:
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::cerr << "用法: " << argv[0] << " <rom文件> [--quiet]" << std::endl;
+        std::cerr << "用法: " << argv[0] << " <rom文件> [--quiet] [--trace]" << std::endl;
         return 1;
     }
     
-    // 检查静默模式
+    // 检查参数
     for (int i = 2; i < argc; i++) {
         if (std::string(argv[i]) == "--quiet") {
             g_quiet_mode = true;
+        }
+        if (std::string(argv[i]) == "--trace") {
+            g_trace_enabled = true;
         }
     }
     
     if (!g_quiet_mode) {
         std::cout << "🚀 NES Verilator 仿真器 (快速模式)" << std::endl;
         std::cout << "====================================" << std::endl;
+        if (g_trace_enabled) {
+            std::cout << "📊 VCD 追踪已启用" << std::endl;
+        }
     }
     
     Verilated::commandArgs(argc, argv);
     
     VNESSystemRefactored* dut = new VNESSystemRefactored;
+    
+#if VM_TRACE
+    VerilatedVcdC* tfp = nullptr;
+    if (g_trace_enabled) {
+        Verilated::traceEverOn(true);
+        tfp = new VerilatedVcdC;
+        dut->trace(tfp, 99);  // 追踪深度
+        tfp->open("nes_trace.vcd");
+        std::cout << "📝 VCD 文件: nes_trace.vcd" << std::endl;
+    }
+    NESEmulator emulator(dut, tfp);
+#else
     NESEmulator emulator(dut);
+#endif
     
     // 在 reset 期间加载 ROM
     std::cout << "🔄 保持 Reset 状态加载 ROM..." << std::endl;
@@ -512,6 +571,14 @@ int main(int argc, char** argv) {
     std::cout << "✅ CPU 已启动，PC = 0x" << std::hex << dut->io_debug_cpuPC << std::dec << std::endl;
     
     emulator.run();
+    
+#if VM_TRACE
+    if (tfp) {
+        tfp->close();
+        delete tfp;
+        std::cout << "📊 VCD 追踪已保存" << std::endl;
+    }
+#endif
     
     delete dut;
     return 0;

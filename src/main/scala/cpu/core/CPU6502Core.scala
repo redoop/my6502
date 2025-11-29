@@ -116,21 +116,18 @@ class CPU6502Core extends Module {
             cycle := 0.U
             state := sNMI
           }.otherwise {
-            // Fetch 需要 3 个周期: 读取 opcode + 预读下一个字节
+            // Fetch 需要 2 个周期来处理 SyncReadMem 的延迟
             when(cycle === 0.U) {
               // 周期 0: 发出读请求
               io.memAddr := regs.pc
               io.memRead := true.B
               cycle := 1.U
-            }.elsewhen(cycle === 1.U) {
-              // 周期 1: 读取 opcode，发出下一个字节的读请求
-              opcode := io.memDataIn
-              regs.pc := regs.pc + 1.U
+            }.otherwise {
+              // 周期 1: 读取数据并进入 Execute (保持地址稳定)
               io.memAddr := regs.pc
               io.memRead := true.B
-              cycle := 2.U
-            }.otherwise {
-              // 周期 2: 下一个字节已准备好，进入 Execute
+              opcode := io.memDataIn
+              regs.pc := regs.pc + 1.U
               cycle := 0.U
               state := sExecute
             }
@@ -149,11 +146,13 @@ class CPU6502Core extends Module {
           
           regs    := execResult.regs
           operand := execResult.operand
-          cycle   := execResult.nextCycle
           
           when(execResult.done) {
+            printf("[Execute] Done! opcode=0x%x cycle=%d -> Fetch\n", opcode, cycle)
             cycle := 0.U
             state := sFetch
+          }.otherwise {
+            cycle := execResult.nextCycle
           }
         }
 
