@@ -74,6 +74,8 @@ class PPURegisterControl extends Module {
     switch(io.cpuAddr) {
       is(0.U) { // $2000 - PPUCTRL
         regs.ppuCtrl := io.cpuDataIn
+        printf("[PPU] Write PPUCTRL = 0x%x (NMI enable = %d)\n", 
+               io.cpuDataIn, io.cpuDataIn(7))
       }
       is(1.U) { // $2001 - PPUMASK
         regs.ppuMask := io.cpuDataIn
@@ -109,6 +111,7 @@ class PPURegisterControl extends Module {
   
   // 读取 PPUSTATUS 清除标志
   when(io.cpuRead && io.cpuAddr === 2.U) {
+    printf("[PPU] Read PPUSTATUS = 0x%x\n", regs.ppuStatus)
     regs.vblank := false.B
     regs.addrLatch := false.B
     regs.scrollLatch := false.B

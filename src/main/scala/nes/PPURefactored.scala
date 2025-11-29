@@ -87,9 +87,18 @@ class PPURefactored extends Module {
     regControl.io.clearVBlank := true.B
   }
   
-  // NMI 生成
+  // NMI 生成 - 只在 VBlank 开始时产生一个周期的脉冲
   val nmiEnable = regs.ppuCtrl(7)
-  io.nmiOut := nmiEnable && vblankFlag
+  val nmiTrigger = RegInit(false.B)
+  
+  // VBlank 开始时设置 NMI 触发
+  when(scanline === 241.U && pixel === 1.U && nmiEnable) {
+    nmiTrigger := true.B
+  }.otherwise {
+    nmiTrigger := false.B
+  }
+  
+  io.nmiOut := nmiTrigger
   
   // CHR ROM (8KB)
   val chrRom = SyncReadMem(8192, UInt(8.W))

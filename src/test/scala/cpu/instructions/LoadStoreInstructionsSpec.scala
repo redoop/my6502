@@ -315,7 +315,7 @@ class LoadStoreImmediateTestModule extends Module {
   regs := Registers.default()
   regs.pc := io.pcIn
 
-  val result = LoadStoreInstructions.executeImmediate(io.opcode, regs, io.memDataIn)
+  val result = LoadStoreInstructions.executeImmediate(io.opcode, 0.U, regs, io.memDataIn)
 
   io.aOut     := result.regs.a
   io.xOut     := result.regs.x

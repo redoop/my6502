@@ -44,6 +44,9 @@ class NESSystemRefactored extends Module {
       val nmi = Bool()
       val apuPulse1Active = Bool()
       val apuPulse2Active = Bool()
+      val cpuState = UInt(3.W)  // CPU 状态机状态
+      val cpuCycle = UInt(3.W)  // CPU 周期计数
+      val cpuOpcode = UInt(8.W) // 当前指令
     })
   })
   
@@ -73,12 +76,44 @@ class NESSystemRefactored extends Module {
   val isController = cpuAddr === 0x4016.U || cpuAddr === 0x4017.U
   val isPrgRom = cpuAddr >= 0x8000.U
   
+  // 控制器 strobe 逻辑
+  val controller1Shift = RegInit(0.U(8.W))
+  val controller2Shift = RegInit(0.U(8.W))
+  val controllerStrobe = RegInit(false.B)
+  
+  when(cpu.io.memWrite && cpuAddr === 0x4016.U) {
+    controllerStrobe := cpu.io.memDataOut(0)
+    when(cpu.io.memDataOut(0)) {
+      // Strobe = 1: 加载控制器状态
+      controller1Shift := io.controller1
+      controller2Shift := io.controller2
+    }
+  }
+  
+  // 控制器读取：每次读取返回最低位，然后右移
+  val controller1Data = controller1Shift(0)
+  val controller2Data = controller2Shift(0)
+  
+  when(cpu.io.memRead && isController && !controllerStrobe) {
+    when(cpuAddr === 0x4016.U) {
+      controller1Shift := controller1Shift >> 1
+    }.otherwise {
+      controller2Shift := controller2Shift >> 1
+    }
+  }
+  
+  val controllerData = Mux(cpuAddr(0), controller2Data, controller1Data)
+  
   // CPU 读取
   val ramData = ram.read(cpuAddr(10, 0))
   val ppuData = ppu.io.cpuDataOut
   // val apuData = apu.io.cpuDataOut
-  val prgData = prgRom.read(cpuAddr(14, 0))
-  val controllerData = Mux(cpuAddr(0), io.controller2, io.controller1)
+  
+  // PRG ROM 读取 - 支持 16KB 镜像
+  // 对于 16KB ROM: $8000-$BFFF 和 $C000-$FFFF 都映射到 $0000-$3FFF
+  // 对于 32KB ROM: $8000-$FFFF 映射到 $0000-$7FFF
+  val prgAddr = Mux(cpuAddr(14), cpuAddr(13, 0), cpuAddr(13, 0))  // 使用 bit 13-0 (14 位 = 16KB)
+  val prgData = prgRom.read(prgAddr)
   
   cpu.io.memDataIn := MuxCase(0.U, Seq(
     isRam -> ramData,
@@ -100,6 +135,11 @@ class NESSystemRefactored extends Module {
   ppu.io.cpuDataIn := cpu.io.memDataOut
   ppu.io.cpuWrite := cpu.io.memWrite && isPpuReg
   ppu.io.cpuRead := cpu.io.memRead && isPpuReg
+  
+  // Debug: PPU 写入监控
+  when(cpu.io.memWrite && isPpuReg) {
+    printf("[PPU Write] Addr=$%x RegAddr=%d Data=0x%x\n", cpuAddr, cpuAddr(2, 0), cpu.io.memDataOut)
+  }
   ppu.io.oamDmaAddr := 0.U
   ppu.io.oamDmaData := 0.U
   ppu.io.oamDmaWrite := false.B
@@ -114,7 +154,7 @@ class NESSystemRefactored extends Module {
   // apu.io.cpuRead := cpu.io.memRead && isApuReg
   
   // CPU 中断
-  cpu.io.reset := false.B
+  cpu.io.reset := reset.asBool  // 连接到系统 reset
   cpu.io.nmi := ppu.io.nmiOut
   
   // 输出
@@ -129,6 +169,9 @@ class NESSystemRefactored extends Module {
   io.debug.cpuA := cpu.io.debug.regA
   io.debug.cpuX := cpu.io.debug.regX
   io.debug.cpuY := cpu.io.debug.regY
+  io.debug.cpuState := cpu.io.debug.state
+  io.debug.cpuCycle := cpu.io.debug.cycle
+  io.debug.cpuOpcode := cpu.io.debug.opcode
   io.debug.ppuCtrl := ppu.io.debug.ppuCtrl
   io.debug.ppuMask := ppu.io.debug.ppuMask
   io.debug.vblank := ppu.io.vblank
