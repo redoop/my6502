@@ -32,7 +32,7 @@ logic [7:0] test_ram[0:255];
 assign ram_data = test_ram[ram_addr_low];
 
 initial begin
-    $dumpfile("test_dma.vcd");
+    $dumpfile("waveforms/test_dma.vcd");
     $dumpvars(0, test_dma);
     
     // Initialize

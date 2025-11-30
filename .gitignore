@@ -31,6 +31,10 @@ test_run_dir/
 Thumbs.db
 nes_trace.vcd
 
+# Test waveforms
+waveforms/
+*.vcd
+
 # Verilator generated directories
 verilator/obj_dir/
 src/test/rtl/obj_dir_nes/

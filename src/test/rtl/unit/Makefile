@@ -12,30 +12,34 @@ all: $(TESTS)
 
 test_dma: test_dma.sv $(RTL_DIR)/nes_dma.sv
 	@echo "Testing DMA..."
+	@mkdir -p waveforms
 	$(VERILATOR) $(VFLAGS) --top-module test_dma $^
 	./obj_dir/Vtest_dma
 	@echo ""
 
 test_apu: test_apu.sv $(RTL_DIR)/nes_apu.sv
 	@echo "Testing APU..."
+	@mkdir -p waveforms
 	$(VERILATOR) $(VFLAGS) --top-module test_apu $^
 	./obj_dir/Vtest_apu
 	@echo ""
 
 test_ppu: test_ppu.sv $(RTL_DIR)/nes_ppu.sv
 	@echo "Testing PPU..."
+	@mkdir -p waveforms
 	$(VERILATOR) $(VFLAGS) --top-module test_ppu $^
 	./obj_dir/Vtest_ppu
 	@echo ""
 
 test_cpu: test_cpu.sv $(RTL_DIR)/cpu_6502.sv
 	@echo "Testing CPU..."
+	@mkdir -p waveforms
 	$(VERILATOR) $(VFLAGS) --top-module test_cpu $^
 	./obj_dir/Vtest_cpu
 	@echo ""
 
 clean:
-	rm -rf obj_dir *.vcd
+	rm -rf obj_dir waveforms
 
 .PHONY: help
 help:

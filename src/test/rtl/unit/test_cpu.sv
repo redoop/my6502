@@ -38,7 +38,7 @@ always @(posedge clk) begin
 end
 
 initial begin
-    $dumpfile("test_cpu.vcd");
+    $dumpfile("waveforms/test_cpu.vcd");
     $dumpvars(0, test_cpu);
     
     rst_n = 0;

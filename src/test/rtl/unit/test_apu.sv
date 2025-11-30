@@ -30,7 +30,7 @@ initial clk = 0;
 always #5 clk = ~clk;
 
 initial begin
-    $dumpfile("test_apu.vcd");
+    $dumpfile("waveforms/test_apu.vcd");
     $dumpvars(0, test_apu);
     
     rst_n = 0;

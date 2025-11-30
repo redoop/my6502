@@ -48,7 +48,7 @@ always #2 clk = ~clk;
 assign chr_rom_data = 8'hAA;
 
 initial begin
-    $dumpfile("test_ppu.vcd");
+    $dumpfile("waveforms/test_ppu.vcd");
     $dumpvars(0, test_ppu);
     
     rst_n = 0;
