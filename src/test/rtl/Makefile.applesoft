@@ -1,0 +1,17 @@
+VERILATOR = verilator
+VFLAGS = --cc --exe --build -Wall -Wno-fatal
+VSRC = ../../main/rtl/cpu_6502.sv
+CSRC = applesoft_runner.cpp
+
+all: obj_dir/Vcpu_6502
+
+obj_dir/Vcpu_6502: $(VSRC) $(CSRC)
+	$(VERILATOR) $(VFLAGS) $(VSRC) $(CSRC) -o Vapplesoft
+
+run: obj_dir/Vcpu_6502
+	./obj_dir/Vapplesoft
+
+clean:
+	rm -rf obj_dir
+
+.PHONY: all run clean

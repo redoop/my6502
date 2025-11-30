@@ -318,9 +318,8 @@ always_ff @(posedge clk or negedge rst_n) begin
                     8'h0A: begin  // ASL A
                         C <= A[7];
                         A <= {A[6:0], 1'b0};
-                        Z <= (A[6:0] == 0);
+                        Z <= ({A[6:0], 1'b0} == 0);
                         N <= A[6];
-                        PC <= PC;
                     end
                     8'h06: begin addr <= {8'h00, data_in}; rw <= 1; PC <= PC + 1; end  // ASL zp
                     8'h16: begin addr <= {8'h00, data_in + X}; rw <= 1; PC <= PC + 1; end  // ASL zp,X
@@ -331,9 +330,8 @@ always_ff @(posedge clk or negedge rst_n) begin
                     8'h4A: begin  // LSR A
                         C <= A[0];
                         A <= {1'b0, A[7:1]};
-                        Z <= (A[7:1] == 0);
+                        Z <= ({1'b0, A[7:1]} == 0);
                         N <= 0;
-                        PC <= PC;
                     end
                     
                     // ROL
@@ -343,7 +341,6 @@ always_ff @(posedge clk or negedge rst_n) begin
                         A <= temp_result;
                         Z <= (temp_result == 0);
                         N <= temp_result[7];
-                        PC <= PC;
                     end
                     
                     // ROR
@@ -353,7 +350,6 @@ always_ff @(posedge clk or negedge rst_n) begin
                         A <= temp_result;
                         Z <= (temp_result == 0);
                         N <= temp_result[7];
-                        PC <= PC;
                     end
                     
                     // CMP
@@ -405,7 +401,6 @@ always_ff @(posedge clk or negedge rst_n) begin
                         X <= temp_result;
                         Z <= (temp_result == 0);
                         N <= temp_result[7];
-                        PC <= PC;
                     end
                     
                     // INY
@@ -414,7 +409,6 @@ always_ff @(posedge clk or negedge rst_n) begin
                         Y <= temp_result;
                         Z <= (temp_result == 0);
                         N <= temp_result[7];
-                        PC <= PC;
                     end
                     
                     // DEX
@@ -423,7 +417,6 @@ always_ff @(posedge clk or negedge rst_n) begin
                         X <= temp_result;
                         Z <= (temp_result == 0);
                         N <= temp_result[7];
-                        PC <= PC;
                     end
                     
                     // DEY
@@ -432,32 +425,31 @@ always_ff @(posedge clk or negedge rst_n) begin
                         Y <= temp_result;
                         Z <= (temp_result == 0);
                         N <= temp_result[7];
-                        PC <= PC;
                     end
                     
                     // TAX
-                    8'hAA: begin X <= A; Z <= (A == 0); N <= A[7]; PC <= PC; end
+                    8'hAA: begin X <= A; Z <= (A == 0); N <= A[7]; end
                     
                     // TAY
-                    8'hA8: begin Y <= A; Z <= (A == 0); N <= A[7]; PC <= PC; end
+                    8'hA8: begin Y <= A; Z <= (A == 0); N <= A[7]; end
                     
                     // TXA
-                    8'h8A: begin A <= X; Z <= (X == 0); N <= X[7]; PC <= PC; end
+                    8'h8A: begin A <= X; Z <= (X == 0); N <= X[7]; end
                     
                     // TYA
-                    8'h98: begin A <= Y; Z <= (Y == 0); N <= Y[7]; PC <= PC; end
+                    8'h98: begin A <= Y; Z <= (Y == 0); N <= Y[7]; end
                     
                     // TSX
-                    8'hBA: begin X <= SP; Z <= (SP == 0); N <= SP[7]; PC <= PC; end
+                    8'hBA: begin X <= SP; Z <= (SP == 0); N <= SP[7]; end
                     
                     // TXS
-                    8'h9A: begin SP <= X; PC <= PC; end
+                    8'h9A: begin SP <= X; end
                     
                     // PHA
-                    8'h48: begin addr <= {8'h01, SP}; data_out <= A; rw <= 0; SP <= SP - 1; PC <= PC; end
+                    8'h48: begin addr <= {8'h01, SP}; data_out <= A; rw <= 0; SP <= SP - 1; end
                     
                     // PLA
-                    8'h68: begin SP <= SP + 1; addr <= {8'h01, SP + 1}; rw <= 1; PC <= PC; end
+                    8'h68: begin SP <= SP + 1; addr <= {8'h01, SP + 1}; rw <= 1; end
                     
                     // PHP
                     8'h08: begin
@@ -465,11 +457,10 @@ always_ff @(posedge clk or negedge rst_n) begin
                         data_out <= {N, V, 1'b1, B, D, I, Z, C};
                         rw <= 0;
                         SP <= SP - 1;
-                        PC <= PC;
                     end
                     
                     // PLP
-                    8'h28: begin SP <= SP + 1; addr <= {8'h01, SP + 1}; rw <= 1; PC <= PC; end
+                    8'h28: begin SP <= SP + 1; addr <= {8'h01, SP + 1}; rw <= 1; end
                     
                     // JMP
                     8'h4C: begin PC <= {data_in, operand}; end  // JMP abs
@@ -566,28 +557,28 @@ always_ff @(posedge clk or negedge rst_n) begin
                     end
                     
                     // CLC
-                    8'h18: begin C <= 0; PC <= PC; end
+                    8'h18: begin C <= 0; end
                     
                     // SEC
-                    8'h38: begin C <= 1; PC <= PC; end
+                    8'h38: begin C <= 1; end
                     
                     // CLI
-                    8'h58: begin I <= 0; PC <= PC; end
+                    8'h58: begin I <= 0; end
                     
                     // SEI
-                    8'h78: begin I <= 1; PC <= PC; end
+                    8'h78: begin I <= 1; end
                     
                     // CLD
-                    8'hD8: begin D <= 0; PC <= PC; end
+                    8'hD8: begin D <= 0; end
                     
                     // SED
-                    8'hF8: begin D <= 1; PC <= PC; end
+                    8'hF8: begin D <= 1; end
                     
                     // CLV
-                    8'hB8: begin V <= 0; PC <= PC; end
+                    8'hB8: begin V <= 0; end
                     
                     // NOP
-                    8'hEA: begin PC <= PC; end
+                    8'hEA: begin end
                     
                     default: begin PC <= PC; end
                 endcase
@@ -636,7 +627,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                     endcase
                 // LDA/STA absolute addressing - read high byte
                 end else if ((opcode == 8'hAD || opcode == 8'hBD || opcode == 8'hB9 || 
-                     opcode == 8'h8D || opcode == 8'h9D ||
+                     opcode == 8'h8D || opcode == 8'h9D || opcode == 8'h99 ||
                      opcode == 8'hAE || opcode == 8'h8E ||
                      opcode == 8'h8C ||
                      opcode == 8'h6D || opcode == 8'h7D || opcode == 8'h79 ||
@@ -644,15 +635,15 @@ always_ff @(posedge clk or negedge rst_n) begin
                     // data_in has high byte, operand has low byte
                     if (opcode == 8'hBD || opcode == 8'h9D || opcode == 8'h7D || opcode == 8'hFD) begin
                         addr <= {data_in, operand} + {8'b0, X};
-                    end else if (opcode == 8'hB9 || opcode == 8'h79 || opcode == 8'hF9) begin
+                    end else if (opcode == 8'hB9 || opcode == 8'h99 || opcode == 8'h79 || opcode == 8'hF9) begin
                         addr <= {data_in, operand} + {8'b0, Y};
                     end else begin
                         addr <= {data_in, operand};
                     end
                     
-                    if (opcode == 8'h8D || opcode == 8'h9D || opcode == 8'h8E || opcode == 8'h8C) begin
+                    if (opcode == 8'h8D || opcode == 8'h9D || opcode == 8'h99 || opcode == 8'h8E || opcode == 8'h8C) begin
                         // Store instructions
-                        if (opcode == 8'h8D || opcode == 8'h9D) data_out <= A;
+                        if (opcode == 8'h8D || opcode == 8'h9D || opcode == 8'h99) data_out <= A;
                         else if (opcode == 8'h8E) data_out <= X;
                         else if (opcode == 8'h8C) data_out <= Y;
                         rw <= 0;
@@ -713,6 +704,9 @@ always_ff @(posedge clk or negedge rst_n) begin
                 end else if (opcode == 8'h28) begin
                     {N, V, B, D, I, Z, C} <= {data_in[7:6], data_in[4:0]};
                     rw <= 1;
+                end else if (opcode == 8'h48 || opcode == 8'h08) begin
+                    // PHA/PHP - write completes this cycle, prepare for next instruction
+                    // Don't change rw yet, let write complete
                 end else if (opcode == 8'h05) begin  // ORA zp
                     temp_result = A | data_in;
                     A <= temp_result;
@@ -961,6 +955,10 @@ always_comb begin
             if (opcode == 8'h20 ||  // JSR
                 opcode == 8'h60 ||  // RTS
                 opcode == 8'h6C ||  // JMP indirect
+                opcode == 8'h68 ||  // PLA
+                opcode == 8'h28 ||  // PLP
+                opcode == 8'h48 ||  // PHA
+                opcode == 8'h08 ||  // PHP
                 (opcode[1:0] == 2'b01 && opcode[4:2] != 3'b100) ||
                 (opcode == 8'h85 || opcode == 8'h8D || opcode == 8'h95 || opcode == 8'h9D || opcode == 8'h99 ||
                  opcode == 8'h86 || opcode == 8'h96 || opcode == 8'h84 || opcode == 8'h94 ||
