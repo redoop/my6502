@@ -298,11 +298,15 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
     end else begin
         vblank_sync <= vblank;
         
+        // VBlank flag set (from PPU)
+        if (vblank && !vblank_sync) begin
+            ppustatus[7] <= 1;
+        end
+        
+        // VBlank flag clear (from CPU read) - happens AFTER read returns old value
         if (cpu_rw && cpu_addr == 16'h2002) begin
             ppustatus[7] <= 0;
             ppuaddr_latch <= 0;
-        end else if (vblank) begin
-            ppustatus[7] <= 1;
         end
     end
 end

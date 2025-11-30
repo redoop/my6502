@@ -112,7 +112,8 @@ int main(int argc, char** argv, char** env) {
         if (cycle % 100000 == 0) {
             cout << "  Cycle: " << cycle 
                  << " VRAM writes: " << (int)top->vram_write_count
-                 << " NMI triggers: " << (int)top->nmi_trigger_count << endl;
+                 << " NMI triggers: " << (int)top->nmi_trigger_count 
+                 << " VBlank: " << (int)top->video_vsync << endl;
         }
     }
     
