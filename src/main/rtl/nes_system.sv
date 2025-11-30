@@ -96,6 +96,9 @@ logic [7:0]  cpu_data_out, cpu_data_in;
 logic        cpu_rw;
 logic        nmi, irq;
 
+// IRQ from mapper
+assign irq = mapper_irq;
+
 cpu_6502 cpu (
     .clk(cpu_clk),
     .rst_n(rst_n),
@@ -121,6 +124,7 @@ logic        vblank, sprite0_hit, rendering;
 // Mapper signals
 logic [13:0] ppu_chr_addr;  // PPU's 14-bit address
 logic        mapper_write;
+logic        mapper_irq;
 
 // PPU Module
 nes_ppu ppu (
@@ -345,9 +349,9 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
         vblank_sync1 <= vblank;
         vblank_sync2 <= vblank_sync1;
         vblank_sync3 <= vblank_sync2;
-        if (vblank_sync2 && !vblank_sync3) begin
-            $display("[SYNC] VBlank rising edge detected");
-        end
+        // if (vblank_sync2 && !vblank_sync3) begin
+        //     $display("[SYNC] VBlank rising edge detected");
+        // end
     end
 end
 
@@ -435,10 +439,12 @@ generate
             .cpu_write(mapper_write),
             .prg_rom_addr(prg_rom_addr),
             .ppu_addr(ppu_chr_addr),
-            .chr_rom_addr(chr_rom_addr)
+            .chr_rom_addr(chr_rom_addr),
+            .irq(mapper_irq)
         );
     end else begin : gen_nrom
         // NROM (Mapper 0): simple address passthrough
+        assign mapper_irq = 0;
         always_comb begin
             if (cpu_addr >= 16'h8000) begin
                 prg_rom_addr = {4'b0, cpu_addr[13:0]};

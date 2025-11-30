@@ -15,7 +15,10 @@ module mapper_mmc3 (
     
     // CHR ROM mapping (256KB max = 18 bits)
     input  logic [13:0] ppu_addr,
-    output logic [17:0] chr_rom_addr
+    output logic [17:0] chr_rom_addr,
+    
+    // IRQ output
+    output logic        irq
 );
 
 // MMC3 registers
@@ -24,21 +27,64 @@ logic prg_rom_bank_mode;
 logic chr_a12_inversion;
 logic [7:0] bank_regs[0:7];
 
+// IRQ registers
+logic [7:0] irq_latch;
+logic [7:0] irq_counter;
+logic irq_reload;
+logic irq_enabled;
+logic last_a12;
+
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         bank_select <= 0;
         prg_rom_bank_mode <= 0;
         chr_a12_inversion <= 0;
         for (int i = 0; i < 8; i++) bank_regs[i] <= 0;
-    end else if (cpu_write) begin
-        if (cpu_addr >= 16'h8000 && cpu_addr <= 16'h9FFF && cpu_addr[0] == 0) begin
-            // Bank select ($8000-$9FFE, even)
-            bank_select <= cpu_data[2:0];
-            prg_rom_bank_mode <= cpu_data[6];
-            chr_a12_inversion <= cpu_data[7];
-        end else if (cpu_addr >= 16'h8000 && cpu_addr <= 16'h9FFF && cpu_addr[0] == 1) begin
-            // Bank data ($8001-$9FFF, odd)
-            bank_regs[bank_select] <= cpu_data;
+        irq_latch <= 0;
+        irq_counter <= 0;
+        irq_reload <= 0;
+        irq_enabled <= 0;
+        irq <= 0;
+        last_a12 <= 0;
+    end else begin
+        // IRQ counter clocking on A12 rising edge
+        if (ppu_addr[12] && !last_a12) begin
+            if (irq_counter == 0 || irq_reload) begin
+                irq_counter <= irq_latch;
+                irq_reload <= 0;
+            end else begin
+                irq_counter <= irq_counter - 1;
+            end
+            
+            if (irq_counter == 0 && irq_enabled) begin
+                irq <= 1;
+            end
+        end
+        last_a12 <= ppu_addr[12];
+        
+        if (cpu_write) begin
+            if (cpu_addr >= 16'h8000 && cpu_addr <= 16'h9FFF && cpu_addr[0] == 0) begin
+                // Bank select ($8000-$9FFE, even)
+                bank_select <= cpu_data[2:0];
+                prg_rom_bank_mode <= cpu_data[6];
+                chr_a12_inversion <= cpu_data[7];
+            end else if (cpu_addr >= 16'h8000 && cpu_addr <= 16'h9FFF && cpu_addr[0] == 1) begin
+                // Bank data ($8001-$9FFF, odd)
+                bank_regs[bank_select] <= cpu_data;
+            end else if (cpu_addr >= 16'hC000 && cpu_addr <= 16'hDFFF && cpu_addr[0] == 0) begin
+                // IRQ latch ($C000-$DFFE, even)
+                irq_latch <= cpu_data;
+            end else if (cpu_addr >= 16'hC000 && cpu_addr <= 16'hDFFF && cpu_addr[0] == 1) begin
+                // IRQ reload ($C001-$DFFF, odd)
+                irq_reload <= 1;
+            end else if (cpu_addr >= 16'hE000 && cpu_addr <= 16'hFFFF && cpu_addr[0] == 0) begin
+                // IRQ disable ($E000-$FFFE, even)
+                irq_enabled <= 0;
+                irq <= 0;
+            end else if (cpu_addr >= 16'hE000 && cpu_addr <= 16'hFFFF && cpu_addr[0] == 1) begin
+                // IRQ enable ($E001-$FFFF, odd)
+                irq_enabled <= 1;
+            end
         end
     end
 end

@@ -47,7 +47,7 @@ always_ff @(posedge clk or negedge rst_n) begin
         ppu_initialized <= 0;
     end else begin
         if (!ppu_initialized) begin
-            $display("[PPU] First clock cycle");
+            // $display("[PPU] First clock cycle");
             ppu_initialized <= 1;
         end
         
@@ -55,7 +55,7 @@ always_ff @(posedge clk or negedge rst_n) begin
             dot <= 0;
             if (scanline == 261) begin
                 scanline <= 0;
-                $display("[PPU] Frame complete, reset to scanline 0");
+                // $display("[PPU] Frame complete, reset to scanline 0");
             end else begin
                 scanline <= scanline + 1;
             end
@@ -65,12 +65,12 @@ always_ff @(posedge clk or negedge rst_n) begin
         
         if (scanline == 241 && dot == 1) begin
             vblank <= 1;
-            $display("[PPU] VBlank START at scanline=%d dot=%d", scanline, dot);
+            // $display("[PPU] VBlank START at scanline=%d dot=%d", scanline, dot);
         end
         
         if (scanline == 261 && dot == 1) begin
             vblank <= 0;
-            $display("[PPU] VBlank END at scanline=%d dot=%d", scanline, dot);
+            // $display("[PPU] VBlank END at scanline=%d dot=%d", scanline, dot);
         end
         
         // Force rendering enabled for testing
