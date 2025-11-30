@@ -84,27 +84,40 @@ int main(int argc, char** argv, char** env) {
     top->rst_n = 1;
     
     // Run simulation
-    cout << "Running simulation for " << max_cycles << " cycles..." << endl;
+    cout << "Running simulation for " << max_cycles << " master clock cycles..." << endl;
     
     for (int cycle = 0; cycle < max_cycles && !contextp->gotFinish(); cycle++) {
-        // Clock
-        top->clk = 0;
-        top->eval();
-        
-        // PRG ROM access
+        // Update ROM data (combinational)
         if (top->prg_rom_addr < prg_rom.size()) {
             top->prg_rom_data = prg_rom[top->prg_rom_addr];
         } else {
             top->prg_rom_data = 0;
         }
         
-        // CHR ROM access
         if (top->chr_rom_addr < chr_rom.size()) {
             top->chr_rom_data = chr_rom[top->chr_rom_addr];
         } else {
             top->chr_rom_data = 0;
         }
         
+        // Clock low
+        top->clk = 0;
+        top->eval();
+        
+        // Update ROM data again
+        if (top->prg_rom_addr < prg_rom.size()) {
+            top->prg_rom_data = prg_rom[top->prg_rom_addr];
+        } else {
+            top->prg_rom_data = 0;
+        }
+        
+        if (top->chr_rom_addr < chr_rom.size()) {
+            top->chr_rom_data = chr_rom[top->chr_rom_addr];
+        } else {
+            top->chr_rom_data = 0;
+        }
+        
+        // Clock high
         top->clk = 1;
         top->eval();
         
@@ -113,7 +126,7 @@ int main(int argc, char** argv, char** env) {
             cout << "  Cycle: " << cycle 
                  << " VRAM writes: " << (int)top->vram_write_count
                  << " NMI triggers: " << (int)top->nmi_trigger_count 
-                 << " VBlank: " << (int)top->video_vsync << endl;
+                 << " vsync: " << (int)top->video_vsync << endl;
         }
     }
     
