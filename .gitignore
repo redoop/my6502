@@ -35,6 +35,7 @@ nes_trace.vcd
 waveforms/
 *.vcd
 
-# Verilator generated directories
+# Verilator
+obj_dir/ generated directories
 verilator/obj_dir/
 src/test/rtl/obj_dir_nes/
