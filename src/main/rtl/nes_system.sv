@@ -176,21 +176,26 @@ always_comb begin
         $display("[DEBUG] PPU read: addr=$%04x", cpu_addr);
     end
     
-    casez (cpu_addr)
-        16'b0001????????????: cpu_data_in = ram[cpu_addr[10:0]];
-        16'h2002: begin
-            cpu_data_in = ppustatus;
-            if (cpu_rw) $display("[PPU] $2002 read: VBlank=%b status=$%02x", ppustatus[7], ppustatus);
-        end
-        16'h2004: cpu_data_in = oam[oamaddr];
-        16'h2007: cpu_data_in = ppudata_buffer;
-        16'h4015: cpu_data_in = apu_status;
-        16'h4016: cpu_data_in = {7'b0, controller1[0]};
-        16'h4017: cpu_data_in = {7'b0, controller2[0]};
-        16'b01??????????????,
-        16'b1???????????????: cpu_data_in = prg_rom_data;
-        default: cpu_data_in = 8'h00;
-    endcase
+    if (cpu_addr >= 16'h0000 && cpu_addr <= 16'h1FFF) begin
+        cpu_data_in = ram[cpu_addr[10:0]];  // $0000-$1FFF: 2KB RAM (mirrored)
+    end else if (cpu_addr == 16'h2002) begin
+        cpu_data_in = ppustatus;
+        if (cpu_rw) $display("[PPU] $2002 read: VBlank=%b status=$%02x", ppustatus[7], ppustatus);
+    end else if (cpu_addr == 16'h2004) begin
+        cpu_data_in = oam[oamaddr];
+    end else if (cpu_addr == 16'h2007) begin
+        cpu_data_in = ppudata_buffer;
+    end else if (cpu_addr == 16'h4015) begin
+        cpu_data_in = apu_status;
+    end else if (cpu_addr == 16'h4016) begin
+        cpu_data_in = {7'b0, controller1[0]};
+    end else if (cpu_addr == 16'h4017) begin
+        cpu_data_in = {7'b0, controller2[0]};
+    end else if (cpu_addr >= 16'h4000 && cpu_addr <= 16'hFFFF) begin
+        cpu_data_in = prg_rom_data;  // $4000-$FFFF: ROM
+    end else begin
+        cpu_data_in = 8'h00;
+    end
 end
 
 //=============================================================================
@@ -227,60 +232,56 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
                 $display("[IO_WRITE] #%d addr=$%04x data=$%02x", total_write_count, cpu_addr, cpu_data_out);
             end
             
-            casez (cpu_addr)
-                16'b0001????????????: ram[cpu_addr[10:0]] <= cpu_data_out;
-                16'h2000: begin
-                    ppuctrl <= cpu_data_out;
-                    $display("[PPU] PPUCTRL=$%02x (NMI=%b BG=$%x SPR=$%x)", 
-                             cpu_data_out, cpu_data_out[7], cpu_data_out[4], cpu_data_out[3]);
+            if (cpu_addr >= 16'h0000 && cpu_addr <= 16'h1FFF) begin
+                ram[cpu_addr[10:0]] <= cpu_data_out;
+            end else if (cpu_addr == 16'h2000) begin
+                ppuctrl <= cpu_data_out;
+                $display("[PPU] PPUCTRL=$%02x (NMI=%b BG=$%x SPR=$%x)", 
+                         cpu_data_out, cpu_data_out[7], cpu_data_out[4], cpu_data_out[3]);
+            end else if (cpu_addr == 16'h2001) begin
+                ppumask <= cpu_data_out;
+                $display("[PPU] PPUMASK=$%02x", cpu_data_out);
+            end else if (cpu_addr == 16'h2003) begin
+                oamaddr <= cpu_data_out;
+            end else if (cpu_addr == 16'h2004) begin
+                oam[oamaddr] <= cpu_data_out;
+                oamaddr <= oamaddr + 1;
+            end else if (cpu_addr == 16'h2005) begin
+                if (!ppuaddr_latch) ppuscroll_x <= cpu_data_out;
+                else ppuscroll_y <= cpu_data_out;
+                ppuaddr_latch <= ~ppuaddr_latch;
+            end else if (cpu_addr == 16'h2006) begin
+                if (!ppuaddr_latch) ppuaddr[15:8] <= cpu_data_out;
+                else ppuaddr[7:0] <= cpu_data_out;
+                ppuaddr_latch <= ~ppuaddr_latch;
+            end else if (cpu_addr == 16'h2007) begin
+                if (ppuaddr[13:0] < 14'h2000) begin
+                    // CHR ROM (read-only)
+                end else if (ppuaddr[13:0] < 14'h3F00) begin
+                    vram[ppuaddr[10:0]] <= cpu_data_out;
+                    vram_write_count <= vram_write_count + 1;
+                end else begin
+                    palette[ppuaddr[4:0]] <= cpu_data_out;
                 end
-                16'h2001: begin
-                    ppumask <= cpu_data_out;
-                    $display("[PPU] PPUMASK=$%02x", cpu_data_out);
-                end
-                16'h2003: oamaddr <= cpu_data_out;
-                16'h2004: begin
-                    oam[oamaddr] <= cpu_data_out;
-                    oamaddr <= oamaddr + 1;
-                end
-                16'h2005: begin
-                    if (!ppuaddr_latch) ppuscroll_x <= cpu_data_out;
-                    else ppuscroll_y <= cpu_data_out;
-                    ppuaddr_latch <= ~ppuaddr_latch;
-                end
-                16'h2006: begin
-                    if (!ppuaddr_latch) ppuaddr[15:8] <= cpu_data_out;
-                    else ppuaddr[7:0] <= cpu_data_out;
-                    ppuaddr_latch <= ~ppuaddr_latch;
-                end
-                16'h2007: begin
-                    if (ppuaddr[13:0] < 14'h2000) begin
-                        // CHR ROM (read-only)
-                    end else if (ppuaddr[13:0] < 14'h3F00) begin
-                        vram[ppuaddr[10:0]] <= cpu_data_out;
-                        vram_write_count <= vram_write_count + 1;
-                    end else begin
-                        palette[ppuaddr[4:0]] <= cpu_data_out;
-                    end
-                    ppuaddr <= ppuaddr + (ppuctrl[2] ? 32 : 1);
-                end
-                16'h4000, 16'h4001, 16'h4002, 16'h4003: 
-                    apu_pulse1[cpu_addr[1:0]] <= cpu_data_out;
-                16'h4004, 16'h4005, 16'h4006, 16'h4007: 
-                    apu_pulse2[cpu_addr[1:0]] <= cpu_data_out;
-                16'h4008, 16'h4009, 16'h400A, 16'h400B: 
-                    apu_triangle[cpu_addr[1:0]] <= cpu_data_out;
-                16'h400C, 16'h400D, 16'h400E, 16'h400F: 
-                    apu_noise[cpu_addr[1:0]] <= cpu_data_out;
-                16'h4010, 16'h4011, 16'h4012, 16'h4013: 
-                    apu_dmc[cpu_addr[1:0]] <= cpu_data_out;
-                16'h4014: begin
-                    dma_page <= cpu_data_out;
-                    dma_start <= 1;
-                end
-                16'h4015: apu_status <= cpu_data_out;
-                16'h4017: apu_frame_counter <= cpu_data_out;
-            endcase
+                ppuaddr <= ppuaddr + (ppuctrl[2] ? 32 : 1);
+            end else if (cpu_addr >= 16'h4000 && cpu_addr <= 16'h4003) begin
+                apu_pulse1[cpu_addr[1:0]] <= cpu_data_out;
+            end else if (cpu_addr >= 16'h4004 && cpu_addr <= 16'h4007) begin
+                apu_pulse2[cpu_addr[1:0]] <= cpu_data_out;
+            end else if (cpu_addr >= 16'h4008 && cpu_addr <= 16'h400B) begin
+                apu_triangle[cpu_addr[1:0]] <= cpu_data_out;
+            end else if (cpu_addr >= 16'h400C && cpu_addr <= 16'h400F) begin
+                apu_noise[cpu_addr[1:0]] <= cpu_data_out;
+            end else if (cpu_addr >= 16'h4010 && cpu_addr <= 16'h4013) begin
+                apu_dmc[cpu_addr[1:0]] <= cpu_data_out;
+            end else if (cpu_addr == 16'h4014) begin
+                dma_page <= cpu_data_out;
+                dma_start <= 1;
+            end else if (cpu_addr == 16'h4015) begin
+                apu_status <= cpu_data_out;
+            end else if (cpu_addr == 16'h4017) begin
+                apu_frame_counter <= cpu_data_out;
+            end
         end
     end
 end
