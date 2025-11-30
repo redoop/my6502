@@ -23,9 +23,6 @@ test_run_dir/
 *.fir
 *.anno.json
 
-# 保留生成的 Verilog 文件
-# generated/*.v 文件会被提交
-
 # OS
 .DS_Store
 Thumbs.db
@@ -35,7 +32,23 @@ nes_trace.vcd
 waveforms/
 *.vcd
 
-# Verilator
-obj_dir/ generated directories
+# Verilator generated files
+obj_dir/
+*.o
+*.a
+*.d
+*.mk
+*.cpp
+*.h
+!*.sv
+!*.v
+# But keep source files
+!src/**/*.cpp
+!src/**/*.h
+
+# Verilator executables
 verilator/obj_dir/
-src/test/rtl/obj_dir_nes/
+src/test/rtl/unit/obj_dir/
+V*__*
+V*_classes.mk
+V*_verFiles.dat
