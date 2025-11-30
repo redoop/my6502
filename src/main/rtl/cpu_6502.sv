@@ -223,6 +223,36 @@ always_ff @(posedge clk or negedge rst_n) begin
                         rw <= 1;
                         PC <= PC + 1;
                     end
+                    8'h2C: begin  // BIT abs
+                        addr <= PC + 1;
+                        rw <= 1;
+                        PC <= PC + 1;
+                        cycle_count <= 1;
+                    end
+                    
+                    // INC - Increment Memory
+                    8'hE6: begin addr <= {8'h00, data_in}; rw <= 1; PC <= PC + 1; end  // INC zp
+                    8'hF6: begin addr <= {8'h00, data_in + X}; rw <= 1; PC <= PC + 1; end  // INC zp,X
+                    8'hEE: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // INC abs
+                    8'hFE: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // INC abs,X
+                    
+                    // DEC - Decrement Memory
+                    8'hC6: begin addr <= {8'h00, data_in}; rw <= 1; PC <= PC + 1; end  // DEC zp
+                    8'hD6: begin addr <= {8'h00, data_in + X}; rw <= 1; PC <= PC + 1; end  // DEC zp,X
+                    8'hCE: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // DEC abs
+                    8'hDE: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // DEC abs,X
+                    
+                    // ROL - Rotate Left
+                    8'h26: begin addr <= {8'h00, data_in}; rw <= 1; PC <= PC + 1; end  // ROL zp
+                    8'h36: begin addr <= {8'h00, data_in + X}; rw <= 1; PC <= PC + 1; end  // ROL zp,X
+                    8'h2E: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // ROL abs
+                    8'h3E: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // ROL abs,X
+                    
+                    // ROR - Rotate Right
+                    8'h66: begin addr <= {8'h00, data_in}; rw <= 1; PC <= PC + 1; end  // ROR zp
+                    8'h76: begin addr <= {8'h00, data_in + X}; rw <= 1; PC <= PC + 1; end  // ROR zp,X
+                    8'h6E: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // ROR abs
+                    8'h7E: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // ROR abs,X
                     
                     // ASL
                     8'h0A: begin  // ASL A
@@ -638,8 +668,38 @@ always_ff @(posedge clk or negedge rst_n) begin
                              opcode == 8'h86 || opcode == 8'h84 ||
                              opcode == 8'h95 || opcode == 8'h9D ||
                              opcode == 8'h96 || opcode == 8'h94) begin
-                    // Store operations - keep rw=0 (don't change it!)
-                    // rw will be reset to 1 in WRITEBACK state
+                    // Store operations - keep rw=0
+                end else if (opcode == 8'h2C) begin  // BIT abs
+                    Z <= ((A & data_in) == 0);
+                    N <= data_in[7];
+                    V <= data_in[6];
+                    rw <= 1;
+                end else if (opcode == 8'hE6 || opcode == 8'hF6 || opcode == 8'hEE || opcode == 8'hFE) begin  // INC
+                    temp_result = data_in + 1;
+                    data_out <= temp_result;
+                    Z <= (temp_result == 0);
+                    N <= temp_result[7];
+                    rw <= 0;  // Write back
+                end else if (opcode == 8'hC6 || opcode == 8'hD6 || opcode == 8'hCE || opcode == 8'hDE) begin  // DEC
+                    temp_result = data_in - 1;
+                    data_out <= temp_result;
+                    Z <= (temp_result == 0);
+                    N <= temp_result[7];
+                    rw <= 0;  // Write back
+                end else if (opcode == 8'h26 || opcode == 8'h36 || opcode == 8'h2E || opcode == 8'h3E) begin  // ROL
+                    temp_result = {data_in[6:0], C};
+                    C <= data_in[7];
+                    data_out <= temp_result;
+                    Z <= (temp_result == 0);
+                    N <= temp_result[7];
+                    rw <= 0;  // Write back
+                end else if (opcode == 8'h66 || opcode == 8'h76 || opcode == 8'h6E || opcode == 8'h7E) begin  // ROR
+                    temp_result = {C, data_in[7:1]};
+                    C <= data_in[0];
+                    data_out <= temp_result;
+                    Z <= (temp_result == 0);
+                    N <= temp_result[7];
+                    rw <= 0;  // Write back
                 end
             end
             
@@ -714,10 +774,14 @@ always_comb begin
                  opcode == 8'hA5 || opcode == 8'hAD || opcode == 8'hB5 || opcode == 8'hBD || opcode == 8'hB9 ||  // LDA
                  opcode == 8'hA6 || opcode == 8'hB6 || opcode == 8'hAE ||  // LDX
                  opcode == 8'hA4 || opcode == 8'hB4 ||               // LDY
-                 opcode == 8'h05 || opcode == 8'h24 || opcode == 8'h06 ||  // ORA zp, BIT zp, ASL zp
+                 opcode == 8'h05 || opcode == 8'h24 || opcode == 8'h2C || opcode == 8'h06 ||  // ORA zp, BIT, ASL zp
                  opcode == 8'hC5 || opcode == 8'hC4 ||               // CMP zp, CPY zp
                  opcode == 8'h65 || opcode == 8'h75 || opcode == 8'h6D || opcode == 8'h7D || opcode == 8'h79 ||  // ADC
                  opcode == 8'hE5 || opcode == 8'hF5 || opcode == 8'hED || opcode == 8'hFD || opcode == 8'hF9 ||  // SBC
+                 opcode == 8'hE6 || opcode == 8'hF6 || opcode == 8'hEE || opcode == 8'hFE ||  // INC
+                 opcode == 8'hC6 || opcode == 8'hD6 || opcode == 8'hCE || opcode == 8'hDE ||  // DEC
+                 opcode == 8'h26 || opcode == 8'h36 || opcode == 8'h2E || opcode == 8'h3E ||  // ROL
+                 opcode == 8'h66 || opcode == 8'h76 || opcode == 8'h6E || opcode == 8'h7E ||  // ROR
                  opcode == 8'hA1 || opcode == 8'hB1 ||               // LDA (ind,X), LDA (ind),Y
                  opcode == 8'h81 || opcode == 8'h91 ||               // STA (ind,X), STA (ind),Y
                  opcode == 8'h01 || opcode == 8'h21)) begin          // ORA (ind,X), AND (ind,X)
