@@ -71,11 +71,19 @@ logic [7:0] ram[0:2047];
 logic [7:0] oam[0:255];
 logic [7:0] vram[0:2047];
 logic [7:0] palette[0:31];
+logic [31:0] palette_write_count;
 
 initial begin
     for (int i = 0; i < 2048; i++) vram[i] = 8'h00;
     for (int i = 0; i < 256; i++) oam[i] = 8'hFF;
-    for (int i = 0; i < 32; i++) palette[i] = 8'h00;
+    // Initialize with default NES palette for testing
+    palette[0] = 8'h0F; palette[1] = 8'h00; palette[2] = 8'h10; palette[3] = 8'h30;
+    palette[4] = 8'h0F; palette[5] = 8'h16; palette[6] = 8'h26; palette[7] = 8'h36;
+    palette[8] = 8'h0F; palette[9] = 8'h09; palette[10] = 8'h19; palette[11] = 8'h29;
+    palette[12] = 8'h0F; palette[13] = 8'h01; palette[14] = 8'h11; palette[15] = 8'h21;
+    for (int i = 16; i < 32; i++) palette[i] = palette[i-16];  // Mirror sprite palette
+    palette_write_count = 0;
+    $display("[INIT] Default palette loaded");
 end
 
 //=============================================================================
@@ -269,17 +277,26 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
                 else ppuscroll_y <= cpu_data_out;
                 ppuaddr_latch <= ~ppuaddr_latch;
             end else if (cpu_addr == 16'h2006) begin
-                if (!ppuaddr_latch) ppuaddr[15:8] <= cpu_data_out;
-                else ppuaddr[7:0] <= cpu_data_out;
+                if (!ppuaddr_latch) begin
+                    ppuaddr[15:8] <= cpu_data_out;
+                    $display("[PPU] PPUADDR high=$%02x", cpu_data_out);
+                end else begin
+                    ppuaddr[7:0] <= cpu_data_out;
+                    $display("[PPU] PPUADDR low=$%02x, full=$%04x", cpu_data_out, {ppuaddr[15:8], cpu_data_out});
+                end
                 ppuaddr_latch <= ~ppuaddr_latch;
             end else if (cpu_addr == 16'h2007) begin
+                $display("[PPU] PPUDATA write addr=$%04x data=$%02x", ppuaddr, cpu_data_out);
                 if (ppuaddr[13:0] < 14'h2000) begin
                     // CHR ROM (read-only)
                 end else if (ppuaddr[13:0] < 14'h3F00) begin
                     vram[ppuaddr[10:0]] <= cpu_data_out;
                     vram_write_count <= vram_write_count + 1;
+                    $display("[VRAM] Write addr=$%03x data=$%02x", ppuaddr[10:0], cpu_data_out);
                 end else begin
                     palette[ppuaddr[4:0]] <= cpu_data_out;
+                    $display("[PALETTE #%0d] addr=$%02x data=$%02x", palette_write_count, ppuaddr[4:0], cpu_data_out);
+                    palette_write_count <= palette_write_count + 1;
                 end
                 ppuaddr <= ppuaddr + (ppuctrl[2] ? 32 : 1);
             end else if (cpu_addr >= 16'h4000 && cpu_addr <= 16'h4003) begin
@@ -326,15 +343,15 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
         ppustatus <= 0;
         ppustatus_read_last <= 0;
     end else begin
-        // VBlank flag set (from synchronized PPU signal)
-        if (vblank_sync2) begin
-            ppustatus[7] <= 1;
-        end
-        
         // VBlank flag clear - delayed by one cycle after read
-        if (ppustatus_read_last) begin
+        if (ppustatus_read_last && !vblank_sync2) begin
             ppustatus[7] <= 0;
             ppuaddr_latch <= 0;
+        end
+        
+        // VBlank flag set (from synchronized PPU signal) - higher priority
+        if (vblank_sync2) begin
+            ppustatus[7] <= 1;
         end
         
         // Track if $2002 was read this cycle
