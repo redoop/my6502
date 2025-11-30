@@ -85,15 +85,10 @@ always_ff @(posedge clk or negedge rst_n) begin
                 rw <= 1;
                 PC <= PC + 1;
                 cycle_count <= 0;
-                if (PC >= 16'hC7A8 && PC <= 16'hC7AD) begin
-                    $display("[CPU] FETCH: PC=$%04x", PC);
-                end
             end
             
             DECODE: begin
-                // Read opcode (data is now stable)
                 opcode <= data_in;
-                // Prepare to fetch operand in next cycle
                 addr <= PC;
                 rw <= 1;
             end
@@ -103,12 +98,6 @@ always_ff @(posedge clk or negedge rst_n) begin
                 // For other modes, operand was set in DECODE
                 // Save operand for later use
                 operand <= data_in;
-                
-                // Debug: print instruction at specific PC
-                if (PC >= 16'hC7A8 && PC <= 16'hC7AD) begin
-                    $display("[CPU] Execute PC=$%04x opcode=$%02x data_in=$%02x A=$%02x", 
-                             PC, opcode, data_in, A);
-                end
                 
                 // Execute instruction
                 case (opcode)
@@ -509,11 +498,6 @@ always_ff @(posedge clk or negedge rst_n) begin
             end
             
             MEMORY: begin
-                if (PC >= 16'hC7A8 && PC <= 16'hC7AD) begin
-                    $display("[CPU] MEMORY: PC=$%04x opcode=$%02x cycle_count=%d addr=$%04x data_in=$%02x operand=$%02x", 
-                             PC, opcode, cycle_count, addr, data_in, operand);
-                end
-                
                 // LDA/STA absolute addressing - read high byte
                 if ((opcode == 8'hAD || opcode == 8'hBD || opcode == 8'hB9 || 
                      opcode == 8'h8D || opcode == 8'h9D ||
@@ -528,11 +512,6 @@ always_ff @(posedge clk or negedge rst_n) begin
                         addr <= {data_in, operand} + Y;
                     end else begin
                         addr <= {data_in, operand};
-                    end
-                    
-                    if (PC >= 16'hC7A8 && PC <= 16'hC7AD) begin
-                        $display("[CPU] MEMORY: forming addr=$%04x from {$%02x, $%02x}", 
-                                 {data_in, operand}, data_in, operand);
                     end
                     
                     if (opcode == 8'h8D || opcode == 8'h9D || opcode == 8'h8E || opcode == 8'h8C) begin

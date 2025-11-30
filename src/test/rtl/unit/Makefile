@@ -4,7 +4,7 @@ RTL_DIR = ../../../main/rtl
 VERILATOR = verilator
 VFLAGS = --binary --trace -Wall -Wno-fatal
 
-TESTS = test_dma test_apu test_ppu test_cpu test_nmi
+TESTS = test_dma test_apu test_ppu test_cpu test_nmi test_ppu_render
 
 .PHONY: all clean $(TESTS)
 
@@ -43,6 +43,13 @@ test_nmi: ../nmi_test.sv $(RTL_DIR)/nes_system.sv $(RTL_DIR)/cpu_6502.sv $(RTL_D
 	@mkdir -p waveforms
 	$(VERILATOR) $(VFLAGS) --top-module nmi_test $^
 	./obj_dir/Vnmi_test
+	@echo ""
+
+test_ppu_render: ../ppu_render_test.sv $(RTL_DIR)/nes_ppu.sv
+	@echo "Testing PPU rendering..."
+	@mkdir -p waveforms
+	$(VERILATOR) $(VFLAGS) --top-module ppu_render_test $^
+	./obj_dir/Vppu_render_test
 	@echo ""
 
 clean:

@@ -80,34 +80,55 @@ always_ff @(posedge clk) begin
 end
 
 // Sprite rendering
-logic [7:0] sprite_y, sprite_tile, sprite_attr, sprite_x;
+logic [7:0] sprite_y[0:7], sprite_tile[0:7], sprite_attr[0:7], sprite_x[0:7];
+logic [7:0] sprite_hit[0:7];
 logic [1:0] sprite_pixel;
 logic [4:0] sprite_palette_idx;
 logic sprite_active;
 
+genvar i;
+generate
+    for (i = 0; i < 8; i++) begin : sprite_check
+        assign sprite_y[i] = oam[i * 4 + 0];
+        assign sprite_tile[i] = oam[i * 4 + 1];
+        assign sprite_attr[i] = oam[i * 4 + 2];
+        assign sprite_x[i] = oam[i * 4 + 3];
+        assign sprite_hit[i] = (sprite_y[i] < 8'hEF) && 
+                               (scanline >= sprite_y[i]) && (scanline < (sprite_y[i] + 8)) &&
+                               (dot >= sprite_x[i]) && (dot < (sprite_x[i] + 8));
+    end
+endgenerate
+
 always_comb begin
-    sprite_active = 0;
+    sprite_active = sprite_hit[0] | sprite_hit[1] | sprite_hit[2] | sprite_hit[3] | 
+                    sprite_hit[4] | sprite_hit[5] | sprite_hit[6] | sprite_hit[7];
     sprite_pixel = 0;
     sprite_palette_idx = 0;
     
-    for (int i = 0; i < 8; i++) begin
-        sprite_y = oam[i * 4 + 0];
-        sprite_tile = oam[i * 4 + 1];
-        sprite_attr = oam[i * 4 + 2];
-        sprite_x = oam[i * 4 + 3];
-        
-        if (sprite_y < 8'hEF) begin
-            if (scanline >= sprite_y && scanline < (sprite_y + 8)) begin
-                if (dot >= sprite_x && dot < (sprite_x + 8)) begin
-                    sprite_active = 1;
-                    sprite_pixel = {chr_rom_data[7-(dot-sprite_x)], chr_rom_data[7-(dot-sprite_x)]};
-                    if (sprite_pixel != 0) begin
-                        sprite_palette_idx = {1'b1, sprite_attr[1:0], sprite_pixel};
-                    end
-                    break;
-                end
-            end
-        end
+    if (sprite_hit[0]) begin
+        sprite_pixel = {chr_rom_data[7-(dot-sprite_x[0])], chr_rom_data[7-(dot-sprite_x[0])]};
+        if (sprite_pixel != 0) sprite_palette_idx = {1'b1, sprite_attr[0][1:0], sprite_pixel};
+    end else if (sprite_hit[1]) begin
+        sprite_pixel = {chr_rom_data[7-(dot-sprite_x[1])], chr_rom_data[7-(dot-sprite_x[1])]};
+        if (sprite_pixel != 0) sprite_palette_idx = {1'b1, sprite_attr[1][1:0], sprite_pixel};
+    end else if (sprite_hit[2]) begin
+        sprite_pixel = {chr_rom_data[7-(dot-sprite_x[2])], chr_rom_data[7-(dot-sprite_x[2])]};
+        if (sprite_pixel != 0) sprite_palette_idx = {1'b1, sprite_attr[2][1:0], sprite_pixel};
+    end else if (sprite_hit[3]) begin
+        sprite_pixel = {chr_rom_data[7-(dot-sprite_x[3])], chr_rom_data[7-(dot-sprite_x[3])]};
+        if (sprite_pixel != 0) sprite_palette_idx = {1'b1, sprite_attr[3][1:0], sprite_pixel};
+    end else if (sprite_hit[4]) begin
+        sprite_pixel = {chr_rom_data[7-(dot-sprite_x[4])], chr_rom_data[7-(dot-sprite_x[4])]};
+        if (sprite_pixel != 0) sprite_palette_idx = {1'b1, sprite_attr[4][1:0], sprite_pixel};
+    end else if (sprite_hit[5]) begin
+        sprite_pixel = {chr_rom_data[7-(dot-sprite_x[5])], chr_rom_data[7-(dot-sprite_x[5])]};
+        if (sprite_pixel != 0) sprite_palette_idx = {1'b1, sprite_attr[5][1:0], sprite_pixel};
+    end else if (sprite_hit[6]) begin
+        sprite_pixel = {chr_rom_data[7-(dot-sprite_x[6])], chr_rom_data[7-(dot-sprite_x[6])]};
+        if (sprite_pixel != 0) sprite_palette_idx = {1'b1, sprite_attr[6][1:0], sprite_pixel};
+    end else if (sprite_hit[7]) begin
+        sprite_pixel = {chr_rom_data[7-(dot-sprite_x[7])], chr_rom_data[7-(dot-sprite_x[7])]};
+        if (sprite_pixel != 0) sprite_palette_idx = {1'b1, sprite_attr[7][1:0], sprite_pixel};
     end
 end
 
@@ -133,26 +154,15 @@ always_comb begin
         
         attr_addr = 10'h3C0 | {tile_y[4:2], tile_x[4:2]};
         attr_byte = vram[attr_addr];
+        attr_bits = attr_byte[{tile_y[1], tile_x[1], 1'b1} -: 2];
         
-        case ({tile_y[1], tile_x[1]})
-            2'b00: attr_bits = attr_byte[1:0];
-            2'b01: attr_bits = attr_byte[3:2];
-            2'b10: attr_bits = attr_byte[5:4];
-            2'b11: attr_bits = attr_byte[7:6];
-        endcase
-        
-        if (dot[2:0] == 3'd5) begin
-            chr_rom_addr = {ppuctrl[4], tile_index, 1'b0, scroll_y[2:0]};
-        end else if (dot[2:0] == 3'd7) begin
-            chr_rom_addr = {ppuctrl[4], tile_index, 1'b1, scroll_y[2:0]};
-        end else begin
-            chr_rom_addr = {ppuctrl[4], tile_index, 1'b0, scroll_y[2:0]};
-        end
+        chr_rom_addr = dot[2:0] == 3'd7 ? 
+                       {ppuctrl[4], tile_index, 1'b1, scroll_y[2:0]} :
+                       {ppuctrl[4], tile_index, 1'b0, scroll_y[2:0]};
         
         pixel_value = {pattern_hi_reg[7-scroll_x[2:0]], pattern_lo_reg[7-scroll_x[2:0]]};
         
-        if (pixel_value == 0) bg_palette_idx = 5'h00;
-        else bg_palette_idx = {1'b0, attr_bits, pixel_value};
+        bg_palette_idx = pixel_value == 0 ? 5'h00 : {1'b0, attr_bits, pixel_value};
     end else begin
         chr_rom_addr = ppuaddr[13:0];
         bg_palette_idx = 5'h00;
