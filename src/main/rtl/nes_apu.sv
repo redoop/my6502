@@ -104,7 +104,25 @@ end
 //=============================================================================
 // Audio Mixer
 //=============================================================================
-assign audio_l = pulse1_out + pulse2_out;
-assign audio_r = pulse1_out + pulse2_out;
+// Test tone generator (440Hz for testing)
+logic [15:0] test_counter;
+logic [15:0] test_tone;
+
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        test_counter <= 0;
+        test_tone <= 0;
+    end else begin
+        test_counter <= test_counter + 1;
+        if (test_counter >= 2034) begin  // ~440Hz at 1.79MHz
+            test_counter <= 0;
+            test_tone <= ~test_tone[15] ? 16'h2000 : 16'h0000;
+        end
+    end
+end
+
+// Mix pulse channels + test tone
+assign audio_l = pulse1_out + pulse2_out + test_tone;
+assign audio_r = pulse1_out + pulse2_out + test_tone;
 
 endmodule

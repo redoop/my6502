@@ -301,8 +301,10 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
                 ppuaddr <= ppuaddr + (ppuctrl[2] ? 32 : 1);
             end else if (cpu_addr >= 16'h4000 && cpu_addr <= 16'h4003) begin
                 apu_pulse1[cpu_addr[1:0]] <= cpu_data_out;
+                $display("[APU] Pulse1[$%01x] = $%02x", cpu_addr[1:0], cpu_data_out);
             end else if (cpu_addr >= 16'h4004 && cpu_addr <= 16'h4007) begin
                 apu_pulse2[cpu_addr[1:0]] <= cpu_data_out;
+                $display("[APU] Pulse2[$%01x] = $%02x", cpu_addr[1:0], cpu_data_out);
             end else if (cpu_addr >= 16'h4008 && cpu_addr <= 16'h400B) begin
                 apu_triangle[cpu_addr[1:0]] <= cpu_data_out;
             end else if (cpu_addr >= 16'h400C && cpu_addr <= 16'h400F) begin
