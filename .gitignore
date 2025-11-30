@@ -45,6 +45,7 @@ obj_dir/
 # But keep source files
 !src/**/*.cpp
 !src/**/*.h
+!verilator/*.cpp
 
 # Verilator executables
 verilator/obj_dir/
