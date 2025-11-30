@@ -81,7 +81,7 @@ end
 
 // Sprite rendering
 logic [7:0] sprite_y[0:7], sprite_tile[0:7], sprite_attr[0:7], sprite_x[0:7];
-logic [7:0] sprite_hit[0:7];
+logic sprite_hit[0:7];
 logic [1:0] sprite_pixel;
 logic [4:0] sprite_palette_idx;
 logic sprite_active;
@@ -94,16 +94,16 @@ generate
         assign sprite_attr[i] = oam[i * 4 + 2];
         assign sprite_x[i] = oam[i * 4 + 3];
         assign sprite_hit[i] = (sprite_y[i] < 8'hEF) && 
-                               (scanline >= sprite_y[i]) && (scanline < (sprite_y[i] + 8)) &&
-                               (dot >= sprite_x[i]) && (dot < (sprite_x[i] + 8));
+                               (scanline >= {1'b0, sprite_y[i]}) && (scanline < ({1'b0, sprite_y[i]} + 9'd8)) &&
+                               (dot >= {1'b0, sprite_x[i]}) && (dot < ({1'b0, sprite_x[i]} + 9'd8));
     end
 endgenerate
 
 always_comb begin
     sprite_active = sprite_hit[0] | sprite_hit[1] | sprite_hit[2] | sprite_hit[3] | 
                     sprite_hit[4] | sprite_hit[5] | sprite_hit[6] | sprite_hit[7];
-    sprite_pixel = 0;
-    sprite_palette_idx = 0;
+    sprite_pixel = 2'b0;
+    sprite_palette_idx = 5'b0;
     
     if (sprite_hit[0]) begin
         sprite_pixel = {chr_rom_data[7-(dot-sprite_x[0])], chr_rom_data[7-(dot-sprite_x[0])]};

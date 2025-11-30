@@ -188,7 +188,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                     
                     // ADC
                     8'h69: begin  // ADC #imm
-                        temp_sum = A + data_in + C;
+                        temp_sum = A + data_in + {8'b0, C};
                         C <= temp_sum[8];
                         A <= temp_sum[7:0];
                         Z <= (temp_sum[7:0] == 0);
@@ -204,7 +204,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                     
                     // SBC
                     8'hE9: begin  // SBC #imm
-                        temp_diff = A - data_in - !C;
+                        temp_diff = A - data_in - {8'b0, !C};
                         C <= !temp_diff[8];
                         A <= temp_diff[7:0];
                         Z <= (temp_diff[7:0] == 0);
@@ -507,9 +507,9 @@ always_ff @(posedge clk or negedge rst_n) begin
                      opcode == 8'hED || opcode == 8'hFD || opcode == 8'hF9) && cycle_count == 1) begin
                     // data_in has high byte, operand has low byte
                     if (opcode == 8'hBD || opcode == 8'h9D || opcode == 8'h7D || opcode == 8'hFD) begin
-                        addr <= {data_in, operand} + X;
+                        addr <= {data_in, operand} + {8'b0, X};
                     end else if (opcode == 8'hB9 || opcode == 8'h79 || opcode == 8'hF9) begin
-                        addr <= {data_in, operand} + Y;
+                        addr <= {data_in, operand} + {8'b0, Y};
                     end else begin
                         addr <= {data_in, operand};
                     end
@@ -546,7 +546,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                 end else if ((opcode == 8'hB1 || opcode == 8'h91) && cycle_count == 2) begin
                     // (ind),Y: Read high byte, form address + Y
                     indirect_addr_hi <= data_in;
-                    addr <= {data_in, indirect_addr_lo} + Y;
+                    addr <= {data_in, indirect_addr_lo} + {8'b0, Y};
                     cycle_count <= 0;
                     if (opcode == 8'h91) begin
                         data_out <= A;
@@ -620,7 +620,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                     N <= temp_result[7];
                     rw <= 1;
                 end else if (opcode == 8'h65 || opcode == 8'h75 || opcode == 8'h6D || opcode == 8'h7D || opcode == 8'h79) begin  // ADC
-                    temp_sum = A + data_in + C;
+                    temp_sum = A + data_in + {8'b0, C};
                     C <= temp_sum[8];
                     A <= temp_sum[7:0];
                     Z <= (temp_sum[7:0] == 0);
@@ -628,7 +628,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                     V <= (A[7] == data_in[7]) && (A[7] != temp_sum[7]);
                     rw <= 1;
                 end else if (opcode == 8'hE5 || opcode == 8'hF5 || opcode == 8'hED || opcode == 8'hFD || opcode == 8'hF9) begin  // SBC
-                    temp_diff = A - data_in - !C;
+                    temp_diff = A - data_in - {8'b0, !C};
                     C <= !temp_diff[8];
                     A <= temp_diff[7:0];
                     Z <= (temp_diff[7:0] == 0);
