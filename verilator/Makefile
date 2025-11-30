@@ -10,7 +10,7 @@ RTL_FILES = $(RTL_DIR)/nes_system.sv \
             $(RTL_DIR)/nes_apu.sv \
             $(RTL_DIR)/nes_dma.sv
 
-.PHONY: all clean run help capture
+.PHONY: all clean run help capture gui
 
 all:
 	@mkdir -p waveforms
@@ -44,6 +44,23 @@ capture_run:
 	fi
 	./obj_dir/Vnes_capture $(ROM) $(DIR)
 
+gui:
+	@echo "Building GUI emulator..."
+	$(VERILATOR) --cc --exe --build -Wall -Wno-fatal \
+		--top-module nes_system \
+		-CFLAGS "-std=c++17 -O3 $$(sdl2-config --cflags)" \
+		-LDFLAGS "$$(sdl2-config --libs)" \
+		nes_gui_tb.cpp $(RTL_FILES) \
+		-o Vnes_gui
+	@echo "Build complete: obj_dir/Vnes_gui"
+
+gui_run:
+	@if [ -z "$(ROM)" ]; then \
+		echo "Usage: make gui_run ROM=<path/to/rom.nes>"; \
+		exit 1; \
+	fi
+	./obj_dir/Vnes_gui $(ROM)
+
 clean:
 	rm -rf obj_dir *.vcd frames
 
@@ -55,8 +72,11 @@ help:
 	@echo "  make run ROM=<file>         - Run NES ROM"
 	@echo "  make capture                - Build frame capture tool"
 	@echo "  make capture_run ROM=<file> - Capture frames to directory"
+	@echo "  make gui                    - Build GUI emulator"
+	@echo "  make gui_run ROM=<file>     - Run GUI emulator"
 	@echo "  make clean                  - Clean build files"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make run ROM=../games/Donkey-Kong.nes"
 	@echo "  make capture_run ROM=../games/Donkey-Kong.nes DIR=dk_frames"
+	@echo "  make gui_run ROM=../games/Donkey-Kong.nes"
