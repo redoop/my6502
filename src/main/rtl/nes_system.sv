@@ -405,15 +405,18 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
 end
 
 //=============================================================================
-// PPUDATA Read Buffering
+// PPUDATA Read Buffering and Auto-increment
 //=============================================================================
-always_ff @(posedge ppu_clk) begin
+always_ff @(posedge cpu_clk) begin
     if (cpu_rw && cpu_addr == 16'h2007) begin
+        // Update buffer for next read
         if (ppuaddr[13:0] >= 14'h3F00) begin
             ppudata_buffer <= palette[ppuaddr[4:0]];
         end else begin
             ppudata_buffer <= vram[ppuaddr[10:0]];
         end
+        // Auto-increment PPUADDR after read
+        ppuaddr <= ppuaddr + (ppuctrl[2] ? 16'd32 : 16'd1);
     end
 end
 
