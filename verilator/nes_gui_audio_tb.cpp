@@ -154,15 +154,15 @@ int main(int argc, char** argv) {
                 }
             }
             
-            // Generate audio sample (simple test tone)
+            // Generate audio sample from APU
             audio_cycle++;
             if (audio_cycle >= cycles_per_sample) {
                 audio_cycle = 0;
                 
-                // Generate 440Hz test tone
-                static int tone_phase = 0;
-                tone_phase++;
-                float sample = (tone_phase % 100 < 50) ? 0.1f : -0.1f;
+                // Use real APU output (16-bit signed to float)
+                float sample_l = (int16_t)dut->audio_l / 32768.0f;
+                float sample_r = (int16_t)dut->audio_r / 32768.0f;
+                float sample = (sample_l + sample_r) * 0.5f; // Mix to mono
                 
                 std::lock_guard<std::mutex> lock(audio_mutex);
                 if (audio_queue.size() < AUDIO_BUFFER_SIZE * 4) {
