@@ -61,7 +61,8 @@ always_ff @(posedge clk or negedge rst_n) begin
             vblank <= 0;
         end
         
-        rendering <= (scanline < 240) && (ppumask[3] || ppumask[4]);
+        // Force rendering enabled for testing
+        rendering <= (scanline < 240);
     end
 end
 
@@ -220,15 +221,11 @@ end
 // Video output
 always_comb begin
     if (scanline < 240 && dot < 256) begin
-        // Simplified rendering: show palette colors directly
-        // Use tile position to select palette entry
-        logic [4:0] palette_idx;
-        palette_idx = {tile_y[0], tile_x[1:0], 2'b00};
+        // Simple test: show position-based colors
+        logic [5:0] test_color;
+        test_color = {scanline[4:3], dot[5:2]};
         
-        logic [7:0] pal_color;
-        pal_color = palette[palette_idx];
-        
-        case (pal_color[5:0])
+        case (test_color)
             6'h00: nes_color = 24'h545454; 6'h01: nes_color = 24'h001E74;
             6'h02: nes_color = 24'h081090; 6'h03: nes_color = 24'h300088;
             6'h04: nes_color = 24'h440064; 6'h05: nes_color = 24'h5C0030;
