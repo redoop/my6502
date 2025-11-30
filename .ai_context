@@ -1,0 +1,27 @@
+# AI Assistant Context
+
+## Project Organization Strategy
+
+### Directory Structure
+- **docs/**: All documentation files (*.md except README.md)
+- **scripts/**: All scripts (*.sh, *.py)
+- **Root**: Only README.md and config files
+
+### File Placement Rules
+1. All `.md` files → `docs/` (except README.md in root)
+2. All `.sh` and `.py` scripts → `scripts/`
+3. Keep root directory clean
+
+### Script Path Convention
+Scripts in `scripts/` directory use relative paths:
+- `../src/test/rtl/` to access source
+- `../games/` to access ROMs
+
+### Important Notes
+- README.md stays in root as project entry point
+- All documentation moved to docs/ for better organization
+- Scripts updated to work from scripts/ directory
+- See docs/PROJECT_ORGANIZATION.md for details
+
+## Last Updated
+2025-12-01: Reorganized project structure, moved docs and scripts

@@ -58,6 +58,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                 // $display("[PPU] Frame complete, reset to scanline 0");
             end else begin
                 scanline <= scanline + 1;
+                // if (scanline == 240) $display("[PPU] Entering VBlank region, next scanline=241");
             end
         end else begin
             dot <= dot + 1;

@@ -36,10 +36,13 @@ class alignas(VL_CACHE_LINE_BYTES) Vnes_system VL_NOT_FINAL : public VerilatedMo
     VL_OUT8(&video_hsync,0,0);
     VL_OUT8(&video_vsync,0,0);
     VL_OUT8(&video_de,0,0);
+    VL_OUT8(&audio_ready,0,0);
     VL_IN8(&controller1,7,0);
     VL_IN8(&controller2,7,0);
     VL_IN8(&prg_rom_data,7,0);
     VL_IN8(&chr_rom_data,7,0);
+    VL_OUT8(&chr_ram_data,7,0);
+    VL_OUT8(&chr_ram_write,0,0);
     VL_OUT8(&debug_cpu_rw,0,0);
     VL_OUT8(&debug_ppustatus,7,0);
     VL_OUT8(&debug_vblank,0,0);

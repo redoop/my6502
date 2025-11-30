@@ -2,7 +2,7 @@
 // Modular SystemVerilog implementation
 
 module nes_system #(
-    parameter MAPPER = 0  // 0=NROM, 4=MMC3
+    parameter MAPPER = 0  // 0=NROM, 1=MMC1, 4=MMC3
 ) (
     input  logic        clk,
     input  logic        rst_n,
@@ -18,6 +18,7 @@ module nes_system #(
     // Audio output
     output logic [15:0] audio_l,
     output logic [15:0] audio_r,
+    output logic        audio_ready,
     
     // Controller input
     input  logic [7:0]  controller1,
@@ -28,6 +29,8 @@ module nes_system #(
     output logic [17:0] prg_rom_addr,
     input  logic [7:0]  chr_rom_data,
     output logic [17:0] chr_rom_addr,
+    output logic [7:0]  chr_ram_data,
+    output logic        chr_ram_write,
     
     // Debug outputs
     output logic [15:0] vram_write_count,
@@ -95,9 +98,37 @@ logic [15:0] cpu_addr;
 logic [7:0]  cpu_data_out, cpu_data_in;
 logic        cpu_rw;
 logic        nmi, irq;
+logic [15:0] cpu_pc;
 
 // IRQ from mapper
 assign irq = mapper_irq;
+
+// PC tracking for debugging
+logic [15:0] last_pc;
+logic [31:0] pc_same_count;
+logic [7:0] stuck_trace_count;
+
+always_ff @(posedge cpu_clk or negedge rst_n) begin
+    if (!rst_n) begin
+        last_pc <= 0;
+        pc_same_count <= 0;
+        stuck_trace_count <= 0;
+    end else begin
+        if (cpu_pc == last_pc) begin
+            pc_same_count <= pc_same_count + 1;
+            if (pc_same_count == 10000) begin  // 增加到10000周期
+                $display("[CPU] Stuck at PC=$%04x for 10000 cycles", cpu_pc);
+            end
+        end else begin
+            if (stuck_trace_count > 0) begin
+                $display("[TRACE] PC=$%04x addr=$%04x data=$%02x rw=%b", cpu_pc, cpu_addr, cpu_rw ? cpu_data_in : cpu_data_out, cpu_rw);
+                stuck_trace_count <= stuck_trace_count - 1;
+            end
+            last_pc <= cpu_pc;
+            pc_same_count <= 0;
+        end
+    end
+end
 
 cpu_6502 cpu (
     .clk(cpu_clk),
@@ -107,7 +138,8 @@ cpu_6502 cpu (
     .data_out(cpu_data_out),
     .rw(cpu_rw),
     .nmi(nmi),
-    .irq(irq)
+    .irq(irq),
+    .pc_out(cpu_pc)
 );
 
 //=============================================================================
@@ -161,8 +193,13 @@ logic [7:0] apu_noise[0:3];
 logic [7:0] apu_dmc[0:3];
 logic [7:0] apu_status;
 logic [7:0] apu_frame_counter;
+logic apu_write_pulse1_3, apu_write_pulse2_3;
+logic [15:0] apu_test_counter;
 
 // APU Module
+logic [15:0] audio_sample;
+logic audio_ready_internal;
+
 nes_apu apu (
     .clk(cpu_clk),
     .rst_n(rst_n),
@@ -172,9 +209,16 @@ nes_apu apu (
     .apu_noise(apu_noise),
     .apu_dmc(apu_dmc),
     .apu_status(apu_status),
-    .audio_l(audio_l),
-    .audio_r(audio_r)
+    .apu_frame_counter(apu_frame_counter),
+    .apu_write_pulse1_3(apu_write_pulse1_3),
+    .apu_write_pulse2_3(apu_write_pulse2_3),
+    .audio_sample(audio_sample),
+    .audio_ready(audio_ready_internal)
 );
+
+assign audio_l = audio_sample;
+assign audio_r = audio_sample;
+assign audio_ready = audio_ready_internal;
 
 //=============================================================================
 // DMA Controller
@@ -227,8 +271,11 @@ always_comb begin
         cpu_data_in = {7'b0, controller1[0]};
     end else if (cpu_addr == 16'h4017) begin
         cpu_data_in = {7'b0, controller2[0]};
-    end else if (cpu_addr >= 16'h4000 && cpu_addr <= 16'hFFFF) begin
-        cpu_data_in = prg_rom_data;  // $4000-$FFFF: ROM
+    end else if (cpu_addr >= 16'h8000) begin
+        cpu_data_in = prg_rom_data;  // $8000-$FFFF: ROM
+        if (cpu_addr == 16'hFF77 && cpu_rw) begin
+            $display("[ROM_READ] addr=$%04x prg_addr=$%05x data=$%02x", cpu_addr, prg_rom_addr, prg_rom_data);
+        end
     end else begin
         cpu_data_in = 8'h00;
     end
@@ -254,8 +301,18 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
         nmi_trigger_count <= 0;
         apu_status <= 0;
         apu_frame_counter <= 0;
+        apu_write_pulse1_3 <= 0;
+        apu_write_pulse2_3 <= 0;
+        apu_test_counter <= 0;
+        chr_ram_write <= 0;
+        chr_ram_data <= 0;
     end else begin
         dma_start <= 0;  // Pulse signal
+        chr_ram_write <= 0;  // Pulse signal
+        apu_write_pulse1_3 <= 0;  // Pulse signal
+        apu_write_pulse2_3 <= 0;  // Pulse signal
+        
+        if (apu_test_counter < 16'hFFFF) apu_test_counter <= apu_test_counter + 1;
         
         if (!cpu_rw) begin
             total_write_count <= total_write_count + 1;
@@ -298,7 +355,10 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
             end else if (cpu_addr == 16'h2007) begin
                 $display("[PPU] PPUDATA write addr=$%04x data=$%02x", ppuaddr, cpu_data_out);
                 if (ppuaddr[13:0] < 14'h2000) begin
-                    // CHR ROM (read-only)
+                    // CHR RAM write (for games without CHR ROM)
+                    chr_ram_data <= cpu_data_out;
+                    chr_ram_write <= 1;
+                    $display("[CHR_RAM] Write addr=$%04x data=$%02x", ppuaddr[13:0], cpu_data_out);
                 end else if (ppuaddr[13:0] < 14'h3F00) begin
                     vram[ppuaddr[10:0]] <= cpu_data_out;
                     vram_write_count <= vram_write_count + 1;
@@ -311,9 +371,11 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
                 ppuaddr <= ppuaddr + (ppuctrl[2] ? 32 : 1);
             end else if (cpu_addr >= 16'h4000 && cpu_addr <= 16'h4003) begin
                 apu_pulse1[cpu_addr[1:0]] <= cpu_data_out;
+                if (cpu_addr[1:0] == 2'b11) apu_write_pulse1_3 <= 1;
                 $display("[APU] Pulse1[$%01x] = $%02x", cpu_addr[1:0], cpu_data_out);
             end else if (cpu_addr >= 16'h4004 && cpu_addr <= 16'h4007) begin
                 apu_pulse2[cpu_addr[1:0]] <= cpu_data_out;
+                if (cpu_addr[1:0] == 2'b11) apu_write_pulse2_3 <= 1;
                 $display("[APU] Pulse2[$%01x] = $%02x", cpu_addr[1:0], cpu_data_out);
             end else if (cpu_addr >= 16'h4008 && cpu_addr <= 16'h400B) begin
                 apu_triangle[cpu_addr[1:0]] <= cpu_data_out;
@@ -442,6 +504,18 @@ generate
             .chr_rom_addr(chr_rom_addr),
             .irq(mapper_irq)
         );
+    end else if (MAPPER == 1) begin : gen_mmc1
+        mapper_mmc1 mapper (
+            .clk(cpu_clk),
+            .rst_n(rst_n),
+            .cpu_addr(cpu_addr),
+            .cpu_data(cpu_data_out),
+            .cpu_write(mapper_write),
+            .prg_rom_addr(prg_rom_addr),
+            .ppu_addr(ppu_chr_addr),
+            .chr_rom_addr(chr_rom_addr)
+        );
+        assign mapper_irq = 0;
     end else begin : gen_nrom
         // NROM (Mapper 0): simple address passthrough
         assign mapper_irq = 0;

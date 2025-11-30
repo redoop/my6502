@@ -9,7 +9,8 @@ module cpu_6502 (
     output logic [7:0]  data_out,
     output logic        rw,
     input  logic        nmi,
-    input  logic        irq
+    input  logic        irq,
+    output logic [15:0] pc_out
 );
 
 // Registers
@@ -472,7 +473,12 @@ always_ff @(posedge clk or negedge rst_n) begin
                     
                     // JMP
                     8'h4C: begin PC <= {data_in, operand}; end  // JMP abs
-                    8'h6C: begin addr <= {data_in, operand}; rw <= 1; PC <= PC + 1; end  // JMP ind
+                    8'h6C: begin 
+                        addr <= {data_in, operand}; 
+                        rw <= 1; 
+                        PC <= PC + 1;
+                        cycle_count <= 1;  // Start multi-cycle JMP indirect
+                    end
                     
                     // JSR
                     8'h20: begin
@@ -481,6 +487,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                         rw <= 0;
                         SP <= SP - 1;
                         PC <= PC;
+                        cycle_count <= 1;  // Start multi-cycle JSR
                     end
                     
                     // RTS
@@ -489,6 +496,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                         addr <= {8'h01, SP + 1};
                         rw <= 1;
                         PC <= PC;
+                        cycle_count <= 1;  // Start multi-cycle RTS
                     end
                     
                     // BRK
@@ -586,8 +594,48 @@ always_ff @(posedge clk or negedge rst_n) begin
             end
             
             MEMORY: begin
+                // JSR - multi-cycle handling
+                if (opcode == 8'h20) begin
+                    case (cycle_count)
+                        1: begin  // Push PC low byte
+                            addr <= {8'h01, SP};
+                            data_out <= PC[7:0];
+                            rw <= 0;
+                            SP <= SP - 1;
+                            cycle_count <= 2;
+                        end
+                        2: begin  // Read target address high byte
+                            addr <= PC;
+                            rw <= 1;
+                            cycle_count <= 0;
+                        end
+                    endcase
+                // RTS - multi-cycle handling
+                end else if (opcode == 8'h60) begin
+                    case (cycle_count)
+                        1: begin  // Read PC low byte from stack
+                            operand <= data_in;
+                            SP <= SP + 1;
+                            addr <= {8'h01, SP + 1};
+                            rw <= 1;
+                            cycle_count <= 2;
+                        end
+                        2: begin  // Read PC high byte from stack
+                            cycle_count <= 0;
+                        end
+                    endcase
+                // JMP indirect - multi-cycle handling
+                end else if (opcode == 8'h6C) begin
+                    case (cycle_count)
+                        1: begin  // Read low byte of target address
+                            operand <= data_in;
+                            addr <= addr + 1;
+                            rw <= 1;
+                            cycle_count <= 0;
+                        end
+                    endcase
                 // LDA/STA absolute addressing - read high byte
-                if ((opcode == 8'hAD || opcode == 8'hBD || opcode == 8'hB9 || 
+                end else if ((opcode == 8'hAD || opcode == 8'hBD || opcode == 8'hB9 || 
                      opcode == 8'h8D || opcode == 8'h9D ||
                      opcode == 8'hAE || opcode == 8'h8E ||
                      opcode == 8'h8C ||
@@ -841,6 +889,13 @@ always_ff @(posedge clk or negedge rst_n) begin
             end
             
             WRITEBACK: begin
+                if (opcode == 8'h20) begin  // JSR - complete jump
+                    PC <= {data_in, operand};
+                end else if (opcode == 8'h60) begin  // RTS - complete return
+                    PC <= {data_in, operand} + 1;  // RTS returns to next instruction
+                end else if (opcode == 8'h6C) begin  // JMP indirect - complete jump
+                    PC <= {data_in, operand};
+                end
                 rw <= 1;
             end
             
@@ -903,7 +958,10 @@ always_comb begin
         end
         DECODE: next_state = EXECUTE;
         EXECUTE: begin
-            if ((opcode[1:0] == 2'b01 && opcode[4:2] != 3'b100) ||
+            if (opcode == 8'h20 ||  // JSR
+                opcode == 8'h60 ||  // RTS
+                opcode == 8'h6C ||  // JMP indirect
+                (opcode[1:0] == 2'b01 && opcode[4:2] != 3'b100) ||
                 (opcode == 8'h85 || opcode == 8'h8D || opcode == 8'h95 || opcode == 8'h9D || opcode == 8'h99 ||
                  opcode == 8'h86 || opcode == 8'h96 || opcode == 8'h84 || opcode == 8'h94 ||
                  opcode == 8'hA5 || opcode == 8'hAD || opcode == 8'hB5 || opcode == 8'hBD || opcode == 8'hB9 ||
@@ -941,5 +999,7 @@ always_comb begin
         default: next_state = FETCH;
     endcase
 end
+
+assign pc_out = PC;
 
 endmodule

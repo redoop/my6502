@@ -17,10 +17,13 @@ Vnes_system::Vnes_system(VerilatedContext* _vcontextp__, const char* _vcname__)
     , video_hsync{vlSymsp->TOP.video_hsync}
     , video_vsync{vlSymsp->TOP.video_vsync}
     , video_de{vlSymsp->TOP.video_de}
+    , audio_ready{vlSymsp->TOP.audio_ready}
     , controller1{vlSymsp->TOP.controller1}
     , controller2{vlSymsp->TOP.controller2}
     , prg_rom_data{vlSymsp->TOP.prg_rom_data}
     , chr_rom_data{vlSymsp->TOP.chr_rom_data}
+    , chr_ram_data{vlSymsp->TOP.chr_ram_data}
+    , chr_ram_write{vlSymsp->TOP.chr_ram_write}
     , debug_cpu_rw{vlSymsp->TOP.debug_cpu_rw}
     , debug_ppustatus{vlSymsp->TOP.debug_ppustatus}
     , debug_vblank{vlSymsp->TOP.debug_vblank}

@@ -27,10 +27,16 @@ bool load_rom(const char* filename, std::vector<uint8_t>& prg_rom, std::vector<u
     std::cout << "PRG: " << prg_size << "B, CHR: " << chr_size << "B, Mapper: " << mapper << std::endl;
     
     prg_rom.resize(prg_size > 0 ? prg_size : 16384);
-    chr_rom.resize(chr_size > 0 ? chr_size : 8192);
+    chr_rom.resize(8192);  // Always 8KB for CHR (ROM or RAM)
     
     file.read((char*)prg_rom.data(), prg_size);
-    if (chr_size > 0) file.read((char*)chr_rom.data(), chr_size);
+    if (chr_size > 0) {
+        file.read((char*)chr_rom.data(), chr_size);
+    } else {
+        std::cout << "[INFO] Using CHR RAM (8KB)" << std::endl;
+        // CHR RAM starts as zeros
+        std::fill(chr_rom.begin(), chr_rom.end(), 0);
+    }
     
     return true;
 }
@@ -42,7 +48,7 @@ int main(int argc, char** argv) {
     }
     
     // Initialize SDL
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
         std::cerr << "SDL init failed: " << SDL_GetError() << std::endl;
         return 1;
     }
@@ -58,6 +64,27 @@ int main(int argc, char** argv) {
     SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB24,
         SDL_TEXTUREACCESS_STREAMING, 256, 240);
     
+    // Setup audio
+    SDL_AudioSpec want, have;
+    SDL_zero(want);
+    want.freq = 44100;
+    want.format = AUDIO_S16SYS;
+    want.channels = 2;
+    want.samples = 512;
+    want.callback = NULL;
+    
+    SDL_AudioDeviceID audio_device = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+    if (audio_device == 0) {
+        std::cerr << "Failed to open audio: " << SDL_GetError() << std::endl;
+    } else {
+        std::cout << "Audio: " << have.freq << "Hz, " << (int)have.channels << " channels" << std::endl;
+        SDL_PauseAudioDevice(audio_device, 0);
+    }
+    
+    std::vector<int16_t> audio_buffer;
+    audio_buffer.reserve(4096);
+    int audio_samples_queued = 0;
+    
     Verilated::commandArgs(argc, argv);
     Vnes_system* dut = new Vnes_system;
     
@@ -69,9 +96,22 @@ int main(int argc, char** argv) {
     dut->controller1 = 0;
     dut->controller2 = 0;
     
+    bool auto_start_pressed = false;
+    uint16_t last_pc = 0;
+    int pc_stuck_count = 0;
+    
+    // Initialize ROM data
+    dut->prg_rom_data = prg_rom[0];
+    dut->chr_rom_data = chr_rom[0];
+    
     for (int i = 0; i < 10; i++) {
         dut->clk = !dut->clk;
         dut->eval();
+        // Update ROM data after each eval
+        uint32_t prg_addr = dut->prg_rom_addr % prg_rom.size();
+        dut->prg_rom_data = prg_rom[prg_addr];
+        uint32_t chr_addr = dut->chr_rom_addr % chr_rom.size();
+        dut->chr_rom_data = chr_rom[chr_addr];
     }
     dut->rst_n = 1;
     
@@ -79,6 +119,7 @@ int main(int argc, char** argv) {
     memset(framebuffer, 0, sizeof(framebuffer));
     
     uint64_t cycles = 0;
+    uint64_t last_cycle_count = 0;
     int frames = 0;
     bool last_vsync = false;
     int pixel_x = 0, pixel_y = 0;
@@ -112,13 +153,37 @@ int main(int argc, char** argv) {
         // Run emulation for ~1 frame worth of cycles
         for (int i = 0; i < 30000; i++) {
             dut->clk = !dut->clk;
+            dut->eval();
+            
+            // Update ROM data after eval (combinational logic)
+            uint32_t prg_addr = dut->prg_rom_addr % prg_rom.size();
+            dut->prg_rom_data = prg_rom[prg_addr];
+            
+            uint32_t chr_addr = dut->chr_rom_addr % chr_rom.size();
+            dut->chr_rom_data = chr_rom[chr_addr];
             
             if (dut->clk) {
-                uint32_t prg_addr = dut->prg_rom_addr % prg_rom.size();
-                dut->prg_rom_data = prg_rom[prg_addr];
+                // Handle CHR RAM writes
+                if (dut->chr_ram_write) {
+                    chr_rom[chr_addr] = dut->chr_ram_data;
+                }
                 
-                uint32_t chr_addr = dut->chr_rom_addr % chr_rom.size();
-                dut->chr_rom_data = chr_rom[chr_addr];
+                // Handle audio output
+                if (audio_device && dut->audio_ready) {
+                    int16_t sample = (int16_t)dut->audio_l;
+                    audio_buffer.push_back(sample); // Left
+                    audio_buffer.push_back(sample); // Right
+                    audio_samples_queued++;
+                    
+                    // Queue audio when buffer is large enough
+                    if (audio_buffer.size() >= 1024) {
+                        if (SDL_GetQueuedAudioSize(audio_device) < 8192) {
+                            SDL_QueueAudio(audio_device, audio_buffer.data(), 
+                                         audio_buffer.size() * sizeof(int16_t));
+                        }
+                        audio_buffer.clear();
+                    }
+                }
                 
                 if (dut->video_de) {
                     int idx = (pixel_y * 256 + pixel_x) * 3;
@@ -139,6 +204,17 @@ int main(int argc, char** argv) {
                     pixel_x = 0;
                     pixel_y = 0;
                     
+                    // Auto-press START at frame 60 to start game
+                    if (frames == 60 && !auto_start_pressed) {
+                        dut->controller1 |= 0x10;  // Press START
+                        auto_start_pressed = true;
+                        std::cout << "[AUTO] Pressing START button" << std::endl;
+                    }
+                    if (frames == 65 && auto_start_pressed) {
+                        dut->controller1 &= ~0x10;  // Release START
+                        std::cout << "[AUTO] Released START button" << std::endl;
+                    }
+                    
                     // Update display
                     SDL_UpdateTexture(texture, NULL, framebuffer, 256 * 3);
                     SDL_RenderClear(renderer);
@@ -146,7 +222,15 @@ int main(int argc, char** argv) {
                     SDL_RenderPresent(renderer);
                     
                     if (frames % 60 == 0) {
-                        std::cout << "Frame " << frames << std::endl;
+                        uint64_t cycles_this_period = cycles - last_cycle_count;
+                        std::cout << "Frame " << frames 
+                                  << " | Cycles: " << cycles_this_period
+                                  << " | Audio samples: " << audio_samples_queued
+                                  << " | Queue: " << SDL_GetQueuedAudioSize(audio_device) << " bytes"
+                                  << " | PC: $" << std::hex << (int)dut->debug_cpu_addr << std::dec
+                                  << std::endl;
+                        audio_samples_queued = 0;
+                        last_cycle_count = cycles;
                     }
                 }
                 last_vsync = dut->video_vsync;
@@ -160,6 +244,7 @@ int main(int argc, char** argv) {
     std::cout << "Total frames: " << frames << std::endl;
     
     delete dut;
+    if (audio_device) SDL_CloseAudioDevice(audio_device);
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

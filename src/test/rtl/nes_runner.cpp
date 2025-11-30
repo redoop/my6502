@@ -99,6 +99,7 @@ int main(int argc, char** argv) {
     bool last_vsync = false;
     uint32_t last_chr_addr = 0xFFFFFFFF;
     int chr_changes = 0;
+    bool nmi_handler_seen = false;
     
     while (cycles < 21477272 * 10 && !Verilated::gotFinish()) {
         dut->clk = !dut->clk;

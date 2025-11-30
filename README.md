@@ -7,14 +7,20 @@ A cycle-accurate NES (Nintendo Entertainment System) emulator implemented in Sys
 ### Hardware Components
 - ✅ **CPU 6502**: Complete instruction set (151 opcodes)
 - ✅ **PPU**: Picture Processing Unit with video output
-- ✅ **APU**: Audio Processing Unit (basic registers)
+- ✅ **APU**: Audio Processing Unit with 5 channels (Pulse×2, Triangle, Noise, DMC)
 - ✅ **DMA**: Direct Memory Access for sprite data
-- ✅ **Mappers**: Support for Mapper 0 (NROM) and Mapper 4 (MMC3)
+- ✅ **Mappers**: Support for Mapper 0 (NROM), Mapper 1 (MMC1), and Mapper 4 (MMC3)
 
 ### Video Output
 - 256x240 resolution at 60 FPS
 - RGB output with HSYNC/VSYNC/DE signals
 - Real-time rendering via SDL2
+
+### Audio Output
+- 5-channel sound (2× Pulse, Triangle, Noise, DMC)
+- 44.1kHz stereo output via SDL2
+- Real-time audio mixing
+- Envelope, length counter, and frame counter support
 
 ### Emulation Accuracy
 - Cycle-accurate CPU execution
@@ -30,15 +36,31 @@ A cycle-accurate NES (Nintendo Entertainment System) emulator implemented in Sys
 brew install verilator sdl2
 ```
 
-### Run Super Mario Bros with GUI
+### Run Games
+
+#### The Legend of Zelda (Mapper 1 - MMC1) ⭐
 ```bash
-./run_smb.sh
+./scripts/run_zelda.sh
 ```
 
-Or manually:
+#### Super Mario Bros (Original - Mapper 0)
 ```bash
-cd src/test/rtl
-make gui_smb
+./scripts/run_smb_mmc1.sh
+```
+
+#### Super Mario Bros 3 (Mapper 4)
+```bash
+./scripts/run_smb.sh
+```
+
+#### Donkey Kong (Mapper 0)
+```bash
+./scripts/run_donkeykong.sh
+```
+
+### Verify ROMs
+```bash
+./scripts/verify_roms.sh
 ```
 
 ### Controls
@@ -60,6 +82,7 @@ make all
 ### Individual Targets
 ```bash
 make runner_nrom    # Mapper 0 (NROM)
+make runner_mmc1    # Mapper 1 (MMC1)
 make runner_mmc3    # Mapper 4 (MMC3)
 make smb_gui        # GUI version
 ```
@@ -116,24 +139,27 @@ Tests include:
 
 ### Game Tests
 - ✅ nestest.nes (Mapper 0)
-- ⚠️ Super Mario Bros (needs Mapper 1 or standard ROM)
+- ✅ The Legend of Zelda (Mapper 1 - MMC1) ⭐
+- ⚠️ Super Mario Bros (original uses Mapper 0/NROM-256, needs debugging)
+- ✅ Mapper 4 (MMC3) implemented
 
 ## Current Status
 
-### Completed (70%)
+### Completed (80%)
 - Full 6502 CPU instruction set
 - PPU video timing and output
+- APU audio processing and SDL2 output
 - VBlank generation and synchronization
-- Mapper 0 (NROM) and Mapper 4 (MMC3)
-- SDL2 GUI with real-time rendering
+- Mapper 0 (NROM), Mapper 1 (MMC1), and Mapper 4 (MMC3)
+- SDL2 GUI with real-time rendering and audio
 - Controller input
 - Unit test suite
 
 ### In Progress
-- Mapper 1 (MMC1) for standard Super Mario Bros
-- MMC3 IRQ support
+- Game ROM compatibility debugging
 - Complete sprite rendering
 - Background scrolling
+- DMC channel implementation
 
 ## Performance
 
@@ -143,9 +169,9 @@ Tests include:
 
 ## Known Issues
 
-- Super Mario Bros (384KB version) requires Mapper 1
+- Super Mario Bros uses Mapper 0 (NROM-256) but needs debugging for proper graphics
 - Some games may need additional mapper features
-- Audio output not yet implemented
+- DMC channel (sample playback) not yet implemented
 
 ## License
 
