@@ -70,13 +70,29 @@ assign video_hsync = (dot >= 280 && dot < 304);
 assign video_vsync = (scanline >= 243 && scanline < 246);
 assign video_de = (scanline < 240) && (dot < 256);
 
-// Pattern cache
+// Pattern cache - load during rendering
 logic [7:0] pattern_lo_reg, pattern_hi_reg;
+logic [7:0] next_pattern_lo, next_pattern_hi;
+
+initial begin
+    pattern_lo_reg = 8'hAA; // Test pattern
+    pattern_hi_reg = 8'h55;
+end
 
 always_ff @(posedge clk) begin
-    if (scanline < 240) begin
-        if (dot[2:0] == 3'd6) pattern_lo_reg <= chr_rom_data;
-        else if (dot[2:0] == 3'd0) pattern_hi_reg <= chr_rom_data;
+    if (scanline < 240 && dot < 256) begin
+        // Load pattern data at specific dots
+        if (dot[2:0] == 3'd1) begin
+            next_pattern_lo <= chr_rom_data;
+        end else if (dot[2:0] == 3'd3) begin
+            next_pattern_hi <= chr_rom_data;
+        end
+        
+        // Shift to next tile every 8 pixels
+        if (dot[2:0] == 3'd7) begin
+            pattern_lo_reg <= next_pattern_lo;
+            pattern_hi_reg <= next_pattern_hi;
+        end
     end
 end
 
@@ -161,7 +177,8 @@ always_comb begin
                        {ppuctrl[4], tile_index, 1'b1, scroll_y[2:0]} :
                        {ppuctrl[4], tile_index, 1'b0, scroll_y[2:0]};
         
-        pixel_value = {pattern_hi_reg[7-scroll_x[2:0]], pattern_lo_reg[7-scroll_x[2:0]]};
+        // Simplified pixel extraction for debugging
+        pixel_value = {pattern_hi_reg[7-dot[2:0]], pattern_lo_reg[7-dot[2:0]]};
         
         bg_palette_idx = pixel_value == 0 ? 5'h00 : {1'b0, attr_bits, pixel_value};
     end else begin
@@ -221,49 +238,10 @@ end
 // Video output
 always_comb begin
     if (scanline < 240 && dot < 256) begin
-        // Simple test: show position-based colors
-        logic [5:0] test_color;
-        test_color = {scanline[4:3], dot[5:2]};
-        
-        case (test_color)
-            6'h00: nes_color = 24'h545454; 6'h01: nes_color = 24'h001E74;
-            6'h02: nes_color = 24'h081090; 6'h03: nes_color = 24'h300088;
-            6'h04: nes_color = 24'h440064; 6'h05: nes_color = 24'h5C0030;
-            6'h06: nes_color = 24'h540400; 6'h07: nes_color = 24'h3C1800;
-            6'h08: nes_color = 24'h202A00; 6'h09: nes_color = 24'h083A00;
-            6'h0A: nes_color = 24'h004000; 6'h0B: nes_color = 24'h003C22;
-            6'h0C: nes_color = 24'h00325D; 6'h0D: nes_color = 24'h000000;
-            6'h0E: nes_color = 24'h000000; 6'h0F: nes_color = 24'h000000;
-            6'h10: nes_color = 24'h989698; 6'h11: nes_color = 24'h084CC4;
-            6'h12: nes_color = 24'h3032EC; 6'h13: nes_color = 24'h5C1EE4;
-            6'h14: nes_color = 24'h8814B0; 6'h15: nes_color = 24'hA01464;
-            6'h16: nes_color = 24'h982220; 6'h17: nes_color = 24'h783C00;
-            6'h18: nes_color = 24'h545A00; 6'h19: nes_color = 24'h287200;
-            6'h1A: nes_color = 24'h087C00; 6'h1B: nes_color = 24'h007628;
-            6'h1C: nes_color = 24'h006678; 6'h1D: nes_color = 24'h000000;
-            6'h1E: nes_color = 24'h000000; 6'h1F: nes_color = 24'h000000;
-            6'h20: nes_color = 24'hECEEEC; 6'h21: nes_color = 24'h4C9AEC;
-            6'h22: nes_color = 24'h787CEC; 6'h23: nes_color = 24'hB062EC;
-            6'h24: nes_color = 24'hE454EC; 6'h25: nes_color = 24'hEC58B4;
-            6'h26: nes_color = 24'hEC6A64; 6'h27: nes_color = 24'hD48820;
-            6'h28: nes_color = 24'hA0AA00; 6'h29: nes_color = 24'h74C400;
-            6'h2A: nes_color = 24'h4CD020; 6'h2B: nes_color = 24'h38CC6C;
-            6'h2C: nes_color = 24'h38B4CC; 6'h2D: nes_color = 24'h3C3C3C;
-            6'h2E: nes_color = 24'h000000; 6'h2F: nes_color = 24'h000000;
-            6'h30: nes_color = 24'hECEEEC; 6'h31: nes_color = 24'hA8CCEC;
-            6'h32: nes_color = 24'hBCBCEC; 6'h33: nes_color = 24'hD4B2EC;
-            6'h34: nes_color = 24'hECAEEC; 6'h35: nes_color = 24'hECAED4;
-            6'h36: nes_color = 24'hECB4B0; 6'h37: nes_color = 24'hE4C490;
-            6'h38: nes_color = 24'hCCD278; 6'h39: nes_color = 24'hB4DE78;
-            6'h3A: nes_color = 24'hA8E290; 6'h3B: nes_color = 24'h98E2B4;
-            6'h3C: nes_color = 24'hA0D6E4; 6'h3D: nes_color = 24'hA0A2A0;
-            6'h3E: nes_color = 24'h000000; 6'h3F: nes_color = 24'h000000;
-            default: nes_color = 24'h000000;
-        endcase
-        
-        video_r = nes_color[23:16];
-        video_g = nes_color[15:8];
-        video_b = nes_color[7:0];
+        // Debug: show pattern registers directly
+        video_r = pattern_lo_reg;
+        video_g = pattern_hi_reg;
+        video_b = 8'h00;
     end else begin
         video_r = 8'h00;
         video_g = 8'h00;
