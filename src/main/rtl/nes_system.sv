@@ -26,7 +26,11 @@ module nes_system (
     input  logic [7:0]  prg_rom_data,
     output logic [14:0] prg_rom_addr,
     input  logic [7:0]  chr_rom_data,
-    output logic [13:0] chr_rom_addr
+    output logic [13:0] chr_rom_addr,
+    
+    // Debug outputs
+    output logic [15:0] vram_write_count,
+    output logic [15:0] nmi_trigger_count
 );
 
 // Clock dividers
@@ -47,34 +51,26 @@ logic [7:0]  cpu_data_out, cpu_data_in;
 logic        cpu_rw;
 logic        nmi, irq;
 
+// Registered versions for stable memory access
+logic [15:0] cpu_addr_reg;
+logic        cpu_rw_reg;
+
+always_ff @(posedge cpu_clk) begin
+    cpu_addr_reg <= cpu_addr;
+    cpu_rw_reg <= cpu_rw;
+end
+
 // Memory
 logic [7:0]  ram[0:2047];      // 2KB internal RAM
 logic [7:0]  oam[0:255];       // Sprite memory
 logic [7:0]  vram[0:2047];     // Nametable VRAM
 logic [7:0]  palette[0:31];    // Palette RAM
 
-// Initialize VRAM - with Donkey Kong level pattern
+// Initialize VRAM - clear it, let game fill
 initial begin
-    // Simulate Donkey Kong level layout
-    // Fill with platform tiles (tile 0x24 = platform, 0x26 = ladder)
-    for (int y = 0; y < 30; y++) begin
-        for (int x = 0; x < 32; x++) begin
-            int addr = y * 32 + x;
-            
-            // Create platform pattern every 4 rows
-            if (y % 4 == 0 || y % 4 == 1) begin
-                vram[addr] = 8'h24;  // Platform tile
-            end else if (x % 8 == 2 || x % 8 == 3) begin
-                vram[addr] = 8'h26;  // Ladder tile
-            end else begin
-                vram[addr] = 8'h00;  // Empty
-            end
-        end
-    end
-    
-    // Attribute table - pink platforms, cyan ladders
-    for (int i = 960; i < 1024; i++) begin
-        vram[i] = 8'hE4;  // Mixed palettes
+    // Clear VRAM
+    for (int i = 0; i < 2048; i++) begin
+        vram[i] = 8'h00;
     end
     
     // Clear OAM
@@ -82,26 +78,10 @@ initial begin
         oam[i] = 8'hFF;
     end
     
-    // Initialize palette with Donkey Kong colors
-    palette[0] = 8'h0F;  // Black background
-    palette[1] = 8'h30;  // White
-    palette[2] = 8'h27;  // Orange
-    palette[3] = 8'h16;  // Red
-    palette[5] = 8'h11;  // Blue (ladder)
-    palette[6] = 8'h21;  // Cyan
-    palette[7] = 8'h31;  // Light cyan
-    palette[9] = 8'h25;  // Pink (platform)
-    palette[10] = 8'h35; // Light pink
-    palette[11] = 8'h15; // Dark pink
-    palette[13] = 8'h28; // Yellow
-    palette[14] = 8'h38; // Light yellow
-    palette[15] = 8'h18; // Dark yellow
-    
-    // Sprite palettes
-    palette[17] = 8'h30; palette[18] = 8'h27; palette[19] = 8'h16;
-    palette[21] = 8'h11; palette[22] = 8'h21; palette[23] = 8'h31;
-    palette[25] = 8'h1A; palette[26] = 8'h2A; palette[27] = 8'h3A;
-    palette[29] = 8'h28; palette[30] = 8'h38; palette[31] = 8'h18;
+    // Clear palette
+    for (int i = 0; i < 32; i++) begin
+        palette[i] = 8'h00;
+    end
 end
 
 // PPU registers
@@ -154,11 +134,17 @@ cpu_6502 cpu (
 always_comb begin
     cpu_data_in = 8'h00;
     
+    // Debug: log all reads in $2000-$2007 range
+    if (cpu_rw && cpu_addr >= 16'h2000 && cpu_addr <= 16'h2007) begin
+        $display("[DEBUG] PPU read: addr=$%04x", cpu_addr);
+    end
+    
     casez (cpu_addr)
         16'b0001????????????: cpu_data_in = ram[cpu_addr[10:0]];    // $0000-$1FFF
         16'h2002: begin
-            // Return VBlank status directly (combinational)
-            cpu_data_in = {vblank_sync, ppustatus[6:0]};
+            // Return real ppustatus
+            cpu_data_in = ppustatus;
+            if (cpu_rw) $display("[PPU] $2002 read: VBlank=%b status=$%02x", ppustatus[7], ppustatus);
         end
         16'h2004:             cpu_data_in = oam[oamaddr];
         16'h2007:             cpu_data_in = ppudata_buffer;
@@ -172,7 +158,6 @@ always_comb begin
 end
 
 // CPU writes
-logic [15:0] vram_write_count;
 logic [31:0] total_write_count;
 
 always_ff @(posedge cpu_clk or negedge rst_n) begin
@@ -187,8 +172,14 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
         ppuscroll_y <= 0;
         vram_write_count <= 0;
         total_write_count <= 0;
+        nmi_trigger_count <= 0;
     end else if (!cpu_rw) begin
         total_write_count <= total_write_count + 1;
+        
+        // Debug: log writes to $6000-$6FFF (test results)
+        if (cpu_addr >= 16'h6000 && cpu_addr < 16'h7000) begin
+            $display("[TEST] Write $%04x = $%02x", cpu_addr, cpu_data_out);
+        end
         
         // Debug: track all I/O writes
         if (cpu_addr >= 16'h2000 && cpu_addr < 16'h4020) begin
@@ -203,7 +194,8 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
             16'b0001????????????: ram[cpu_addr[10:0]] <= cpu_data_out;
             16'h2000: begin
                 ppuctrl <= cpu_data_out;
-                $display("[PPU] PPUCTRL=$%02x", cpu_data_out);
+                $display("[PPU] PPUCTRL=$%02x (NMI=%b BG=$%x SPR=$%x)", 
+                         cpu_data_out, cpu_data_out[7], cpu_data_out[4], cpu_data_out[3]);
             end
             16'h2001: begin
                 ppumask <= cpu_data_out;
@@ -267,15 +259,13 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
         // Sync vblank from PPU clock domain
         vblank_sync <= vblank;
         
-        // Set VBlank flag on rising edge (only if not being cleared by read)
-        if (vblank && !vblank_sync && !(cpu_rw && cpu_addr == 16'h2002)) begin
-            ppustatus[7] <= 1;
-        end
-        
-        // Clear VBlank flag on $2002 read (happens AFTER the read returns current value)
+        // VBlank flag management
+        // Clear uses immediate signals (same cycle as read)
         if (cpu_rw && cpu_addr == 16'h2002) begin
             ppustatus[7] <= 0;
             ppuaddr_latch <= 0;
+        end else if (vblank) begin
+            ppustatus[7] <= 1;
         end
     end
 end
@@ -327,8 +317,13 @@ always_ff @(posedge ppu_clk or negedge rst_n) begin
         // VBlank control
         if (scanline == 241 && dot == 1) begin
             vblank <= 1;
+            $display("[PPU] VBlank START at frame cycle");
             if (ppuctrl[7]) begin
                 nmi <= 1;
+                nmi_trigger_count <= nmi_trigger_count + 1;
+                $display("[PPU] NMI triggered (ppuctrl[7]=1)");
+            end else begin
+                $display("[PPU] NMI NOT triggered (ppuctrl[7]=0)");
             end
         end
         
@@ -367,12 +362,12 @@ logic [4:0] sprite_palette_idx;
 logic sprite_active;
 logic [5:0] sprite_idx;
 
-// Cache pattern data
+// Cache pattern data - read one cycle after address is set
 always_ff @(posedge ppu_clk) begin
     if (scanline < 240) begin
-        if (dot[2:0] == 3'd5) begin
+        if (dot[2:0] == 3'd6) begin
             pattern_lo_reg <= chr_rom_data;
-        end else if (dot[2:0] == 3'd7) begin
+        end else if (dot[2:0] == 3'd0) begin
             pattern_hi_reg <= chr_rom_data;
         end
     end
@@ -542,6 +537,7 @@ always_comb begin
         6'h3D: nes_color = 24'hA0A2A0;
         6'h3E: nes_color = 24'h000000;
         6'h3F: nes_color = 24'h000000;
+        default: nes_color = 24'h000000;  // Black for undefined
     endcase
 end
 
@@ -747,6 +743,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                     reset_vector[15:8] <= data_in;
                     PC <= {data_in, reset_vector[7:0]};
                     cycle_count <= 0;
+                    $display("[CPU] Reset vector: $%04x", {data_in, reset_vector[7:0]});
                 end
             end
             FETCH: begin
@@ -754,6 +751,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                 rw <= 1;
                 PC <= PC + 1;
                 cycle_count <= 0;
+                $display("[CPU] PC=$%04x", PC);
             end
             
             DECODE: begin

@@ -1,9 +1,13 @@
 #include <verilated.h>
 #include "Vnes_system.h"
 #include <SDL.h>
+#include <SDL_image.h>
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <ctime>
 
 struct iNESHeader {
     char magic[4];
@@ -14,6 +18,27 @@ struct iNESHeader {
 };
 
 std::vector<uint8_t> prg_rom, chr_rom;
+
+void save_frame_image(uint32_t* pixels, int frame_num) {
+    mkdir("images", 0755);
+    
+    char filename[256];
+    time_t now = time(NULL);
+    struct tm* t = localtime(&now);
+    snprintf(filename, sizeof(filename), "images/frame_%04d_%02d%02d_%02d%02d%02d.png",
+             frame_num, t->tm_mon+1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
+    
+    // Create surface with correct byte order (0xRRGGBB00 format)
+    SDL_Surface* surface = SDL_CreateRGBSurfaceFrom(
+        pixels, 256, 240, 32, 256 * 4,
+        0xFF0000, 0x00FF00, 0x0000FF, 0);
+    
+    if (surface) {
+        IMG_SavePNG(surface, filename);
+        SDL_FreeSurface(surface);
+        std::cout << "Saved: " << filename << std::endl;
+    }
+}
 
 bool load_rom(const char* filename) {
     std::ifstream file(filename, std::ios::binary);
@@ -80,6 +105,9 @@ int main(int argc, char** argv) {
     int16_t audio_buffer[2048];
     int audio_pos = 0;
     
+    // Clean up old sampled images
+    system("rm -f images/frame_*.png images/diff.png");
+    
     Verilated::commandArgs(argc, argv);
     Vnes_system* top = new Vnes_system;
     
@@ -93,8 +121,13 @@ int main(int argc, char** argv) {
     int frame = 0;
     uint8_t controller = 0;
     
+    // Sampling configuration
+    const int SAMPLE_INTERVAL = 60;  // Sample every 60 frames (1 second at 60fps)
+    int next_sample_frame = 30;  // Start sampling at frame 30
+    
     std::cout << "Starting emulation... Press ESC to quit" << std::endl;
     std::cout << "Controls: Arrow keys=D-Pad, Z=A, X=B, Enter=Start, RShift=Select" << std::endl;
+    std::cout << "Auto-sampling: Every " << SAMPLE_INTERVAL << " frames -> images/" << std::endl;
     
     while (running) {
         // Handle events
@@ -124,6 +157,10 @@ int main(int argc, char** argv) {
         // PPU: 341 dots/scanline * 262 scanlines = 89342 PPU cycles
         // Master clock / 4 = PPU clock, so 89342 * 4 = 357368 master cycles
         int px = 0, py = 0;
+        uint8_t sample_r = 0, sample_g = 0, sample_b = 0;
+        bool has_video = false;
+        uint16_t sample_chr_addr = 0;
+        
         for (int i = 0; i < 357368; i++) {
             if (cycle == 10) top->rst_n = 1;
             
@@ -147,6 +184,14 @@ int main(int argc, char** argv) {
                 if (px < 256 && py < 240) {
                     pixels[py * 256 + px] = (top->video_r << 16) | 
                                             (top->video_g << 8) | top->video_b;
+                }
+                // Sample middle pixel for logging
+                if (px == 128 && py == 120 && !has_video) {
+                    sample_r = top->video_r;
+                    sample_g = top->video_g;
+                    sample_b = top->video_b;
+                    sample_chr_addr = top->chr_rom_addr;
+                    has_video = true;
                 }
                 px++;
                 if (px >= 256) {
@@ -189,15 +234,24 @@ int main(int argc, char** argv) {
         SDL_RenderPresent(renderer);
         
         frame++;
-        if (frame % 60 == 0) {
+        
+        // Auto-sample and save image
+        if (frame >= next_sample_frame) {
+            save_frame_image(pixels, frame);
+            next_sample_frame = frame + SAMPLE_INTERVAL;
+        }
+        
+        if (frame % 30 == 0 && frame > 0) {
             std::cout << "Frame " << frame 
                       << " PRG=0x" << std::hex << (int)top->prg_rom_addr 
-                      << " CHR=0x" << (int)top->chr_rom_addr << std::dec
-                      << " Video:" << (int)top->video_r << "," 
-                      << (int)top->video_g << "," << (int)top->video_b;
+                      << " CHR=0x" << (int)sample_chr_addr << std::dec
+                      << " Video:" << (int)sample_r << "," 
+                      << (int)sample_g << "," << (int)sample_b
+                      << " VRAM_wr:" << (int)top->vram_write_count
+                      << " NMI:" << (int)top->nmi_trigger_count;
             
             // Show if rendering is enabled
-            std::cout << " Render:" << (top->video_de ? "ON" : "OFF");
+            std::cout << " Render:" << (has_video ? "ON" : "OFF");
             
             // Show controller input
             if (controller) {
