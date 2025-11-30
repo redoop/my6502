@@ -1,0 +1,15 @@
+smb_nrom_gui: smb_gui.cpp
+	@echo "Building SMB NROM GUI..."
+	verilator --cc -Wall -Wno-fatal --exe --top-module nes_system \
+		-GMAPPER=0 \
+		--Mdir obj_dir_nrom_gui --build \
+		-CFLAGS "`sdl2-config --cflags`" \
+		-LDFLAGS "`sdl2-config --libs`" \
+		smb_gui.cpp \
+		../../main/rtl/nes_system.sv \
+		../../main/rtl/cpu_6502.sv \
+		../../main/rtl/nes_ppu.sv \
+		../../main/rtl/nes_apu.sv \
+		../../main/rtl/nes_dma.sv \
+		../../main/rtl/mapper_mmc3.sv
+	@echo "SMB NROM GUI built successfully"

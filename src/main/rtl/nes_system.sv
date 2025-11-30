@@ -447,7 +447,8 @@ generate
         assign mapper_irq = 0;
         always_comb begin
             if (cpu_addr >= 16'h8000) begin
-                prg_rom_addr = {4'b0, cpu_addr[13:0]};
+                // Support both 16KB (mirrored) and 32KB ROMs
+                prg_rom_addr = {3'b0, cpu_addr[14:0]};
             end else begin
                 prg_rom_addr = 18'h00000;
             end
