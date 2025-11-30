@@ -1,0 +1,211 @@
+6502 指令集依赖树
+═══════════════════════════════════════════════════════════════
+
+硬件基础层
+├─ 时钟 (CLK)
+├─ 复位 (RST)
+└─ 总线接口 (ADDR, DATA, RW)
+
+状态机层
+├─ RESET
+├─ FETCH
+├─ DECODE
+├─ EXECUTE
+├─ MEMORY
+├─ WRITEBACK
+└─ NMI_HANDLER
+
+寻址模式层（所有指令依赖）
+├─ 隐含寻址 (Implied)
+│   └─ 用于: NOP, CLC, SEC, CLI, SEI, CLV, CLD, SED, TAX, TXA, TAY, TYA, TSX, TXS, INX, INY, DEX, DEY
+│
+├─ 累加器寻址 (Accumulator)
+│   └─ 用于: ASL A, LSR A, ROL A, ROR A
+│
+├─ 立即数寻址 (Immediate)
+│   └─ 用于: LDA #, LDX #, LDY #, ADC #, SBC #, AND #, ORA #, EOR #, CMP #, CPX #, CPY #
+│
+├─ 零页寻址 (Zero Page)
+│   ├─ 基础零页
+│   │   └─ 用于: LDA zp, STA zp, LDX zp, STX zp, LDY zp, STY zp, ADC zp, SBC zp, AND zp, ORA zp, EOR zp, CMP zp, CPX zp, CPY zp, BIT zp, INC zp, DEC zp, ASL zp, LSR zp, ROL zp, ROR zp
+│   │
+│   ├─ 零页X索引 (Zero Page,X)
+│   │   └─ 用于: LDA zp,X, STA zp,X, LDY zp,X, STY zp,X, ADC zp,X, SBC zp,X, AND zp,X, ORA zp,X, EOR zp,X, CMP zp,X, INC zp,X, DEC zp,X, ASL zp,X, LSR zp,X, ROL zp,X, ROR zp,X
+│   │
+│   └─ 零页Y索引 (Zero Page,Y)
+│       └─ 用于: LDX zp,Y, STX zp,Y
+│
+├─ 绝对寻址 (Absolute)
+│   ├─ 基础绝对
+│   │   └─ 用于: LDA abs, STA abs, LDX abs, STX abs, LDY abs, STY abs, ADC abs, SBC abs, AND abs, ORA abs, EOR abs, CMP abs, CPX abs, CPY abs, BIT abs, INC abs, DEC abs, ASL abs, LSR abs, ROL abs, ROR abs, JMP abs, JSR abs
+│   │
+│   ├─ 绝对X索引 (Absolute,X)
+│   │   └─ 用于: LDA abs,X, STA abs,X, LDY abs,X, ADC abs,X, SBC abs,X, AND abs,X, ORA abs,X, EOR abs,X, CMP abs,X, INC abs,X, DEC abs,X, ASL abs,X, LSR abs,X, ROL abs,X, ROR abs,X
+│   │
+│   └─ 绝对Y索引 (Absolute,Y)
+│       └─ 用于: LDA abs,Y, STA abs,Y, LDX abs,Y, ADC abs,Y, SBC abs,Y, AND abs,Y, ORA abs,Y, EOR abs,Y, CMP abs,Y
+│
+├─ 间接寻址 (Indirect)
+│   ├─ 间接 (Indirect)
+│   │   └─ 用于: JMP (ind)
+│   │
+│   ├─ 索引间接 (Indexed Indirect) - (ind,X)
+│   │   └─ 用于: LDA (ind,X), STA (ind,X), ADC (ind,X), SBC (ind,X), AND (ind,X), ORA (ind,X), EOR (ind,X), CMP (ind,X)
+│   │
+│   └─ 间接索引 (Indirect Indexed) - (ind),Y
+│       └─ 用于: LDA (ind),Y, STA (ind),Y, ADC (ind),Y, SBC (ind),Y, AND (ind),Y, ORA (ind),Y, EOR (ind),Y, CMP (ind),Y
+│
+└─ 相对寻址 (Relative)
+    └─ 用于: BCC, BCS, BEQ, BNE, BMI, BPL, BVC, BVS
+
+寄存器层
+├─ 程序计数器 (PC)
+├─ 栈指针 (SP)
+├─ 累加器 (A)
+├─ 索引寄存器 (X, Y)
+└─ 状态寄存器 (P)
+    ├─ C (Carry)
+    ├─ Z (Zero)
+    ├─ I (Interrupt Disable)
+    ├─ D (Decimal Mode)
+    ├─ B (Break)
+    ├─ V (Overflow)
+    └─ N (Negative)
+
+指令功能族群
+│
+├─ 数据传输族
+│   ├─ 加载指令
+│   │   ├─ LDA (依赖: A寄存器, 所有寻址模式, Z/N标志)
+│   │   ├─ LDX (依赖: X寄存器, 部分寻址模式, Z/N标志)
+│   │   └─ LDY (依赖: Y寄存器, 部分寻址模式, Z/N标志)
+│   │
+│   ├─ 存储指令
+│   │   ├─ STA (依赖: A寄存器, 写操作, 寻址模式)
+│   │   ├─ STX (依赖: X寄存器, 写操作, 寻址模式)
+│   │   └─ STY (依赖: Y寄存器, 写操作, 寻址模式)
+│   │
+│   └─ 寄存器传输
+│       ├─ TAX, TAY (依赖: A→X/Y, Z/N标志)
+│       ├─ TXA, TYA (依赖: X/Y→A, Z/N标志)
+│       ├─ TSX (依赖: SP→X, Z/N标志)
+│       └─ TXS (依赖: X→SP)
+│
+├─ 算术运算族
+│   ├─ 加法
+│   │   └─ ADC (依赖: A寄存器, C标志输入, 所有寻址, Z/N/C/V标志输出)
+│   │
+│   ├─ 减法
+│   │   └─ SBC (依赖: A寄存器, C标志输入, 所有寻址, Z/N/C/V标志输出)
+│   │
+│   ├─ 递增
+│   │   ├─ INC (依赖: 内存读写, MEMORY状态, Z/N标志)
+│   │   ├─ INX (依赖: X寄存器, Z/N标志)
+│   │   └─ INY (依赖: Y寄存器, Z/N标志)
+│   │
+│   └─ 递减
+│       ├─ DEC (依赖: 内存读写, MEMORY状态, Z/N标志)
+│       ├─ DEX (依赖: X寄存器, Z/N标志)
+│       └─ DEY (依赖: Y寄存器, Z/N标志)
+│
+├─ 逻辑运算族
+│   ├─ AND (依赖: A寄存器, 所有寻址, Z/N标志)
+│   ├─ ORA (依赖: A寄存器, 所有寻址, Z/N标志)
+│   ├─ EOR (依赖: A寄存器, 所有寻址, Z/N标志)
+│   └─ BIT (依赖: A寄存器, 零页/绝对寻址, Z/N/V标志)
+│
+├─ 移位/旋转族
+│   ├─ 算术左移
+│   │   └─ ASL (依赖: A或内存, C标志输出, Z/N标志)
+│   │
+│   ├─ 逻辑右移
+│   │   └─ LSR (依赖: A或内存, C标志输出, Z/N标志)
+│   │
+│   ├─ 循环左移
+│   │   └─ ROL (依赖: A或内存, C标志输入输出, Z/N标志)
+│   │
+│   └─ 循环右移
+│       └─ ROR (依赖: A或内存, C标志输入输出, Z/N标志)
+│
+├─ 比较指令族
+│   ├─ CMP (依赖: A寄存器, 所有寻址, Z/N/C标志)
+│   ├─ CPX (依赖: X寄存器, 立即/零页/绝对, Z/N/C标志)
+│   └─ CPY (依赖: Y寄存器, 立即/零页/绝对, Z/N/C标志)
+│
+├─ 分支指令族（所有依赖相对寻址和PC修改）
+│   ├─ BCC (依赖: C=0)
+│   ├─ BCS (依赖: C=1)
+│   ├─ BEQ (依赖: Z=1)
+│   ├─ BNE (依赖: Z=0)
+│   ├─ BMI (依赖: N=1)
+│   ├─ BPL (依赖: N=0)
+│   ├─ BVC (依赖: V=0)
+│   └─ BVS (依赖: V=1)
+│
+├─ 跳转/子程序族
+│   ├─ JMP (依赖: PC修改, 绝对/间接寻址)
+│   ├─ JSR (依赖: PC入栈, SP, 绝对寻址)
+│   ├─ RTS (依赖: PC出栈, SP)
+│   └─ RTI (依赖: P和PC出栈, SP, NMI_HANDLER状态)
+│
+├─ 栈操作族
+│   ├─ PHA (依赖: A→栈, SP递减)
+│   ├─ PLA (依赖: 栈→A, SP递增, Z/N标志)
+│   ├─ PHP (依赖: P→栈, SP递减)
+│   └─ PLP (依赖: 栈→P, SP递增)
+│
+├─ 标志位操作族
+│   ├─ CLC (清除C)
+│   ├─ SEC (设置C)
+│   ├─ CLI (清除I)
+│   ├─ SEI (设置I)
+│   ├─ CLV (清除V)
+│   ├─ CLD (清除D)
+│   └─ SED (设置D)
+│
+└─ 系统控制族
+    ├─ NOP (无操作)
+    ├─ BRK (依赖: NMI_HANDLER, 栈操作, 中断向量)
+    └─ RTI (依赖: NMI_HANDLER, 栈操作)
+
+关键依赖关系
+═══════════════════════════════════════════════════════════════
+
+1. 所有指令 → 状态机 (FETCH/DECODE/EXECUTE)
+2. 读写指令 → MEMORY/WRITEBACK 状态
+3. 所有算术/逻辑指令 → 标志位系统
+4. 所有分支指令 → 标志位读取 + PC修改
+5. 间接寻址指令 → cycle_count 多周期支持
+6. 栈操作指令 → SP管理
+7. 中断处理 → NMI_HANDLER 状态 + 栈操作
+
+实现优先级建议
+═══════════════════════════════════════════════════════════════
+
+第一层（基础）：
+  - 状态机框架
+  - 基本寻址模式（立即数、零页、绝对）
+  - LDA/STA（最常用）
+
+第二层（核心）：
+  - 所有加载/存储指令
+  - 基本算术（ADC/SBC）
+  - 跳转（JMP/JSR/RTS）
+  - 分支指令
+
+第三层（扩展）：
+  - 逻辑运算（AND/ORA/EOR）
+  - 移位指令（ASL/LSR/ROL/ROR）
+  - 递增递减（INC/DEC）
+  - 比较指令（CMP/CPX/CPY）
+
+第四层（完善）：
+  - 间接寻址模式
+  - 栈操作
+  - 标志位操作
+  - 中断处理
+
+═══════════════════════════════════════════════════════════════
+总计：151 条官方指令
+当前实现：151 条 (100% 覆盖率)
+═══════════════════════════════════════════════════════════════

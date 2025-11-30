@@ -53,3 +53,20 @@ src/test/rtl/unit/obj_dir/
 V*__*
 V*_classes.mk
 V*_verFiles.dat
+
+# Test output files
+*.ppm
+*.png
+frame_*.ppm
+frame_*.png
+test_pattern.*
+dk_output/
+
+# Verilator build artifacts
+src/test/rtl/obj_dir/
+*.verilator_deplist.tmp
+
+# Backup files
+*.bak
+*.bak2
+*.bak3

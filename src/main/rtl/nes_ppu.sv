@@ -220,9 +220,20 @@ end
 // Video output
 always_comb begin
     if (scanline < 240 && dot < 256) begin
-        video_r = nes_color[23:16];
-        video_g = nes_color[15:8];
-        video_b = nes_color[7:0];
+        // Test pattern: color bars
+        if (dot < 32) begin
+            video_r = 8'hFF; video_g = 8'h00; video_b = 8'h00; // Red
+        end else if (dot < 64) begin
+            video_r = 8'h00; video_g = 8'hFF; video_b = 8'h00; // Green
+        end else if (dot < 96) begin
+            video_r = 8'h00; video_g = 8'h00; video_b = 8'hFF; // Blue
+        end else if (dot < 128) begin
+            video_r = 8'hFF; video_g = 8'hFF; video_b = 8'h00; // Yellow
+        end else begin
+            video_r = nes_color[23:16];
+            video_g = nes_color[15:8];
+            video_b = nes_color[7:0];
+        end
     end else begin
         video_r = 8'h00;
         video_g = 8'h00;
