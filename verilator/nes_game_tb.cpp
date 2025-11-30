@@ -1,6 +1,7 @@
 // NES Game Testbench - Run NES ROMs with Verilator
 
 #include <verilated.h>
+#include <verilated_vcd_c.h>
 #include "Vnes_system.h"
 #include <iostream>
 #include <fstream>
@@ -50,7 +51,8 @@ bool load_rom(const char* filename) {
 }
 
 // Verilator main (for --binary mode)
-double sc_time_stamp() { return 0; }
+vluint64_t main_time = 0;
+double sc_time_stamp() { return main_time; }
 
 int main(int argc, char** argv, char** env) {
     if (argc < 2) {
@@ -67,8 +69,15 @@ int main(int argc, char** argv, char** env) {
     
     const std::unique_ptr<VerilatedContext> contextp{new VerilatedContext};
     contextp->commandArgs(argc, argv);
+    contextp->traceEverOn(true);
     
     const std::unique_ptr<Vnes_system> top{new Vnes_system{contextp.get()}};
+    
+    // Setup VCD trace
+    VerilatedVcdC* tfp = new VerilatedVcdC;
+    top->trace(tfp, 99);
+    tfp->open("waveforms/nes_game.vcd");
+    cout << "VCD trace enabled: waveforms/nes_game.vcd" << endl;
     
     // Reset
     top->clk = 0;
@@ -86,12 +95,24 @@ int main(int argc, char** argv, char** env) {
     // Run simulation
     cout << "Running simulation for " << max_cycles << " master clock cycles..." << endl;
     
+    bool first_rom_access = true;
+    
     for (int cycle = 0; cycle < max_cycles && !contextp->gotFinish(); cycle++) {
         // Update ROM data (combinational)
         if (top->prg_rom_addr < prg_rom.size()) {
             top->prg_rom_data = prg_rom[top->prg_rom_addr];
+            if (first_rom_access && top->prg_rom_addr > 0) {
+                cout << "First ROM access: addr=0x" << hex << (int)top->prg_rom_addr 
+                     << " data=0x" << (int)top->prg_rom_data << dec << endl;
+                first_rom_access = false;
+            }
         } else {
             top->prg_rom_data = 0;
+            if (first_rom_access && top->prg_rom_addr > 0) {
+                cout << "ROM access OUT OF RANGE: addr=0x" << hex << (int)top->prg_rom_addr 
+                     << " (ROM size=" << prg_rom.size() << ")" << dec << endl;
+                first_rom_access = false;
+            }
         }
         
         if (top->chr_rom_addr < chr_rom.size()) {
@@ -103,6 +124,7 @@ int main(int argc, char** argv, char** env) {
         // Clock low
         top->clk = 0;
         top->eval();
+        tfp->dump(main_time++);
         
         // Update ROM data again
         if (top->prg_rom_addr < prg_rom.size()) {
@@ -120,15 +142,21 @@ int main(int argc, char** argv, char** env) {
         // Clock high
         top->clk = 1;
         top->eval();
+        tfp->dump(main_time++);
         
         // Progress indicator
         if (cycle % 100000 == 0) {
             cout << "  Cycle: " << cycle 
                  << " VRAM writes: " << (int)top->vram_write_count
                  << " NMI triggers: " << (int)top->nmi_trigger_count 
-                 << " vsync: " << (int)top->video_vsync << endl;
+                 << " vsync: " << (int)top->video_vsync
+                 << " ppustatus: 0x" << hex << (int)top->debug_ppustatus << dec
+                 << " cpu_addr: 0x" << hex << (int)top->debug_cpu_addr << dec
+                 << " rw: " << (int)top->debug_cpu_rw << endl;
         }
     }
+    
+    tfp->close();
     
     cout << "Simulation complete!" << endl;
     cout << "  Total VRAM writes: " << (int)top->vram_write_count << endl;

@@ -63,6 +63,7 @@ class alignas(VL_CACHE_LINE_BYTES) Vtest_cpu___024root final : public VerilatedM
         CData/*7:0*/ __Vdly__test_cpu__DOT__dut__DOT__SP;
         CData/*0:0*/ __Vdly__test_cpu__DOT__dut__DOT__I;
         CData/*0:0*/ __Vdly__test_cpu__DOT__dut__DOT__B;
+        CData/*7:0*/ __Vdly__test_cpu__DOT__dut__DOT__operand;
         CData/*7:0*/ __Vdly__test_cpu__DOT__dut__DOT__indirect_addr_lo;
         CData/*2:0*/ __Vdly__test_cpu__DOT__dut__DOT__nmi_cycle;
         CData/*0:0*/ __VstlFirstIteration;
@@ -80,9 +81,9 @@ class alignas(VL_CACHE_LINE_BYTES) Vtest_cpu___024root final : public VerilatedM
         VlUnpacked<CData/*7:0*/, 65536> test_cpu__DOT__mem;
         VlUnpacked<QData/*63:0*/, 1> __VstlTriggered;
         VlUnpacked<QData/*63:0*/, 1> __VactTriggered;
-        VlUnpacked<QData/*63:0*/, 1> __VnbaTriggered;
     };
     struct {
+        VlUnpacked<QData/*63:0*/, 1> __VnbaTriggered;
         VlUnpacked<CData/*0:0*/, 2> __Vm_traceActivity;
     };
     VlDelayScheduler __VdlySched;

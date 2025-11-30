@@ -13,7 +13,9 @@ RTL_FILES = $(RTL_DIR)/nes_system.sv \
 .PHONY: all clean run help
 
 all:
+	@mkdir -p waveforms
 	$(VERILATOR) --cc --exe --build -Wall -Wno-fatal \
+		--trace \
 		--top-module nes_system \
 		-CFLAGS "-std=c++17" \
 		nes_game_tb.cpp $(RTL_FILES)

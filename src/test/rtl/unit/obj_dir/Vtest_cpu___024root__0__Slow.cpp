@@ -325,6 +325,7 @@ VL_ATTR_COLD void Vtest_cpu___024root___ctor_var_reset(Vtest_cpu___024root* vlSe
     vlSelf->__Vdly__test_cpu__DOT__dut__DOT__SP = VL_SCOPED_RAND_RESET_I(8, __VscopeHash, 8106371680367001836ull);
     vlSelf->__Vdly__test_cpu__DOT__dut__DOT__I = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 13199059214576970639ull);
     vlSelf->__Vdly__test_cpu__DOT__dut__DOT__B = VL_SCOPED_RAND_RESET_I(1, __VscopeHash, 8988061164873310155ull);
+    vlSelf->__Vdly__test_cpu__DOT__dut__DOT__operand = VL_SCOPED_RAND_RESET_I(8, __VscopeHash, 1185134842633849558ull);
     vlSelf->__Vdly__test_cpu__DOT__dut__DOT__indirect_addr_lo = VL_SCOPED_RAND_RESET_I(8, __VscopeHash, 2466516969936969026ull);
     vlSelf->__Vdly__test_cpu__DOT__dut__DOT__nmi_cycle = VL_SCOPED_RAND_RESET_I(3, __VscopeHash, 7269242086401729421ull);
     for (int __Vi0 = 0; __Vi0 < 1; ++__Vi0) {

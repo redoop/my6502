@@ -29,7 +29,15 @@ module nes_system (
     
     // Debug outputs
     output logic [15:0] vram_write_count,
-    output logic [15:0] nmi_trigger_count
+    output logic [15:0] nmi_trigger_count,
+    output logic [15:0] debug_cpu_addr,
+    output logic        debug_cpu_rw,
+    output logic [7:0]  debug_ppustatus,
+    output logic        debug_vblank,
+    output logic        debug_vblank_sync1,
+    output logic        debug_vblank_sync2,
+    output logic        debug_nmi,
+    output logic [7:0]  debug_ppuctrl
 );
 
 //=============================================================================
@@ -45,6 +53,16 @@ end
 
 assign cpu_clk = clk_div[3];  // ÷12 = 1.79 MHz
 assign ppu_clk = clk_div[1];  // ÷4 = 5.37 MHz
+
+// Debug signal assignments
+assign debug_cpu_addr = cpu_addr;
+assign debug_cpu_rw = cpu_rw;
+assign debug_ppustatus = ppustatus;
+assign debug_vblank = vblank;
+assign debug_vblank_sync1 = vblank_sync1;
+assign debug_vblank_sync2 = vblank_sync2;
+assign debug_nmi = nmi;
+assign debug_ppuctrl = ppuctrl;
 
 //=============================================================================
 // Memory Arrays
@@ -289,25 +307,38 @@ end
 //=============================================================================
 // PPUSTATUS Management
 //=============================================================================
-logic vblank_sync;
+// Double-flop synchronizer for vblank (ppu_clk -> cpu_clk)
+logic vblank_sync1, vblank_sync2;
+logic ppustatus_read_last;  // Track if $2002 was read last cycle
+
+always_ff @(posedge cpu_clk or negedge rst_n) begin
+    if (!rst_n) begin
+        vblank_sync1 <= 0;
+        vblank_sync2 <= 0;
+    end else begin
+        vblank_sync1 <= vblank;
+        vblank_sync2 <= vblank_sync1;
+    end
+end
 
 always_ff @(posedge cpu_clk or negedge rst_n) begin
     if (!rst_n) begin
         ppustatus <= 0;
-        vblank_sync <= 0;
+        ppustatus_read_last <= 0;
     end else begin
-        vblank_sync <= vblank;
-        
-        // VBlank flag set (from PPU)
-        if (vblank && !vblank_sync) begin
+        // VBlank flag set (from synchronized PPU signal)
+        if (vblank_sync2) begin
             ppustatus[7] <= 1;
         end
         
-        // VBlank flag clear (from CPU read) - happens AFTER read returns old value
-        if (cpu_rw && cpu_addr == 16'h2002) begin
+        // VBlank flag clear - delayed by one cycle after read
+        if (ppustatus_read_last) begin
             ppustatus[7] <= 0;
             ppuaddr_latch <= 0;
         end
+        
+        // Track if $2002 was read this cycle
+        ppustatus_read_last <= (cpu_rw && cpu_addr == 16'h2002);
     end
 end
 
@@ -345,6 +376,8 @@ end
 //=============================================================================
 always_comb begin
     if (cpu_addr >= 16'h8000) begin
+        // NROM: 16KB ROM mirrors to both $8000-$BFFF and $C000-$FFFF
+        // Use only lower 14 bits to support 16KB mirroring
         prg_rom_addr = {1'b0, cpu_addr[13:0]};
     end else begin
         prg_rom_addr = 15'h0000;

@@ -85,7 +85,9 @@ always_ff @(posedge clk or negedge rst_n) begin
                 rw <= 1;
                 PC <= PC + 1;
                 cycle_count <= 0;
-                $display("[CPU] PC=$%04x", PC);
+                if (PC >= 16'hC7A8 && PC <= 16'hC7AD) begin
+                    $display("[CPU] FETCH: PC=$%04x", PC);
+                end
             end
             
             DECODE: begin
@@ -102,6 +104,12 @@ always_ff @(posedge clk or negedge rst_n) begin
                 // Save operand for later use
                 operand <= data_in;
                 
+                // Debug: print instruction at specific PC
+                if (PC >= 16'hC7A8 && PC <= 16'hC7AD) begin
+                    $display("[CPU] Execute PC=$%04x opcode=$%02x data_in=$%02x A=$%02x", 
+                             PC, opcode, data_in, A);
+                end
+                
                 // Execute instruction
                 case (opcode)
                     // LDA - use data_in directly
@@ -113,9 +121,10 @@ always_ff @(posedge clk or negedge rst_n) begin
                     end
                     8'hA5: begin addr <= {8'h00, data_in}; rw <= 1; PC <= PC + 1; end
                     8'hB5: begin addr <= {8'h00, data_in + X}; rw <= 1; PC <= PC + 1; end  // LDA zp,X
-                    8'hAD: begin addr <= {data_in, operand}; rw <= 1; PC <= PC + 1; end
-                    8'hBD: begin addr <= {data_in, operand} + X; rw <= 1; PC <= PC + 1; end  // LDA abs,X
-                    8'hB9: begin addr <= {data_in, operand} + Y; rw <= 1; PC <= PC + 1; end  // LDA abs,Y
+                    // LDA absolute - need to read high byte first, save low byte in operand
+                    8'hAD: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end
+                    8'hBD: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // LDA abs,X
+                    8'hB9: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // LDA abs,Y
                     8'hA1: begin addr <= {8'h00, data_in + X}; rw <= 1; cycle_count <= 1; PC <= PC + 1; end  // LDA (ind,X) - read pointer
                     8'hB1: begin addr <= {8'h00, data_in}; rw <= 1; cycle_count <= 1; PC <= PC + 1; end      // LDA (ind),Y - read pointer
                     
@@ -128,7 +137,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                     end
                     8'hA6: begin addr <= {8'h00, data_in}; rw <= 1; PC <= PC + 1; end  // LDX zp
                     8'hB6: begin addr <= {8'h00, data_in + Y}; rw <= 1; PC <= PC + 1; end  // LDX zp,Y
-                    8'hAE: begin addr <= {data_in, operand}; rw <= 1; PC <= PC + 1; end  // LDX abs
+                    8'hAE: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // LDX abs
                     
                     // LDY
                     8'hA0: begin 
@@ -143,20 +152,20 @@ always_ff @(posedge clk or negedge rst_n) begin
                     // STA
                     8'h85: begin addr <= {8'h00, data_in}; data_out <= A; rw <= 0; PC <= PC + 1; end
                     8'h95: begin addr <= {8'h00, data_in + X}; data_out <= A; rw <= 0; PC <= PC + 1; end  // STA zp,X
-                    8'h8D: begin addr <= {data_in, operand}; data_out <= A; rw <= 0; PC <= PC + 1; end
-                    8'h9D: begin addr <= {data_in, operand} + X; data_out <= A; rw <= 0; PC <= PC + 1; end  // STA abs,X
+                    8'h8D: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // STA abs
+                    8'h9D: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // STA abs,X
                     8'h81: begin addr <= {8'h00, data_in + X}; rw <= 1; cycle_count <= 1; PC <= PC + 1; end  // STA (ind,X)
                     8'h91: begin addr <= {8'h00, data_in}; rw <= 1; cycle_count <= 1; PC <= PC + 1; end      // STA (ind),Y
                     
                     // STX
                     8'h86: begin addr <= {8'h00, data_in}; data_out <= X; rw <= 0; PC <= PC + 1; end  // STX zp
                     8'h96: begin addr <= {8'h00, data_in + Y}; data_out <= X; rw <= 0; PC <= PC + 1; end  // STX zp,Y
-                    8'h8E: begin addr <= {data_in, operand}; data_out <= X; rw <= 0; PC <= PC + 1; end  // STX abs
+                    8'h8E: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // STX abs
                     
                     // STY
                     8'h84: begin addr <= {8'h00, data_in}; data_out <= Y; rw <= 0; PC <= PC + 1; end  // STY zp
                     8'h94: begin addr <= {8'h00, data_in + X}; data_out <= Y; rw <= 0; PC <= PC + 1; end  // STY zp,X
-                    8'h8C: begin addr <= {data_in, operand}; data_out <= Y; rw <= 0; PC <= PC + 1; end  // STY abs
+                    8'h8C: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // STY abs
                     
                     // ORA
                     8'h09: begin
@@ -200,9 +209,9 @@ always_ff @(posedge clk or negedge rst_n) begin
                     end
                     8'h65: begin addr <= {8'h00, data_in}; rw <= 1; PC <= PC + 1; end  // ADC zp
                     8'h75: begin addr <= {8'h00, data_in + X}; rw <= 1; PC <= PC + 1; end  // ADC zp,X
-                    8'h6D: begin addr <= {data_in, operand}; rw <= 1; PC <= PC + 1; end  // ADC abs
-                    8'h7D: begin addr <= {data_in, operand} + X; rw <= 1; PC <= PC + 1; end  // ADC abs,X
-                    8'h79: begin addr <= {data_in, operand} + Y; rw <= 1; PC <= PC + 1; end  // ADC abs,Y
+                    8'h6D: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // ADC abs
+                    8'h7D: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // ADC abs,X
+                    8'h79: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // ADC abs,Y
                     
                     // SBC
                     8'hE9: begin  // SBC #imm
@@ -215,9 +224,9 @@ always_ff @(posedge clk or negedge rst_n) begin
                     end
                     8'hE5: begin addr <= {8'h00, data_in}; rw <= 1; PC <= PC + 1; end  // SBC zp
                     8'hF5: begin addr <= {8'h00, data_in + X}; rw <= 1; PC <= PC + 1; end  // SBC zp,X
-                    8'hED: begin addr <= {data_in, operand}; rw <= 1; PC <= PC + 1; end  // SBC abs
-                    8'hFD: begin addr <= {data_in, operand} + X; rw <= 1; PC <= PC + 1; end  // SBC abs,X
-                    8'hF9: begin addr <= {data_in, operand} + Y; rw <= 1; PC <= PC + 1; end  // SBC abs,Y
+                    8'hED: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // SBC abs
+                    8'hFD: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // SBC abs,X
+                    8'hF9: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // SBC abs,Y
                     
                     // BIT
                     8'h24: begin  // BIT zp
@@ -500,8 +509,45 @@ always_ff @(posedge clk or negedge rst_n) begin
             end
             
             MEMORY: begin
+                if (PC >= 16'hC7A8 && PC <= 16'hC7AD) begin
+                    $display("[CPU] MEMORY: PC=$%04x opcode=$%02x cycle_count=%d addr=$%04x data_in=$%02x operand=$%02x", 
+                             PC, opcode, cycle_count, addr, data_in, operand);
+                end
+                
+                // LDA/STA absolute addressing - read high byte
+                if ((opcode == 8'hAD || opcode == 8'hBD || opcode == 8'hB9 || 
+                     opcode == 8'h8D || opcode == 8'h9D ||
+                     opcode == 8'hAE || opcode == 8'h8E ||
+                     opcode == 8'h8C ||
+                     opcode == 8'h6D || opcode == 8'h7D || opcode == 8'h79 ||
+                     opcode == 8'hED || opcode == 8'hFD || opcode == 8'hF9) && cycle_count == 1) begin
+                    // data_in has high byte, operand has low byte
+                    if (opcode == 8'hBD || opcode == 8'h9D || opcode == 8'h7D || opcode == 8'hFD) begin
+                        addr <= {data_in, operand} + X;
+                    end else if (opcode == 8'hB9 || opcode == 8'h79 || opcode == 8'hF9) begin
+                        addr <= {data_in, operand} + Y;
+                    end else begin
+                        addr <= {data_in, operand};
+                    end
+                    
+                    if (PC >= 16'hC7A8 && PC <= 16'hC7AD) begin
+                        $display("[CPU] MEMORY: forming addr=$%04x from {$%02x, $%02x}", 
+                                 {data_in, operand}, data_in, operand);
+                    end
+                    
+                    if (opcode == 8'h8D || opcode == 8'h9D || opcode == 8'h8E || opcode == 8'h8C) begin
+                        // Store instructions
+                        if (opcode == 8'h8D || opcode == 8'h9D) data_out <= A;
+                        else if (opcode == 8'h8E) data_out <= X;
+                        else if (opcode == 8'h8C) data_out <= Y;
+                        rw <= 0;
+                    end else begin
+                        rw <= 1;
+                    end
+                    cycle_count <= 0;
+                    PC <= PC + 1;  // Increment PC for the high byte
                 // Indirect addressing - multi-cycle
-                if ((opcode == 8'hA1 || opcode == 8'h81 || opcode == 8'h01 || opcode == 8'h21 || opcode == 8'hB1 || opcode == 8'h91) && cycle_count == 1) begin
+                end else if ((opcode == 8'hA1 || opcode == 8'h81 || opcode == 8'h01 || opcode == 8'h21 || opcode == 8'hB1 || opcode == 8'h91) && cycle_count == 1) begin
                     // Read low byte of pointer
                     indirect_addr_lo <= data_in;
                     addr <= addr + 1;
