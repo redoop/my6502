@@ -1,6 +1,10 @@
 #!/bin/bash
 
-cd ../src/test/rtl
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+cd "$PROJECT_ROOT/src/test/rtl"
 
 echo "========================================="
 echo "  Super Mario Bros (Mapper 0 - NROM)"

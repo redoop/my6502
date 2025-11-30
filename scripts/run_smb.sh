@@ -1,7 +1,11 @@
 #!/bin/bash
 # Quick launcher for Super Mario Bros 3 GUI
 
-cd ../src/test/rtl
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+cd "$PROJECT_ROOT/src/test/rtl"
 
 # Check if GUI is built
 if [ ! -f obj_dir_gui/Vnes_system ]; then
@@ -10,7 +14,7 @@ if [ ! -f obj_dir_gui/Vnes_system ]; then
 fi
 
 # Check if ROM exists
-if [ ! -f ../games/SuperMarioBros3_mapper4.nes ]; then
+if [ ! -f "$PROJECT_ROOT/games/SuperMarioBros3_mapper4.nes" ]; then
     echo "Error: SuperMarioBros3_mapper4.nes not found in games/ directory"
     exit 1
 fi
@@ -26,4 +30,4 @@ echo "  Right Shift - SELECT"
 echo "  ESC - Quit"
 echo ""
 
-./obj_dir_gui/Vnes_system ../games/SuperMarioBros3_mapper4.nes
+./obj_dir_gui/Vnes_system "$PROJECT_ROOT/games/SuperMarioBros3_mapper4.nes"

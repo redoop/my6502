@@ -20,7 +20,7 @@ echo "✅ GUI emulator built"
 echo ""
 
 # Test with Donkey Kong
-ROM="../games/Donkey-Kong.nes"
+ROM="../../../games/DonkeyKong_mapper0.nes"
 if [ ! -f "$ROM" ]; then
     echo "❌ ROM not found: $ROM"
     exit 1
