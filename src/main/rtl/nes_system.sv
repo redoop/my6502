@@ -349,10 +349,12 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
     if (!rst_n) begin
         nmi <= 0;
     end else begin
-        if (vblank && ppuctrl[7]) begin
+        // Use synchronized vblank signal and check PPUCTRL NMI enable
+        if (vblank_sync2 && ppuctrl[7]) begin
             nmi <= 1;
             nmi_trigger_count <= nmi_trigger_count + 1;
-        end else if (!vblank) begin
+            $display("[NMI] Triggered at cycle, ppuctrl=$%02x", ppuctrl);
+        end else if (!vblank_sync2) begin
             nmi <= 0;
         end
     end
