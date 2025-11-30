@@ -3,7 +3,7 @@ VERILATOR = verilator
 VFLAGS = --cc -Wall -Wno-fatal --exe
 GAMES_DIR = ../../../games
 
-.PHONY: all clean run_mario run_nestest
+.PHONY: all clean run_mario run_nestest render_smb
 
 all: runner_nrom runner_mmc3
 
@@ -42,8 +42,26 @@ run_nestest: runner_nrom
 	@echo "Running nestest..."
 	./obj_dir_nrom/Vnes_system $(GAMES_DIR)/nestest.nes
 
+smb_render: smb_render.cpp
+	@echo "Building SMB renderer..."
+	$(VERILATOR) $(VFLAGS) --top-module nes_system \
+		-GMAPPER=4 \
+		--Mdir obj_dir_smb --build \
+		smb_render.cpp \
+		$(RTL_DIR)/nes_system.sv \
+		$(RTL_DIR)/cpu_6502.sv \
+		$(RTL_DIR)/nes_ppu.sv \
+		$(RTL_DIR)/nes_apu.sv \
+		$(RTL_DIR)/nes_dma.sv \
+		$(RTL_DIR)/mapper_mmc3.sv
+	@echo "SMB renderer built successfully"
+
+render_smb: smb_render
+	@echo "Rendering Super Mario Bros..."
+	./obj_dir_smb/Vnes_system $(GAMES_DIR)/Super-Mario-Bros.nes
+
 clean:
-	rm -rf obj_dir obj_dir_nrom obj_dir_mmc3
+	rm -rf obj_dir obj_dir_nrom obj_dir_mmc3 obj_dir_smb *.ppm
 
 render: nes_render.cpp
 	@echo "Building NES renderer..."

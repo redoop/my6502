@@ -345,6 +345,9 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
         vblank_sync1 <= vblank;
         vblank_sync2 <= vblank_sync1;
         vblank_sync3 <= vblank_sync2;
+        if (vblank_sync2 && !vblank_sync3) begin
+            $display("[SYNC] VBlank rising edge detected");
+        end
     end
 end
 
@@ -363,18 +366,19 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
             $display("[VBLANK] SET - holding for 200 cycles");
         end
         
+        // VBlank flag clear - on cycle AFTER $2002 read
+        if (ppustatus_read_last) begin
+            ppustatus[7] <= 0;
+            ppuaddr_latch <= 0;
+            $display("[VBLANK] Cleared (delayed after $2002 read)");
+        end
+        
         // Decrement counter
         if (vblank_hold_counter > 0) begin
             vblank_hold_counter <= vblank_hold_counter - 1;
             if (vblank_hold_counter == 1) begin
                 $display("[VBLANK] Hold expired");
             end
-        end
-        
-        // VBlank flag clear - only after hold expires
-        if (ppustatus_read_last && vblank_hold_counter == 0) begin
-            ppustatus[7] <= 0;
-            ppuaddr_latch <= 0;
         end
         
         // Track if $2002 was read this cycle
