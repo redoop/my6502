@@ -173,6 +173,7 @@ end
 
 // CPU writes
 logic [15:0] vram_write_count;
+logic [31:0] total_write_count;
 
 always_ff @(posedge cpu_clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -185,11 +186,29 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
         ppuscroll_x <= 0;
         ppuscroll_y <= 0;
         vram_write_count <= 0;
+        total_write_count <= 0;
     end else if (!cpu_rw) begin
+        total_write_count <= total_write_count + 1;
+        
+        // Debug: track all I/O writes
+        if (cpu_addr >= 16'h2000 && cpu_addr < 16'h4020) begin
+            $display("[IO_WRITE] #%d addr=$%04x data=$%02x", total_write_count, cpu_addr, cpu_data_out);
+        end
+        
+        if (total_write_count % 10000 == 0) begin
+            $display("[DEBUG] Total writes: %d", total_write_count);
+        end
+        
         casez (cpu_addr)
             16'b0001????????????: ram[cpu_addr[10:0]] <= cpu_data_out;
-            16'h2000: ppuctrl <= cpu_data_out;
-            16'h2001: ppumask <= cpu_data_out;
+            16'h2000: begin
+                ppuctrl <= cpu_data_out;
+                $display("[PPU] PPUCTRL=$%02x", cpu_data_out);
+            end
+            16'h2001: begin
+                ppumask <= cpu_data_out;
+                $display("[PPU] PPUMASK=$%02x", cpu_data_out);
+            end
             16'h2003: oamaddr <= cpu_data_out;
             16'h2004: begin
                 oam[oamaddr] <= cpu_data_out;
@@ -713,11 +732,6 @@ always_ff @(posedge clk or negedge rst_n) begin
             nmi_pending <= 1;
         end
         
-        // Debug: Print store instructions
-        if (state == EXECUTE && (opcode == 8'h8D || opcode == 8'h85)) begin
-            $display("CPU: STA addr=$%04x data=$%02x rw=%b", addr, data_out, rw);
-        end
-        
         case (state)
             RESET: begin
                 // Read reset vector from $FFFC-$FFFD
@@ -745,95 +759,139 @@ always_ff @(posedge clk or negedge rst_n) begin
             DECODE: begin
                 // Read opcode (data is now stable)
                 opcode <= data_in;
-                // Fetch operand if needed
+                // Prepare to fetch operand in next cycle
                 addr <= PC;
-                operand <= data_in;
-                if (data_in[1:0] != 2'b10 || data_in[4:2] == 3'b100) begin
-                    PC <= PC + 1;
-                end
+                rw <= 1;
             end
             
             EXECUTE: begin
+                // For immediate addressing, operand is in data_in
+                // For other modes, operand was set in DECODE
+                // Save operand for later use
+                operand <= data_in;
+                
                 // Execute instruction
                 case (opcode)
-                    // LDA
-                    8'hA9: begin A <= operand; Z <= (operand == 0); N <= operand[7]; end
-                    8'hA5: begin addr <= {8'h00, operand}; rw <= 1; end
-                    8'hB5: begin addr <= {8'h00, operand + X}; rw <= 1; end  // LDA zp,X
-                    8'hAD: begin addr <= {data_in, operand}; rw <= 1; end
-                    8'hBD: begin addr <= {data_in, operand} + X; rw <= 1; end  // LDA abs,X
-                    8'hB9: begin addr <= {data_in, operand} + Y; rw <= 1; end  // LDA abs,Y
-                    8'hA1: begin addr <= {8'h00, operand + X}; rw <= 1; cycle_count <= 1; end  // LDA (ind,X) - read pointer
-                    8'hB1: begin addr <= {8'h00, operand}; rw <= 1; cycle_count <= 1; end      // LDA (ind),Y - read pointer
+                    // LDA - use data_in directly
+                    8'hA9: begin 
+                        A <= data_in; 
+                        Z <= (data_in == 0); 
+                        N <= data_in[7]; 
+                        PC <= PC + 1;
+                    end
+                    8'hA5: begin addr <= {8'h00, data_in}; rw <= 1; PC <= PC + 1; end
+                    8'hB5: begin addr <= {8'h00, data_in + X}; rw <= 1; PC <= PC + 1; end  // LDA zp,X
+                    8'hAD: begin addr <= {data_in, operand}; rw <= 1; PC <= PC + 1; end
+                    8'hBD: begin addr <= {data_in, operand} + X; rw <= 1; PC <= PC + 1; end  // LDA abs,X
+                    8'hB9: begin addr <= {data_in, operand} + Y; rw <= 1; PC <= PC + 1; end  // LDA abs,Y
+                    8'hA1: begin addr <= {8'h00, data_in + X}; rw <= 1; cycle_count <= 1; PC <= PC + 1; end  // LDA (ind,X) - read pointer
+                    8'hB1: begin addr <= {8'h00, data_in}; rw <= 1; cycle_count <= 1; PC <= PC + 1; end      // LDA (ind),Y - read pointer
+                    
+                    // LDX
+                    8'hA2: begin 
+                        X <= data_in; 
+                        Z <= (data_in == 0); 
+                        N <= data_in[7]; 
+                        PC <= PC + 1;
+                    end
+                    8'hA6: begin addr <= {8'h00, data_in}; rw <= 1; PC <= PC + 1; end  // LDX zp
+                    8'hB6: begin addr <= {8'h00, data_in + Y}; rw <= 1; PC <= PC + 1; end  // LDX zp,Y
+                    8'hAE: begin addr <= {data_in, operand}; rw <= 1; PC <= PC + 1; end  // LDX abs
+                    
+                    // LDY
+                    8'hA0: begin 
+                        Y <= data_in; 
+                        Z <= (data_in == 0); 
+                        N <= data_in[7]; 
+                        PC <= PC + 1;
+                    end
+                    8'hA4: begin addr <= {8'h00, data_in}; rw <= 1; PC <= PC + 1; end  // LDY zp
+                    8'hB4: begin addr <= {8'h00, data_in + X}; rw <= 1; PC <= PC + 1; end  // LDY zp,X
                     
                     // STA
-                    8'h85: begin addr <= {8'h00, operand}; data_out <= A; rw <= 0; end
-                    8'h95: begin addr <= {8'h00, operand + X}; data_out <= A; rw <= 0; end  // STA zp,X
-                    8'h8D: begin addr <= {data_in, operand}; data_out <= A; rw <= 0; end
-                    8'h9D: begin addr <= {data_in, operand} + X; data_out <= A; rw <= 0; end  // STA abs,X
-                    8'h81: begin addr <= {8'h00, operand + X}; rw <= 1; cycle_count <= 1; end  // STA (ind,X)
-                    8'h91: begin addr <= {8'h00, operand}; rw <= 1; cycle_count <= 1; end      // STA (ind),Y
+                    8'h85: begin addr <= {8'h00, data_in}; data_out <= A; rw <= 0; PC <= PC + 1; end
+                    8'h95: begin addr <= {8'h00, data_in + X}; data_out <= A; rw <= 0; PC <= PC + 1; end  // STA zp,X
+                    8'h8D: begin addr <= {data_in, operand}; data_out <= A; rw <= 0; PC <= PC + 1; end
+                    8'h9D: begin addr <= {data_in, operand} + X; data_out <= A; rw <= 0; PC <= PC + 1; end  // STA abs,X
+                    8'h81: begin addr <= {8'h00, data_in + X}; rw <= 1; cycle_count <= 1; PC <= PC + 1; end  // STA (ind,X)
+                    8'h91: begin addr <= {8'h00, data_in}; rw <= 1; cycle_count <= 1; PC <= PC + 1; end      // STA (ind),Y
+                    
+                    // STX
+                    8'h86: begin addr <= {8'h00, data_in}; data_out <= X; rw <= 0; PC <= PC + 1; end  // STX zp
+                    8'h96: begin addr <= {8'h00, data_in + Y}; data_out <= X; rw <= 0; PC <= PC + 1; end  // STX zp,Y
+                    8'h8E: begin addr <= {data_in, operand}; data_out <= X; rw <= 0; PC <= PC + 1; end  // STX abs
+                    
+                    // STY
+                    8'h84: begin addr <= {8'h00, data_in}; data_out <= Y; rw <= 0; PC <= PC + 1; end  // STY zp
+                    8'h94: begin addr <= {8'h00, data_in + X}; data_out <= Y; rw <= 0; PC <= PC + 1; end  // STY zp,X
+                    8'h8C: begin addr <= {data_in, operand}; data_out <= Y; rw <= 0; PC <= PC + 1; end  // STY abs
                     
                     // ORA
                     8'h09: begin
-                        temp_result = A | operand;
+                        temp_result = A | data_in;
                         A <= temp_result;
                         Z <= (temp_result == 0);
                         N <= temp_result[7];
+                        PC <= PC + 1;
                     end
-                    8'h05: begin addr <= {8'h00, operand}; rw <= 1; end  // ORA zp
-                    8'h01: begin addr <= {8'h00, operand + X}; rw <= 1; cycle_count <= 1; end  // ORA (ind,X)
+                    8'h05: begin addr <= {8'h00, data_in}; rw <= 1; PC <= PC + 1; end  // ORA zp
+                    8'h01: begin addr <= {8'h00, data_in + X}; rw <= 1; cycle_count <= 1; PC <= PC + 1; end  // ORA (ind,X)
                     
                     // AND
                     8'h29: begin
-                        temp_result = A & operand;
+                        temp_result = A & data_in;
                         A <= temp_result;
                         Z <= (temp_result == 0);
                         N <= temp_result[7];
+                        PC <= PC + 1;
                     end
-                    8'h21: begin addr <= {8'h00, operand + X}; rw <= 1; cycle_count <= 1; end  // AND (ind,X)
+                    8'h21: begin addr <= {8'h00, data_in + X}; rw <= 1; cycle_count <= 1; PC <= PC + 1; end  // AND (ind,X)
                     
                     // EOR
                     8'h49: begin
-                        temp_result = A ^ operand;
+                        temp_result = A ^ data_in;
                         A <= temp_result;
                         Z <= (temp_result == 0);
                         N <= temp_result[7];
+                        PC <= PC + 1;
                     end
                     
                     // ADC
                     8'h69: begin  // ADC #imm
-                        temp_sum = A + operand + C;
+                        temp_sum = A + data_in + C;
                         C <= temp_sum[8];
                         A <= temp_sum[7:0];
                         Z <= (temp_sum[7:0] == 0);
                         N <= temp_sum[7];
-                        V <= (A[7] == operand[7]) && (A[7] != temp_sum[7]);
+                        V <= (A[7] == data_in[7]) && (A[7] != temp_sum[7]);
+                        PC <= PC + 1;
                     end
-                    8'h65: begin addr <= {8'h00, operand}; rw <= 1; end  // ADC zp
-                    8'h75: begin addr <= {8'h00, operand + X}; rw <= 1; end  // ADC zp,X
-                    8'h6D: begin addr <= {data_in, operand}; rw <= 1; end  // ADC abs
-                    8'h7D: begin addr <= {data_in, operand} + X; rw <= 1; end  // ADC abs,X
-                    8'h79: begin addr <= {data_in, operand} + Y; rw <= 1; end  // ADC abs,Y
+                    8'h65: begin addr <= {8'h00, data_in}; rw <= 1; PC <= PC + 1; end  // ADC zp
+                    8'h75: begin addr <= {8'h00, data_in + X}; rw <= 1; PC <= PC + 1; end  // ADC zp,X
+                    8'h6D: begin addr <= {data_in, operand}; rw <= 1; PC <= PC + 1; end  // ADC abs
+                    8'h7D: begin addr <= {data_in, operand} + X; rw <= 1; PC <= PC + 1; end  // ADC abs,X
+                    8'h79: begin addr <= {data_in, operand} + Y; rw <= 1; PC <= PC + 1; end  // ADC abs,Y
                     
                     // SBC
                     8'hE9: begin  // SBC #imm
-                        temp_diff = A - operand - !C;
+                        temp_diff = A - data_in - !C;
                         C <= !temp_diff[8];
                         A <= temp_diff[7:0];
                         Z <= (temp_diff[7:0] == 0);
                         N <= temp_diff[7];
+                        PC <= PC + 1;
                     end
-                    8'hE5: begin addr <= {8'h00, operand}; rw <= 1; end  // SBC zp
-                    8'hF5: begin addr <= {8'h00, operand + X}; rw <= 1; end  // SBC zp,X
-                    8'hED: begin addr <= {data_in, operand}; rw <= 1; end  // SBC abs
-                    8'hFD: begin addr <= {data_in, operand} + X; rw <= 1; end  // SBC abs,X
-                    8'hF9: begin addr <= {data_in, operand} + Y; rw <= 1; end  // SBC abs,Y
+                    8'hE5: begin addr <= {8'h00, data_in}; rw <= 1; PC <= PC + 1; end  // SBC zp
+                    8'hF5: begin addr <= {8'h00, data_in + X}; rw <= 1; PC <= PC + 1; end  // SBC zp,X
+                    8'hED: begin addr <= {data_in, operand}; rw <= 1; PC <= PC + 1; end  // SBC abs
+                    8'hFD: begin addr <= {data_in, operand} + X; rw <= 1; PC <= PC + 1; end  // SBC abs,X
+                    8'hF9: begin addr <= {data_in, operand} + Y; rw <= 1; PC <= PC + 1; end  // SBC abs,Y
                     
                     // BIT
                     8'h24: begin  // BIT zp
-                        addr <= {8'h00, operand};
+                        addr <= {8'h00, data_in};
                         rw <= 1;
+                        PC <= PC + 1;
                     end
                     
                     // ASL
@@ -842,10 +900,12 @@ always_ff @(posedge clk or negedge rst_n) begin
                         A <= {A[6:0], 1'b0};
                         Z <= (A[6:0] == 0);
                         N <= A[6];
+                        PC <= PC;
                     end
                     8'h06: begin  // ASL zp
-                        addr <= {8'h00, operand};
+                        addr <= {8'h00, data_in};
                         rw <= 1;
+                        PC <= PC + 1;
                     end
                     
                     // LSR
@@ -854,6 +914,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                         A <= {1'b0, A[7:1]};
                         Z <= (A[7:1] == 0);
                         N <= 0;
+                        PC <= PC;
                     end
                     
                     // ROL
@@ -863,6 +924,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                         A <= temp_result;
                         Z <= (temp_result == 0);
                         N <= temp_result[7];
+                        PC <= PC;
                     end
                     
                     // ROR
@@ -872,50 +934,50 @@ always_ff @(posedge clk or negedge rst_n) begin
                         A <= temp_result;
                         Z <= (temp_result == 0);
                         N <= temp_result[7];
+                        PC <= PC;
                     end
                     
                     // CMP
                     8'hC9: begin
-                        temp_result = A - operand;
-                        C <= (A >= operand);
-                        Z <= (A == operand);
+                        temp_result = A - data_in;
+                        C <= (A >= data_in);
+                        Z <= (A == data_in);
                         N <= temp_result[7];
+                        PC <= PC + 1;
                     end
-                    8'hC5: begin addr <= {8'h00, operand}; rw <= 1; end  // CMP zp
+                    8'hC5: begin addr <= {8'h00, data_in}; rw <= 1; PC <= PC + 1; end  // CMP zp
                     
                     // CPX
                     8'hE0: begin
-                        temp_result = X - operand;
-                        C <= (X >= operand);
-                        Z <= (X == operand);
+                        temp_result = X - data_in;
+                        C <= (X >= data_in);
+                        Z <= (X == data_in);
                         N <= temp_result[7];
+                        PC <= PC + 1;
                     end
                     
                     // CPY
                     8'hC0: begin
-                        temp_result = Y - operand;
-                        C <= (Y >= operand);
-                        Z <= (Y == operand);
+                        temp_result = Y - data_in;
+                        C <= (Y >= data_in);
+                        Z <= (Y == data_in);
                         N <= temp_result[7];
+                        PC <= PC + 1;
                     end
-                    8'hC4: begin addr <= {8'h00, operand}; rw <= 1; end  // CPY zp
+                    8'hC4: begin addr <= {8'h00, data_in}; rw <= 1; PC <= PC + 1; end  // CPY zp
                     
                     // INC
                     8'hE6: begin
-                        addr <= {8'h00, operand};
-                        temp_result = data_in + 1;
-                        alu_result <= temp_result;
-                        Z <= (temp_result == 0);
-                        N <= temp_result[7];
+                        addr <= {8'h00, data_in};
+                        rw <= 1;
+                        PC <= PC + 1;
                     end
                     
                     // DEC
                     8'hC6: begin
-                        addr <= {8'h00, operand};
-                        temp_result = data_in - 1;
-                        alu_result <= temp_result;
-                        Z <= (temp_result == 0);
-                        N <= temp_result[7];
+                        addr <= {8'h00, data_in};
+                        rw <= 1;
+                        PC <= PC + 1;
                     end
                     
                     // INX
@@ -924,6 +986,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                         X <= temp_result;
                         Z <= (temp_result == 0);
                         N <= temp_result[7];
+                        PC <= PC;
                     end
                     
                     // INY
@@ -932,6 +995,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                         Y <= temp_result;
                         Z <= (temp_result == 0);
                         N <= temp_result[7];
+                        PC <= PC;
                     end
                     
                     // DEX
@@ -940,6 +1004,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                         X <= temp_result;
                         Z <= (temp_result == 0);
                         N <= temp_result[7];
+                        PC <= PC;
                     end
                     
                     // DEY
@@ -948,31 +1013,32 @@ always_ff @(posedge clk or negedge rst_n) begin
                         Y <= temp_result;
                         Z <= (temp_result == 0);
                         N <= temp_result[7];
+                        PC <= PC;
                     end
                     
                     // TAX
-                    8'hAA: begin X <= A; Z <= (A == 0); N <= A[7]; end
+                    8'hAA: begin X <= A; Z <= (A == 0); N <= A[7]; PC <= PC; end
                     
                     // TAY
-                    8'hA8: begin Y <= A; Z <= (A == 0); N <= A[7]; end
+                    8'hA8: begin Y <= A; Z <= (A == 0); N <= A[7]; PC <= PC; end
                     
                     // TXA
-                    8'h8A: begin A <= X; Z <= (X == 0); N <= X[7]; end
+                    8'h8A: begin A <= X; Z <= (X == 0); N <= X[7]; PC <= PC; end
                     
                     // TYA
-                    8'h98: begin A <= Y; Z <= (Y == 0); N <= Y[7]; end
+                    8'h98: begin A <= Y; Z <= (Y == 0); N <= Y[7]; PC <= PC; end
                     
                     // TSX
-                    8'hBA: begin X <= SP; Z <= (SP == 0); N <= SP[7]; end
+                    8'hBA: begin X <= SP; Z <= (SP == 0); N <= SP[7]; PC <= PC; end
                     
                     // TXS
-                    8'h9A: begin SP <= X; end
+                    8'h9A: begin SP <= X; PC <= PC; end
                     
                     // PHA
-                    8'h48: begin addr <= {8'h01, SP}; data_out <= A; rw <= 0; SP <= SP - 1; end
+                    8'h48: begin addr <= {8'h01, SP}; data_out <= A; rw <= 0; SP <= SP - 1; PC <= PC; end
                     
                     // PLA
-                    8'h68: begin SP <= SP + 1; addr <= {8'h01, SP + 1}; rw <= 1; end
+                    8'h68: begin SP <= SP + 1; addr <= {8'h01, SP + 1}; rw <= 1; PC <= PC; end
                     
                     // PHP
                     8'h08: begin
@@ -980,14 +1046,15 @@ always_ff @(posedge clk or negedge rst_n) begin
                         data_out <= {N, V, 1'b1, B, D, I, Z, C};
                         rw <= 0;
                         SP <= SP - 1;
+                        PC <= PC;
                     end
                     
                     // PLP
-                    8'h28: begin SP <= SP + 1; addr <= {8'h01, SP + 1}; rw <= 1; end
+                    8'h28: begin SP <= SP + 1; addr <= {8'h01, SP + 1}; rw <= 1; PC <= PC; end
                     
                     // JMP
-                    8'h4C: begin PC <= {data_in, operand}; end
-                    8'h6C: begin addr <= {data_in, operand}; rw <= 1; end
+                    8'h4C: begin PC <= {data_in, operand}; end  // JMP abs
+                    8'h6C: begin addr <= {data_in, operand}; rw <= 1; PC <= PC + 1; end  // JMP ind
                     
                     // JSR
                     8'h20: begin
@@ -995,6 +1062,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                         data_out <= PC[15:8];
                         rw <= 0;
                         SP <= SP - 1;
+                        PC <= PC;
                     end
                     
                     // RTS
@@ -1002,6 +1070,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                         SP <= SP + 1;
                         addr <= {8'h01, SP + 1};
                         rw <= 1;
+                        PC <= PC;
                     end
                     
                     // BRK
@@ -1011,6 +1080,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                         rw <= 0;
                         SP <= SP - 1;
                         B <= 1;
+                        PC <= PC;
                     end
                     
                     // RTI
@@ -1018,57 +1088,82 @@ always_ff @(posedge clk or negedge rst_n) begin
                         SP <= SP + 1;
                         addr <= {8'h01, SP + 1};
                         rw <= 1;
+                        PC <= PC;
                     end
                     
                     // BEQ
-                    8'hF0: if (Z) PC <= PC + {{8{operand[7]}}, operand};
+                    8'hF0: begin
+                        if (Z) PC <= PC + 1 + {{8{data_in[7]}}, data_in};
+                        else PC <= PC + 1;
+                    end
                     
                     // BNE
-                    8'hD0: if (!Z) PC <= PC + {{8{operand[7]}}, operand};
+                    8'hD0: begin
+                        if (!Z) PC <= PC + 1 + {{8{data_in[7]}}, data_in};
+                        else PC <= PC + 1;
+                    end
                     
                     // BCS
-                    8'hB0: if (C) PC <= PC + {{8{operand[7]}}, operand};
+                    8'hB0: begin
+                        if (C) PC <= PC + 1 + {{8{data_in[7]}}, data_in};
+                        else PC <= PC + 1;
+                    end
                     
                     // BCC
-                    8'h90: if (!C) PC <= PC + {{8{operand[7]}}, operand};
+                    8'h90: begin
+                        if (!C) PC <= PC + 1 + {{8{data_in[7]}}, data_in};
+                        else PC <= PC + 1;
+                    end
                     
                     // BMI
-                    8'h30: if (N) PC <= PC + {{8{operand[7]}}, operand};
+                    8'h30: begin
+                        if (N) PC <= PC + 1 + {{8{data_in[7]}}, data_in};
+                        else PC <= PC + 1;
+                    end
                     
                     // BPL
-                    8'h10: if (!N) PC <= PC + {{8{operand[7]}}, operand};
+                    8'h10: begin
+                        if (!N) PC <= PC + 1 + {{8{data_in[7]}}, data_in};
+                        else PC <= PC + 1;
+                    end
                     
                     // BVS
-                    8'h70: if (V) PC <= PC + {{8{operand[7]}}, operand};
+                    8'h70: begin
+                        if (V) PC <= PC + 1 + {{8{data_in[7]}}, data_in};
+                        else PC <= PC + 1;
+                    end
                     
                     // BVC
-                    8'h50: if (!V) PC <= PC + {{8{operand[7]}}, operand};
+                    8'h50: begin
+                        if (!V) PC <= PC + 1 + {{8{data_in[7]}}, data_in};
+                        else PC <= PC + 1;
+                    end
                     
                     // CLC
-                    8'h18: C <= 0;
+                    8'h18: begin C <= 0; PC <= PC; end
                     
                     // SEC
-                    8'h38: C <= 1;
+                    8'h38: begin C <= 1; PC <= PC; end
                     
                     // CLI
-                    8'h58: I <= 0;
+                    8'h58: begin I <= 0; PC <= PC; end
                     
                     // SEI
-                    8'h78: I <= 1;
+                    8'h78: begin I <= 1; PC <= PC; end
                     
                     // CLD
-                    8'hD8: D <= 0;
+                    8'hD8: begin D <= 0; PC <= PC; end
                     
                     // SED
-                    8'hF8: D <= 1;
+                    8'hF8: begin D <= 1; PC <= PC; end
                     
                     // CLV
-                    8'hB8: V <= 0;
+                    8'hB8: begin V <= 0; PC <= PC; end
                     
                     // NOP
-                    8'hEA: begin end
+                    8'hEA: begin PC <= PC; end
                     
-                    default: begin end
+                    default: begin PC <= PC; end
                 endcase
             end
             
@@ -1186,8 +1281,8 @@ always_ff @(posedge clk or negedge rst_n) begin
                              opcode == 8'h86 || opcode == 8'h84 ||
                              opcode == 8'h95 || opcode == 8'h9D ||
                              opcode == 8'h96 || opcode == 8'h94) begin
-                    // Store operations - keep rw=0 for one more cycle
-                    rw <= 1;  // Will be set to 1 next cycle
+                    // Store operations - keep rw=0 (don't change it!)
+                    // rw will be reset to 1 in WRITEBACK state
                 end
             end
             

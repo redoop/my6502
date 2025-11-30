@@ -1,0 +1,30 @@
+# Makefile for PPU tests
+
+VERILATOR = verilator
+VERILATOR_FLAGS = --cc --exe --build --timing --trace -Wno-fatal
+
+RTL_DIR = ../../../src/main/rtl
+TEST_DIR = .
+SRC = $(RTL_DIR)/nes_system.sv
+TEST = $(TEST_DIR)/ppu_test.sv
+CPP_MAIN = $(TEST_DIR)/ppu_test_main.cpp
+
+BUILD_DIR = obj_dir_ppu
+EXEC = $(BUILD_DIR)/Vppu_test
+
+.PHONY: all test clean
+
+all: test
+
+test: $(EXEC)
+	@echo "Running PPU tests..."
+	@./$(EXEC)
+
+$(EXEC): $(SRC) $(TEST) $(CPP_MAIN)
+	$(VERILATOR) $(VERILATOR_FLAGS) \
+		--Mdir $(BUILD_DIR) \
+		--top-module ppu_test \
+		$(SRC) $(TEST) $(CPP_MAIN)
+
+clean:
+	rm -rf $(BUILD_DIR) *.vcd

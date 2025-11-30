@@ -1,0 +1,30 @@
+# Makefile for NES system unit tests
+
+VERILATOR = verilator
+VERILATOR_FLAGS = --cc --exe --build --timing -Wno-fatal
+
+RTL_DIR = ../../../src/main/rtl
+TEST_DIR = .
+SRC = $(RTL_DIR)/nes_system.sv
+TEST = $(TEST_DIR)/nes_unit_test.sv
+CPP_MAIN = $(TEST_DIR)/nes_test_main.cpp
+
+BUILD_DIR = obj_dir_nes
+EXEC = $(BUILD_DIR)/Vnes_unit_test
+
+.PHONY: all test clean
+
+all: test
+
+test: $(EXEC)
+	@echo "Running NES unit tests..."
+	@./$(EXEC)
+
+$(EXEC): $(SRC) $(TEST) $(CPP_MAIN)
+	$(VERILATOR) $(VERILATOR_FLAGS) \
+		--Mdir $(BUILD_DIR) \
+		--top-module nes_unit_test \
+		$(SRC) $(TEST) $(CPP_MAIN)
+
+clean:
+	rm -rf $(BUILD_DIR) *.vcd
