@@ -51,7 +51,7 @@ always_ff @(posedge clk or negedge rst_n) begin
     else clk_div <= clk_div + 1;
 end
 
-assign cpu_clk = clk_div[3];  // ÷12 = 1.79 MHz
+assign cpu_clk = clk_div[2];  // ÷8 = 2.68 MHz (faster for testing)
 assign ppu_clk = clk_div[1];  // ÷4 = 5.37 MHz
 
 // Debug signal assignments
@@ -340,20 +340,33 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
     end
 end
 
+logic [7:0] vblank_hold_counter;
+
 always_ff @(posedge cpu_clk or negedge rst_n) begin
     if (!rst_n) begin
-        ppustatus <= 0;
+        ppustatus <= 8'h80;  // Start with VBlank set
         ppustatus_read_last <= 0;
+        vblank_hold_counter <= 255;  // Hold initially
     end else begin
-        // VBlank flag clear - delayed by one cycle after read
-        if (ppustatus_read_last && !vblank_sync2) begin
-            ppustatus[7] <= 0;
-            ppuaddr_latch <= 0;
+        // VBlank flag set - hold for multiple cycles
+        if (vblank_sync2 && !ppustatus[7]) begin
+            ppustatus[7] <= 1;
+            vblank_hold_counter <= 200;  // Hold for 200 CPU cycles
+            $display("[VBLANK] SET - holding for 200 cycles");
         end
         
-        // VBlank flag set (from synchronized PPU signal) - higher priority
-        if (vblank_sync2) begin
-            ppustatus[7] <= 1;
+        // Decrement counter
+        if (vblank_hold_counter > 0) begin
+            vblank_hold_counter <= vblank_hold_counter - 1;
+            if (vblank_hold_counter == 1) begin
+                $display("[VBLANK] Hold expired");
+            end
+        end
+        
+        // VBlank flag clear - only after hold expires
+        if (ppustatus_read_last && vblank_hold_counter == 0) begin
+            ppustatus[7] <= 0;
+            ppuaddr_latch <= 0;
         end
         
         // Track if $2002 was read this cycle
