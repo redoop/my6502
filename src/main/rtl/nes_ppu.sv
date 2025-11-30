@@ -36,6 +36,7 @@ module nes_ppu (
 // Timing
 logic [8:0] scanline;
 logic [8:0] dot;
+logic ppu_initialized = 0;
 
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -43,22 +44,33 @@ always_ff @(posedge clk or negedge rst_n) begin
         dot <= 0;
         vblank <= 0;
         sprite0_hit <= 0;
+        ppu_initialized <= 0;
     end else begin
+        if (!ppu_initialized) begin
+            $display("[PPU] First clock cycle");
+            ppu_initialized <= 1;
+        end
+        
         if (dot == 340) begin
             dot <= 0;
-            if (scanline == 261) scanline <= 0;
-            else scanline <= scanline + 1;
+            if (scanline == 261) begin
+                scanline <= 0;
+                $display("[PPU] Frame complete, reset to scanline 0");
+            end else begin
+                scanline <= scanline + 1;
+            end
         end else begin
             dot <= dot + 1;
         end
         
         if (scanline == 241 && dot == 1) begin
             vblank <= 1;
-            $display("[PPU] VBlank START at frame cycle");
+            $display("[PPU] VBlank START at scanline=%d dot=%d", scanline, dot);
         end
         
         if (scanline == 261 && dot == 1) begin
             vblank <= 0;
+            $display("[PPU] VBlank END at scanline=%d dot=%d", scanline, dot);
         end
         
         // Force rendering enabled for testing
@@ -70,30 +82,15 @@ assign video_hsync = (dot >= 280 && dot < 304);
 assign video_vsync = (scanline >= 243 && scanline < 246);
 assign video_de = (scanline < 240) && (dot < 256);
 
-// Pattern cache - load during rendering
-logic [7:0] pattern_lo_reg, pattern_hi_reg;
-logic [7:0] next_pattern_lo, next_pattern_hi;
+// Pattern cache - use direct CHR ROM access
+logic [7:0] pattern_lo_data;
+logic [7:0] pattern_hi_data;
 
-initial begin
-    pattern_lo_reg = 8'hAA; // Test pattern
-    pattern_hi_reg = 8'h55;
-end
-
+// Store last fetched data
 always_ff @(posedge clk) begin
-    if (scanline < 240 && dot < 256) begin
-        // Load pattern data at specific dots
-        if (dot[2:0] == 3'd1) begin
-            next_pattern_lo <= chr_rom_data;
-        end else if (dot[2:0] == 3'd3) begin
-            next_pattern_hi <= chr_rom_data;
-        end
-        
-        // Shift to next tile every 8 pixels
-        if (dot[2:0] == 3'd7) begin
-            pattern_lo_reg <= next_pattern_lo;
-            pattern_hi_reg <= next_pattern_hi;
-        end
-    end
+    // Always capture CHR ROM data
+    pattern_lo_data <= chr_rom_data;
+    pattern_hi_data <= chr_rom_data;
 end
 
 // Sprite rendering
@@ -178,7 +175,7 @@ always_comb begin
                        {ppuctrl[4], tile_index, 1'b0, scroll_y[2:0]};
         
         // Simplified pixel extraction for debugging
-        pixel_value = {pattern_hi_reg[7-dot[2:0]], pattern_lo_reg[7-dot[2:0]]};
+        pixel_value = {pattern_hi_data[7-dot[2:0]], pattern_lo_data[7-dot[2:0]]};
         
         bg_palette_idx = pixel_value == 0 ? 5'h00 : {1'b0, attr_bits, pixel_value};
     end else begin
@@ -238,10 +235,16 @@ end
 // Video output
 always_comb begin
     if (scanline < 240 && dot < 256) begin
-        // Debug: show pattern registers directly
-        video_r = pattern_lo_reg;
-        video_g = pattern_hi_reg;
-        video_b = 8'h00;
+        // Checkerboard pattern
+        if ((scanline[3] ^ dot[3]) == 1'b1) begin
+            video_r = 8'hFF;
+            video_g = 8'hFF;
+            video_b = 8'hFF;
+        end else begin
+            video_r = 8'h00;
+            video_g = 8'h00;
+            video_b = 8'h00;
+        end
     end else begin
         video_r = 8'h00;
         video_g = 8'h00;

@@ -1,7 +1,9 @@
 // NES System - Top Level Integration
 // Modular SystemVerilog implementation
 
-module nes_system (
+module nes_system #(
+    parameter MAPPER = 0  // 0=NROM, 4=MMC3
+) (
     input  logic        clk,
     input  logic        rst_n,
     
@@ -23,9 +25,9 @@ module nes_system (
     
     // Cartridge interface
     input  logic [7:0]  prg_rom_data,
-    output logic [14:0] prg_rom_addr,
+    output logic [17:0] prg_rom_addr,
     input  logic [7:0]  chr_rom_data,
-    output logic [13:0] chr_rom_addr,
+    output logic [17:0] chr_rom_addr,
     
     // Debug outputs
     output logic [15:0] vram_write_count,
@@ -116,6 +118,10 @@ logic        ppuaddr_latch;
 logic [7:0]  ppudata_buffer;
 logic        vblank, sprite0_hit, rendering;
 
+// Mapper signals
+logic [13:0] ppu_chr_addr;  // PPU's 14-bit address
+logic        mapper_write;
+
 // PPU Module
 nes_ppu ppu (
     .clk(ppu_clk),
@@ -129,7 +135,7 @@ nes_ppu ppu (
     .oam(oam),
     .palette(palette),
     .chr_rom_data(chr_rom_data),
-    .chr_rom_addr(chr_rom_addr),
+    .chr_rom_addr(ppu_chr_addr),
     .video_r(video_r),
     .video_g(video_g),
     .video_b(video_b),
@@ -327,16 +333,18 @@ end
 // PPUSTATUS Management
 //=============================================================================
 // Double-flop synchronizer for vblank (ppu_clk -> cpu_clk)
-logic vblank_sync1, vblank_sync2;
+logic vblank_sync1, vblank_sync2, vblank_sync3;
 logic ppustatus_read_last;  // Track if $2002 was read last cycle
 
 always_ff @(posedge cpu_clk or negedge rst_n) begin
     if (!rst_n) begin
         vblank_sync1 <= 0;
         vblank_sync2 <= 0;
+        vblank_sync3 <= 0;
     end else begin
         vblank_sync1 <= vblank;
         vblank_sync2 <= vblank_sync1;
+        vblank_sync3 <= vblank_sync2;
     end
 end
 
@@ -348,8 +356,8 @@ always_ff @(posedge cpu_clk or negedge rst_n) begin
         ppustatus_read_last <= 0;
         vblank_hold_counter <= 255;  // Hold initially
     end else begin
-        // VBlank flag set - hold for multiple cycles
-        if (vblank_sync2 && !ppustatus[7]) begin
+        // VBlank flag set on rising edge
+        if (vblank_sync2 && !vblank_sync3) begin
             ppustatus[7] <= 1;
             vblank_hold_counter <= 200;  // Hold for 200 CPU cycles
             $display("[VBLANK] SET - holding for 200 cycles");
@@ -406,16 +414,33 @@ always_ff @(posedge ppu_clk) begin
 end
 
 //=============================================================================
-// Cartridge Interface (Mapper 0 - NROM)
+// Cartridge Mapper
 //=============================================================================
-always_comb begin
-    if (cpu_addr >= 16'h8000) begin
-        // NROM: 16KB ROM mirrors to both $8000-$BFFF and $C000-$FFFF
-        // Use only lower 14 bits to support 16KB mirroring
-        prg_rom_addr = {1'b0, cpu_addr[13:0]};
-    end else begin
-        prg_rom_addr = 15'h0000;
+assign mapper_write = !cpu_rw && (cpu_addr >= 16'h8000);
+
+generate
+    if (MAPPER == 4) begin : gen_mmc3
+        mapper_mmc3 mapper (
+            .clk(cpu_clk),
+            .rst_n(rst_n),
+            .cpu_addr(cpu_addr),
+            .cpu_data(cpu_data_out),
+            .cpu_write(mapper_write),
+            .prg_rom_addr(prg_rom_addr),
+            .ppu_addr(ppu_chr_addr),
+            .chr_rom_addr(chr_rom_addr)
+        );
+    end else begin : gen_nrom
+        // NROM (Mapper 0): simple address passthrough
+        always_comb begin
+            if (cpu_addr >= 16'h8000) begin
+                prg_rom_addr = {4'b0, cpu_addr[13:0]};
+            end else begin
+                prg_rom_addr = 18'h00000;
+            end
+            chr_rom_addr = {4'b0, ppu_chr_addr};
+        end
     end
-end
+endgenerate
 
 endmodule

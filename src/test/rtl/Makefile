@@ -5,30 +5,45 @@ GAMES_DIR = ../../../games
 
 .PHONY: all clean run_mario run_nestest
 
-all: runner
+all: runner_nrom runner_mmc3
 
-runner: nes_runner.cpp
-	@echo "Building NES runner..."
+runner_nrom: nes_runner.cpp
+	@echo "Building NES runner (NROM)..."
 	$(VERILATOR) $(VFLAGS) --top-module nes_system \
-		--Mdir obj_dir --build \
+		-GMAPPER=0 \
+		--Mdir obj_dir_nrom --build \
 		nes_runner.cpp \
 		$(RTL_DIR)/nes_system.sv \
 		$(RTL_DIR)/cpu_6502.sv \
 		$(RTL_DIR)/nes_ppu.sv \
 		$(RTL_DIR)/nes_apu.sv \
 		$(RTL_DIR)/nes_dma.sv
-	@echo "Runner built successfully"
+	@echo "NROM runner built successfully"
 
-run_mario: runner
+runner_mmc3: nes_runner.cpp
+	@echo "Building NES runner (MMC3)..."
+	$(VERILATOR) $(VFLAGS) --top-module nes_system \
+		-GMAPPER=4 \
+		--Mdir obj_dir_mmc3 --build \
+		nes_runner.cpp \
+		$(RTL_DIR)/nes_system.sv \
+		$(RTL_DIR)/cpu_6502.sv \
+		$(RTL_DIR)/nes_ppu.sv \
+		$(RTL_DIR)/nes_apu.sv \
+		$(RTL_DIR)/nes_dma.sv \
+		$(RTL_DIR)/mapper_mmc3.sv
+	@echo "MMC3 runner built successfully"
+
+run_mario: runner_mmc3
 	@echo "Running Super Mario Bros..."
-	./obj_dir/Vnes_system $(GAMES_DIR)/Super-Mario-Bros.nes
+	./obj_dir_mmc3/Vnes_system $(GAMES_DIR)/Super-Mario-Bros.nes
 
-run_nestest: runner
+run_nestest: runner_nrom
 	@echo "Running nestest..."
-	./obj_dir/Vnes_system $(GAMES_DIR)/nestest.nes
+	./obj_dir_nrom/Vnes_system $(GAMES_DIR)/nestest.nes
 
 clean:
-	rm -rf obj_dir
+	rm -rf obj_dir obj_dir_nrom obj_dir_mmc3
 
 render: nes_render.cpp
 	@echo "Building NES renderer..."
