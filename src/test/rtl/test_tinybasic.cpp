@@ -14,9 +14,9 @@ int main() {
     cpu = new Vcpu_6502;
     memset(mem, 0, sizeof(mem));
     
-    FILE* f = fopen("basic/mini_basic.bin", "rb");
+    FILE* f = fopen("basic/tinybasic_my6502.bin", "rb");
     if (!f) {
-        printf("Can't open mini_basic.bin\n");
+        printf("Can't open tinybasic_my6502.bin\n");
         return 1;
     }
     
@@ -28,11 +28,13 @@ int main() {
     fread(buf, 1, size, f);
     fclose(f);
     
-    memcpy(&mem[0x0300], buf, size - 2);
+    // Load at 0x0200
+    memcpy(&mem[0x0200], buf, size - 2);
+    // Reset vector
     mem[0xFFFC] = buf[size-2];
     mem[0xFFFD] = buf[size-1];
     
-    printf("Testing mini_basic (mini2.bin)\n\n");
+    printf("Testing Tiny BASIC for my6502\n\n");
     
     cpu->rst_n = 0; cpu->nmi = 0; cpu->irq = 1;
     for (int i = 0; i < 10; i++) tick();
@@ -43,7 +45,7 @@ int main() {
     uint8_t last_output = 0;
     bool output_written = false;
     
-    for (int cycle = 0; cycle < 10000; cycle++) {
+    for (int cycle = 0; cycle < 50000; cycle++) {
         uint16_t addr = cpu->addr;
         
         if (cpu->rw) {
@@ -65,7 +67,7 @@ int main() {
         
         tick();
         
-        if (output_len > 20) break;
+        if (output_len > 50) break;
     }
     
     output[output_len] = '\0';

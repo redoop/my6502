@@ -10,13 +10,18 @@ vluint64_t main_time = 0;
 double sc_time_stamp() { return main_time; }
 void tick() { cpu->clk = 0; cpu->eval(); main_time++; cpu->clk = 1; cpu->eval(); main_time++; }
 
-int main() {
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        printf("Usage: %s <bin_file>\n", argv[0]);
+        return 1;
+    }
+    
     cpu = new Vcpu_6502;
     memset(mem, 0, sizeof(mem));
     
-    FILE* f = fopen("basic/mini_basic.bin", "rb");
+    FILE* f = fopen(argv[1], "rb");
     if (!f) {
-        printf("Can't open mini_basic.bin\n");
+        printf("Can't open %s\n", argv[1]);
         return 1;
     }
     
@@ -28,20 +33,18 @@ int main() {
     fread(buf, 1, size, f);
     fclose(f);
     
-    memcpy(&mem[0x0300], buf, size - 2);
+    memcpy(&mem[0x0200], buf, size - 2);
     mem[0xFFFC] = buf[size-2];
     mem[0xFFFD] = buf[size-1];
     
-    printf("Testing mini_basic (mini2.bin)\n\n");
+    printf("Running %s\n\n", argv[1]);
     
     cpu->rst_n = 0; cpu->nmi = 0; cpu->irq = 1;
     for (int i = 0; i < 10; i++) tick();
     cpu->rst_n = 1;
     
-    char output[1024];
-    int output_len = 0;
-    uint8_t last_output = 0;
-    bool output_written = false;
+    uint8_t last_out = 0;
+    bool out_written = false;
     
     for (int cycle = 0; cycle < 10000; cycle++) {
         uint16_t addr = cpu->addr;
@@ -50,27 +53,22 @@ int main() {
             cpu->data_in = mem[addr];
         } else {
             mem[addr] = cpu->data_out;
-            if (addr == 0xF000 && output_len < 1023) {
-                if (!output_written || cpu->data_out != last_output) {
-                    output[output_len++] = cpu->data_out;
+            if (addr == 0xF000) {
+                if (!out_written || cpu->data_out != last_out) {
                     printf("%c", cpu->data_out);
                     fflush(stdout);
-                    last_output = cpu->data_out;
-                    output_written = true;
+                    last_out = cpu->data_out;
+                    out_written = true;
                 }
             } else if (addr != 0xF000) {
-                output_written = false;
+                out_written = false;
             }
         }
         
         tick();
-        
-        if (output_len > 20) break;
     }
     
-    output[output_len] = '\0';
-    printf("\n\nOutput: %s\n", output);
-    
+    printf("\n");
     delete cpu;
     return 0;
 }

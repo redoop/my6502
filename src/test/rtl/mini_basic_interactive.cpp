@@ -2,13 +2,43 @@
 #include "Vcpu_6502.h"
 #include <cstdio>
 #include <cstring>
+#include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 uint8_t mem[65536];
 Vcpu_6502* cpu;
 vluint64_t main_time = 0;
+uint8_t input_buffer = 0;
+bool input_ready = false;
 
 double sc_time_stamp() { return main_time; }
 void tick() { cpu->clk = 0; cpu->eval(); main_time++; cpu->clk = 1; cpu->eval(); main_time++; }
+
+void set_nonblocking(bool enable) {
+    static struct termios oldt, newt;
+    if (enable) {
+        tcgetattr(STDIN_FILENO, &oldt);
+        newt = oldt;
+        newt.c_lflag &= ~(ICANON | ECHO);
+        tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+        fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
+    } else {
+        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+        fcntl(STDIN_FILENO, F_SETFL, 0);
+    }
+}
+
+bool check_input() {
+    if (input_ready) return true;
+    char c;
+    if (read(STDIN_FILENO, &c, 1) == 1) {
+        input_buffer = c;
+        input_ready = true;
+        return true;
+    }
+    return false;
+}
 
 int main() {
     cpu = new Vcpu_6502;
@@ -32,27 +62,41 @@ int main() {
     mem[0xFFFC] = buf[size-2];
     mem[0xFFFD] = buf[size-1];
     
-    printf("Testing mini_basic (mini2.bin)\n\n");
+    printf("\n=================================\n");
+    printf("   Mini BASIC Interactive\n");
+    printf("=================================\n");
+    printf("Commands:\n");
+    printf("  PRINT \"text\"  - Display text\n");
+    printf("  Ctrl+C        - Exit\n");
+    printf("=================================\n\n");
+    
+    set_nonblocking(true);
     
     cpu->rst_n = 0; cpu->nmi = 0; cpu->irq = 1;
     for (int i = 0; i < 10; i++) tick();
     cpu->rst_n = 1;
     
-    char output[1024];
-    int output_len = 0;
     uint8_t last_output = 0;
     bool output_written = false;
     
-    for (int cycle = 0; cycle < 10000; cycle++) {
+    for (int cycle = 0; cycle < 10000000; cycle++) {
         uint16_t addr = cpu->addr;
         
         if (cpu->rw) {
-            cpu->data_in = mem[addr];
+            if (addr == 0xF001) {
+                if (check_input()) {
+                    cpu->data_in = input_buffer;
+                    input_ready = false;
+                } else {
+                    cpu->data_in = 0;
+                }
+            } else {
+                cpu->data_in = mem[addr];
+            }
         } else {
             mem[addr] = cpu->data_out;
-            if (addr == 0xF000 && output_len < 1023) {
+            if (addr == 0xF000) {
                 if (!output_written || cpu->data_out != last_output) {
-                    output[output_len++] = cpu->data_out;
                     printf("%c", cpu->data_out);
                     fflush(stdout);
                     last_output = cpu->data_out;
@@ -64,13 +108,9 @@ int main() {
         }
         
         tick();
-        
-        if (output_len > 20) break;
     }
     
-    output[output_len] = '\0';
-    printf("\n\nOutput: %s\n", output);
-    
+    set_nonblocking(false);
     delete cpu;
     return 0;
 }
