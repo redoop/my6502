@@ -46,6 +46,8 @@ int main(int argc, char** argv) {
     char output[256];
     int output_len = 0;
     uint16_t last_pc = 0xFFFF;
+    uint8_t last_output = 0;
+    bool output_written = false;
     
     for (int cycle = 0; cycle < 100000; cycle++) {
         uint16_t addr = cpu->addr;
@@ -63,9 +65,15 @@ int main(int argc, char** argv) {
         } else {
             mem[addr] = cpu->data_out;
             if (addr == 0xF000 && output_len < 255) {
-                output[output_len++] = cpu->data_out;
-                printf("%c", cpu->data_out);
-                fflush(stdout);
+                if (!output_written || cpu->data_out != last_output) {
+                    output[output_len++] = cpu->data_out;
+                    printf("%c", cpu->data_out);
+                    fflush(stdout);
+                    last_output = cpu->data_out;
+                    output_written = true;
+                }
+            } else if (addr != 0xF000) {
+                output_written = false;
             }
         }
         

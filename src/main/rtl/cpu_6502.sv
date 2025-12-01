@@ -446,10 +446,10 @@ always_ff @(posedge clk or negedge rst_n) begin
                     8'h9A: begin SP <= X; end
                     
                     // PHA
-                    8'h48: begin addr <= {8'h01, SP}; data_out <= A; rw <= 0; SP <= SP - 1; end
+                    8'h48: begin addr <= {8'h01, SP}; data_out <= A; rw <= 0; SP <= SP - 1; PC <= PC + 1; end
                     
                     // PLA
-                    8'h68: begin SP <= SP + 1; addr <= {8'h01, SP + 1}; rw <= 1; end
+                    8'h68: begin SP <= SP + 1; addr <= {8'h01, SP + 1}; rw <= 1; PC <= PC + 1; end
                     
                     // PHP
                     8'h08: begin
@@ -457,15 +457,16 @@ always_ff @(posedge clk or negedge rst_n) begin
                         data_out <= {N, V, 1'b1, B, D, I, Z, C};
                         rw <= 0;
                         SP <= SP - 1;
+                        PC <= PC + 1;
                     end
                     
                     // PLP
-                    8'h28: begin SP <= SP + 1; addr <= {8'h01, SP + 1}; rw <= 1; end
+                    8'h28: begin SP <= SP + 1; addr <= {8'h01, SP + 1}; rw <= 1; PC <= PC + 1; end
                     
                     // JMP
-                    8'h4C: begin PC <= {data_in, operand}; end  // JMP abs
+                    8'h4C: begin addr <= PC + 1; rw <= 1; PC <= PC + 1; cycle_count <= 1; end  // JMP abs
                     8'h6C: begin 
-                        addr <= {data_in, operand}; 
+                        addr <= PC + 1; 
                         rw <= 1; 
                         PC <= PC + 1;
                         cycle_count <= 1;  // Start multi-cycle JMP indirect
@@ -473,20 +474,20 @@ always_ff @(posedge clk or negedge rst_n) begin
                     
                     // JSR
                     8'h20: begin
-                        addr <= {8'h01, SP};
-                        data_out <= PC[15:8];
-                        rw <= 0;
-                        SP <= SP - 1;
-                        PC <= PC;
+                        addr <= PC + 1;
+                        rw <= 1;
+                        PC <= PC + 1;
                         cycle_count <= 1;  // Start multi-cycle JSR
                     end
                     
                     // RTS
                     8'h60: begin
+                        $display("[RTS] EXECUTE: SP=%02X, SP+1=%02X", SP, SP + 8'd1);
+                        $display("[RTS] EXECUTE: Setting addr to {8'h01, %02X} = %04X", SP + 8'd1, {8'h01, SP + 8'd1});
                         SP <= SP + 1;
-                        addr <= {8'h01, SP + 1};
+                        addr <= {8'h01, SP + 8'd1};
                         rw <= 1;
-                        PC <= PC;
+                        PC <= PC + 1;
                         cycle_count <= 1;  // Start multi-cycle RTS
                     end
                     
@@ -588,43 +589,59 @@ always_ff @(posedge clk or negedge rst_n) begin
                 // JSR - multi-cycle handling
                 if (opcode == 8'h20) begin
                     case (cycle_count)
-                        1: begin  // Push PC low byte
+                        1: begin  // Push PCH first
                             addr <= {8'h01, SP};
-                            data_out <= PC[7:0];
+                            data_out <= PC[15:8];
+                            $display("[JSR] cycle 1: Push PCH=%02X to SP=%02X, PC=%04X", PC[15:8], SP, PC);
                             rw <= 0;
                             SP <= SP - 1;
                             cycle_count <= 2;
                         end
-                        2: begin  // Read target address high byte
-                            addr <= PC;
-                            rw <= 1;
+                        2: begin  // Push PCL
+                            addr <= {8'h01, SP};
+                            data_out <= PC[7:0];
+                            $display("[JSR] cycle 2: Push PCL=%02X to SP=%02X", PC[7:0], SP);
+                            rw <= 0;
+                            SP <= SP - 1;
                             cycle_count <= 0;
                         end
                     endcase
                 // RTS - multi-cycle handling
                 end else if (opcode == 8'h60) begin
                     case (cycle_count)
-                        1: begin  // Read PC low byte from stack
+                        1: begin  // Read PCL from stack
                             operand <= data_in;
+                            $display("[RTS] cycle 1: data_in=%02X (PCL), SP=%02X, addr=%04X", data_in, SP, addr);
                             SP <= SP + 1;
-                            addr <= {8'h01, SP + 1};
+                            addr <= {8'h01, (SP + 8'd1)};
                             rw <= 1;
                             cycle_count <= 2;
                         end
-                        2: begin  // Read PC high byte from stack
+                        2: begin  // Read PCH from stack
+                            $display("[RTS] cycle 2: data_in=%02X (PCH), operand=%02X, addr=%04X", data_in, operand, addr);
                             cycle_count <= 0;
                         end
                     endcase
                 // JMP indirect - multi-cycle handling
                 end else if (opcode == 8'h6C) begin
                     case (cycle_count)
-                        1: begin  // Read low byte of target address
+                        1: begin  // Read high byte of indirect address
+                            addr <= {data_in, operand};
+                            rw <= 1;
+                            cycle_count <= 2;
+                        end
+                        2: begin  // Read low byte of target address
                             operand <= data_in;
                             addr <= addr + 1;
                             rw <= 1;
                             cycle_count <= 0;
                         end
                     endcase
+                // JMP absolute - read high byte
+                end else if (opcode == 8'h4C && cycle_count == 1) begin
+                    // data_in has high byte, operand has low byte
+                    cycle_count <= 0;
+                    rw <= 1;
                 // LDA/STA absolute addressing - read high byte
                 end else if ((opcode == 8'hAD || opcode == 8'hBD || opcode == 8'hB9 || 
                      opcode == 8'h8D || opcode == 8'h9D || opcode == 8'h99 ||
@@ -702,7 +719,7 @@ always_ff @(posedge clk or negedge rst_n) begin
                     N <= data_in[7];
                     rw <= 1;
                 end else if (opcode == 8'h28) begin
-                    {N, V, B, D, I, Z, C} <= {data_in[7:6], data_in[4:0]};
+                    {N, V, D, I, Z, C} <= {data_in[7:6], data_in[3:0]};
                     rw <= 1;
                 end else if (opcode == 8'h48 || opcode == 8'h08) begin
                     // PHA/PHP - write completes this cycle, prepare for next instruction
@@ -884,9 +901,14 @@ always_ff @(posedge clk or negedge rst_n) begin
             
             WRITEBACK: begin
                 if (opcode == 8'h20) begin  // JSR - complete jump
+                    $display("[JSR] WRITEBACK: Jump to %04X (data_in=%02X, operand=%02X)", {data_in, operand}, data_in, operand);
                     PC <= {data_in, operand};
                 end else if (opcode == 8'h60) begin  // RTS - complete return
-                    PC <= {data_in, operand} + 1;  // RTS returns to next instruction
+                    $display("[RTS] WRITEBACK: Return to %04X+1 (data_in=%02X, operand=%02X)", {data_in, operand}, data_in, operand);
+                    PC <= {data_in, operand} + 1;  // RTS returns to saved address + 1
+                end else if (opcode == 8'h4C) begin  // JMP abs - complete jump
+                    $display("[JMP] WRITEBACK: Jump to %04X (data_in=%02X, operand=%02X)", {data_in, operand}, data_in, operand);
+                    PC <= {data_in, operand};
                 end else if (opcode == 8'h6C) begin  // JMP indirect - complete jump
                     PC <= {data_in, operand};
                 end
@@ -954,6 +976,7 @@ always_comb begin
         EXECUTE: begin
             if (opcode == 8'h20 ||  // JSR
                 opcode == 8'h60 ||  // RTS
+                opcode == 8'h4C ||  // JMP abs
                 opcode == 8'h6C ||  // JMP indirect
                 opcode == 8'h68 ||  // PLA
                 opcode == 8'h28 ||  // PLP
