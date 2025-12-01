@@ -1,14 +1,12 @@
 ; Phase 2 Test 1: Cold Start Vector
-; Test cold start vector jump
 
 OUTCH = $F000
 
-*= $0200
+*= $0300
 
 START:
         JMP CV
 
-; Vector table
 CV:     JMP COLD_S
 WV:     JMP WARM_S
 

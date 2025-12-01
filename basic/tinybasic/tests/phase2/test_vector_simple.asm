@@ -2,7 +2,7 @@
 
 OUTCH = $F000
 
-*= $0200
+*= $0300
 
 START:
         LDX #$FF
