@@ -2,23 +2,32 @@
 
 ## 运行 Tiny BASIC
 
-### 方法 1: 使用脚本（推荐）
+### 方法 1: 交互模式（推荐）✨
+```bash
+./run_tinybasic_interactive.sh
+```
+
+这会启动交互式 Tiny BASIC，可以输入命令。
+
+### 方法 2: 测试模式
 ```bash
 ./run_tinybasic.sh
 ```
 
-### 方法 2: 手动运行
+运行非交互式测试。
+
+### 方法 3: 手动运行
 ```bash
 # 1. 编译
 cd basic/tinybasic
 xa -o tinybasic_adapted.bin tinybasic_adapted.asm
 
-# 2. 运行
+# 2. 运行交互模式
 cd ../../src/test/rtl
-./obj_dir/Vcpu_6502 ../../../basic/tinybasic/tinybasic_adapted.bin
+./obj_dir_clean/Vclean ../../../basic/tinybasic/tinybasic_adapted.bin
 ```
 
-## 可用命令
+## 交互模式使用
 
 启动后会看到：
 ```
@@ -27,7 +36,7 @@ Ready
 > 
 ```
 
-### 命令列表
+### 可用命令
 
 | 命令 | 说明 | 示例 |
 |-----|------|------|

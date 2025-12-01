@@ -3,9 +3,9 @@ VERILATOR = verilator
 VFLAGS = --cc -Wall -Wno-fatal --exe
 GAMES_DIR = ../../../games
 
-.PHONY: all clean run_mario run_nestest render_smb gui_smb gui_smb_mmc1
+.PHONY: all clean run_mario run_nestest render_smb gui_smb gui_smb_mmc1 interactive
 
-all: runner_nrom runner_mmc1 runner_mmc3
+all: runner_nrom runner_mmc1 runner_mmc3 interactive
 
 runner_nrom: nes_runner.cpp
 	@echo "Building NES runner (NROM)..."
@@ -136,3 +136,12 @@ render_mario: render
 render_nestest: render
 	@echo "Rendering nestest..."
 	./obj_dir/Vnes_system $(GAMES_DIR)/nestest_mapper0.nes 60
+
+interactive: run_interactive.cpp
+	@echo "Building interactive runner..."
+	$(VERILATOR) $(VFLAGS) --top-module cpu_6502 \
+		--Mdir obj_dir_interactive --build \
+		run_interactive.cpp \
+		$(RTL_DIR)/cpu_6502.sv \
+		-o Vinteractive
+	@echo "Interactive runner built successfully"
