@@ -5,6 +5,7 @@
 #include <termios.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <signal.h>
 
 uint8_t mem[65536];
 Vcpu_6502* cpu;
@@ -13,6 +14,11 @@ vluint64_t main_time = 0;
 // Input buffer
 uint8_t input_char = 0;
 bool input_ready = false;
+volatile bool running = true;
+
+void signal_handler(int sig) {
+    running = false;
+}
 
 double sc_time_stamp() { return main_time; }
 void tick() { 
@@ -77,13 +83,15 @@ int main(int argc, char** argv) {
     printf("Type commands and press Enter\n");
     printf("Ctrl+C to exit\n\n");
     
+    signal(SIGINT, signal_handler);
+    
     // Reset
     cpu->rst_n = 0; cpu->nmi = 0; cpu->irq = 1;
     for (int i = 0; i < 10; i++) tick();
     cpu->rst_n = 1;
     
     // Main loop
-    for (int cycle = 0; cycle < 10000000; cycle++) {
+    while (running) {
         // Check for keyboard input
         if (kbhit()) {
             input_char = getchar();
@@ -118,6 +126,7 @@ int main(int argc, char** argv) {
         tick();
     }
     
+    printf("\nExiting...\n");
     delete cpu;
     return 0;
 }

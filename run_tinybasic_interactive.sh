@@ -1,8 +1,12 @@
 #!/bin/bash
 # Run Tiny BASIC in Interactive Mode
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 echo "Compiling Tiny BASIC..."
-cd basic/tinybasic
+cd "$SCRIPT_DIR/basic/tinybasic"
 xa -o tinybasic_adapted.bin tinybasic_adapted.asm
 
 if [ $? -ne 0 ]; then
@@ -25,5 +29,5 @@ echo ""
 echo "======================================"
 echo ""
 
-cd ../../src/test/rtl
-./obj_dir_clean/Vclean ../../../basic/tinybasic/tinybasic_adapted.bin
+cd "$SCRIPT_DIR/src/test/rtl"
+./obj_dir_clean/Vclean "$SCRIPT_DIR/basic/tinybasic/tinybasic_adapted.bin"
