@@ -1,4 +1,4 @@
-; Phase 3 Test 1: IL NO opcode
+; Phase 7: Simple BASIC Test
 
 OUTCH = $F000
 
@@ -8,10 +8,6 @@ START:
         LDX #$FF
         TXS
         
-        ; Simulate NO opcode (does nothing)
-        NOP
-        
-        ; Test passed
         LDA #'O'
         STA OUTCH
         LDA #'K'

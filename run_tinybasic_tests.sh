@@ -1,7 +1,7 @@
 #!/bin/bash
 # Tiny BASIC TDD Migration Test Runner
 
-PHASES=(1 2 3)
+PHASES=(1 2 3 4 5 6 7)
 PASS=0
 FAIL=0
 TOTAL=0
