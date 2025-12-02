@@ -11,29 +11,35 @@ Vcpu_6502* cpu;
 vluint64_t main_time = 0;
 uint8_t input_char = 0;
 bool input_ready = false;
+bool last_was_write_f000 = false;  // Edge detection for character output
+FILE* logfile = NULL;  // Log file for debugging
 
 double sc_time_stamp() { return main_time; }
-void tick() { 
-    cpu->clk = 0; cpu->eval(); main_time++; 
-    cpu->clk = 1; cpu->eval(); main_time++; 
+
+void tick() {
+    cpu->clk = 0; cpu->eval(); main_time++;
+    cpu->clk = 1; cpu->eval(); main_time++;
 }
 
 int kbhit() {
+    // Skip keyboard check if not running with a TTY
+    if (!isatty(STDIN_FILENO)) return 0;
+
     struct termios oldt, newt;
     int ch, oldf;
-    
+
     tcgetattr(STDIN_FILENO, &oldt);
     newt = oldt;
     newt.c_lflag &= ~(ICANON | ECHO);
     tcsetattr(STDIN_FILENO, TCSANOW, &newt);
     oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
     fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
-    
+
     ch = getchar();
-    
+
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
     fcntl(STDIN_FILENO, F_SETFL, oldf);
-    
+
     if(ch != EOF) {
         ungetc(ch, stdin);
         return 1;
@@ -49,6 +55,10 @@ int main(int argc, char** argv) {
     
     cpu = new Vcpu_6502;
     memset(mem, 0, sizeof(mem));
+
+    // Open log file for debugging
+    logfile = fopen("/tmp/tinybasic_output.log", "w");
+    if (logfile) fprintf(logfile, "Starting simulation...\n");
     
     FILE* f = fopen(argv[1], "rb");
     if (!f) {
@@ -79,10 +89,14 @@ int main(int argc, char** argv) {
             input_char = getchar();
             input_ready = true;
         }
-        
+
         uint16_t addr = cpu->addr;
-        
+
+        // Detect if current operation is a write to 0xF000
+        bool is_write_f000 = (!cpu->rw) && (addr == 0xF000);
+
         if (cpu->rw) {
+            // Read operation
             if (addr == 0xF001) {
                 cpu->data_in = input_ready ? input_char : 0;
                 if (input_ready) input_ready = false;
@@ -90,16 +104,25 @@ int main(int argc, char** argv) {
                 cpu->data_in = mem[addr];
             }
         } else {
+            // Write operation
             mem[addr] = cpu->data_out;
-            if (addr == 0xF000) {
+            // Only print on the rising edge of a write to 0xF000
+            if (is_write_f000 && !last_was_write_f000) {
                 printf("%c", cpu->data_out);
                 fflush(stdout);
+                if (logfile) {
+                    fprintf(logfile, "%c", cpu->data_out);
+                    fflush(logfile);
+                }
             }
         }
-        
+
+        last_was_write_f000 = is_write_f000;
+
         tick();
     }
     
+    if (logfile) fclose(logfile);
     delete cpu;
     return 0;
 }
