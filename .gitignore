@@ -70,3 +70,8 @@ src/test/rtl/obj_dir/
 *.bak
 *.bak2
 *.bak3
+
+# Executables in obj_dir
+obj_dir*/V*
+!obj_dir*/*.cpp
+!obj_dir*/*.h
